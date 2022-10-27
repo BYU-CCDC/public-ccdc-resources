@@ -21,6 +21,7 @@ These tools usually don't have installers or packages and can only be accessed t
 ## Threat hunting
 - [HELK](https://github.com/Cyb3rWard0g/HELK) - Threat hunting platform
 - [pe-sieve](https://github.com/hasherezade/pe-sieve) - Memory scanner
+- [Rita](https://github.com/activecm/rita) - C2 detection
 - [sandfly-processdecloak](https://github.com/sandflysecurity/sandfly-processdecloak) - Linux rootkit detection
 
 ## Vulnerability scanning
