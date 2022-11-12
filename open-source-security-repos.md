@@ -32,3 +32,7 @@ These tools usually don't have installers or packages and can only be accessed t
 - [OpenVAS](https://github.com/greenbone/openvas-scanner) - Vulnerability scanner
 - [Robber](https://github.com/MojtabaTajik/Robber) - DLL hijacking vulnerability scanner
 - [sqlmap](https://github.com/sqlmapproject/sqlmap) - SQL injection detection tool
+
+---
+
+TinyURL for this file: https://tinyurl.com/2p8zypmr
