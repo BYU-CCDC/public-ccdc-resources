@@ -92,3 +92,5 @@ Get-ScreenCapture -Wait 0 -FIleType "AutoRuns"
 invoke-expression 'cmd /c start powershell -Command { netstat; Read-Host }'
 
 explorer .
+
+# TinyURL for this file: https://tinyurl.com/54eenapr
