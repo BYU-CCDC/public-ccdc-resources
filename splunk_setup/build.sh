@@ -1,0 +1,21 @@
+#!/bin/bash
+
+spl_url="https://download.splunk.com/products/splunk/releases/9.0.4.1/linux/splunk-9.0.4.1-419ad9369127-linux-2.6-amd64.deb"
+if ! apt list | grep -q 'wget'; then 
+    echo "Error: wget not installed! Proceeding to install"
+    sudo apt update && sudo apt install -y wget
+fi
+echo "Grabbing splunk install"
+wget -O splunk.deb $spl_url
+echo "Currently Installing Splunk, please wait at least 2-3 minutes for completion"
+sudo dpkg -i ./splunk.deb
+echo "Installation should be done"
+echo "alias splunk='/opt/splunk/bin/splunk'" >> ~/.bashrc
+reset
+sleep 3
+echo "Starting up splunk. Please set name to.....you know and the password to....you know"
+sudo /opt/splunk/bin/splunk start --accept-license
+
+
+
+
