@@ -3,23 +3,22 @@ if [[ $1 == "" ]]; then
     echo "Error please provide the IP of the central splunk instance"
     exit
 fi
+echo "Script runs best when run as root. Switching to root user"
+sudo su
 sudo /opt/splunkforwarder/bin/splunk add forward-server $1:9997
 # enables logging in mysql
-if [[ -f /etc/alternatives/my.cnf ]]; then
-        sudo echo "[mysqld_safe]
-    log_error=/var/log/mysql/mysql_error.log
-
-    [mysqld]
-    log_error=/var/log/mysql/mysql_error.log" >> /etc/alternatives/my.cnf
-    echo "***** Attempting to restart mysql *******"
-    service mysql restart
-else
+path=""
+if [[ -d /etc/mysql ]]; then
+    if [[ -f /etc/alternatives/my.cnf ]]; then
+        path="/etc/alternatives/my.cnf"
+    else
+        path="/etc/mysql/my.cnf"
+    fi
     sudo echo "[mysqld_safe]
     log_error=/var/log/mysql/mysql_error.log
 
     [mysqld]
-    log_error=/var/log/mysql/mysql_error.log" >> /etc/mysql/my.cnf
-
+    log_error=/var/log/mysql/mysql_error.log" >> $path
     echo "***** Attempting to restart mysql *******"
     service mysql restart
 fi
