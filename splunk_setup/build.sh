@@ -1,6 +1,6 @@
 #!/bin/bash
-echo "Script runs best when run as root. Switching to root user"
-sudo su
+echo "Run this script as root, exit and rerun if not root user. Script will begin in 3 seconds"
+sleep 3
 spl_url="https://download.splunk.com/products/splunk/releases/9.0.4.1/linux/splunk-9.0.4.1-419ad9369127-linux-2.6-amd64.deb"
 if apt list | grep -q 'wget'; then 
     wget -O splunk.deb $spl_url

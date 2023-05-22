@@ -13,8 +13,8 @@ sparcz="https://download.splunk.com/products/universalforwarder/releases/9.0.1/s
 sparcp5p="https://download.splunk.com/products/universalforwarder/releases/9.0.1/solaris/splunkforwarder-9.0.1-82c987350fde-solaris-sparc.p5p"
 aix="https://download.splunk.com/products/universalforwarder/releases/9.0.1/aix/splunkforwarder-9.0.1-82c987350fde-AIX-powerpc.tgz"
 
-echo "Script runs best when run as root. Switching to root user"
-sudo su
+echo "Run this script as root, exit and rerun if not root user. Script will begin in 3 seconds"
+sleep 3
 echo "Performing Setup"
 # this case statement handles command line arguments
 # for example if you wanted to install a forwarder for debian you would input:

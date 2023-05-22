@@ -3,8 +3,8 @@ if [[ $1 == "" ]]; then
     echo "Error please provide the IP of the central splunk instance"
     exit
 fi
-echo "Script runs best when run as root. Switching to root user"
-sudo su
+echo "Run this script as root, exit and rerun if not root user. Script will begin in 3 seconds"
+sleep 3
 sudo /opt/splunkforwarder/bin/splunk add forward-server $1:9997
 # enables logging in mysql
 path=""
