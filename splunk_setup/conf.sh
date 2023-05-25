@@ -1,11 +1,11 @@
 #!/bin/bash
-if [[ $1 == "" ]]; then 
+if [[ $2 == "" ]]; then 
     echo "Error please provide the IP of the central splunk instance"
     exit
 fi
 echo "Run this script as root, exit and rerun if not root user. Script will begin in 3 seconds"
 sleep 3
-sudo /opt/splunkforwarder/bin/splunk add forward-server $1:9997
+sudo /opt/splunkforwarder/bin/splunk add forward-server $2:9997
 # enables logging in mysql
 path=""
 if [[ -d /etc/mysql ]]; then
@@ -20,7 +20,7 @@ if [[ -d /etc/mysql ]]; then
     [mysqld]
     log_error=/var/log/mysql/mysql_error.log" >> $path
     echo "***** Attempting to restart mysql *******"
-    service mysql restart
+    service mysql restart 
 fi
 
 # these are separated in order to use indexes in splunk which increases searchability and organization
@@ -30,8 +30,7 @@ misc=('/tmp' '/etc/passwd')
 
 for i in "${services[@]}"; do
     if [[ -f $i || -d $i ]]; then
-        sudo /opt/splunkforwarder/bin/splunk add monitor $i index="service"
-        echo "$i added as a monitored file"
+        sudo /opt/splunkforwarder/bin/splunk add monitor $i -index "service"
     else
         echo "$i does not exist"
     fi
@@ -39,8 +38,7 @@ done
 
 for i in "${logs[@]}"; do
     if [[ -f $i || -d $i ]]; then
-        sudo /opt/splunkforwarder/bin/splunk add monitor $i index="audit"
-        echo "$i added as a monitored file"
+        sudo /opt/splunkforwarder/bin/splunk add monitor $i -index "audit"
     else
         echo "$i does not exist"
     fi
@@ -48,8 +46,7 @@ done
 
 for i in "${misc[@]}"; do
     if [[ -f $i || -d $i ]]; then
-        sudo /opt/splunkforwarder/bin/splunk add monitor $i index="misc"
-        echo "$i added as a monitored file"
+        sudo /opt/splunkforwarder/bin/splunk add monitor $i -index "misc"
     else
         echo "$i does not exist"
     fi
