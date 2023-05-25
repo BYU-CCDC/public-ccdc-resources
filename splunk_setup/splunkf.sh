@@ -142,7 +142,7 @@ done
 
 for i in "${logs[@]}"; do
     if [[ -f $i || -d $i ]]; then
-        sudo /opt/splunkforwarder/bin/splunk add monitor $i -index "audit"
+        sudo /opt/splunkforwarder/bin/splunk add monitor $i -index "auth"
     else
         echo "$i does not exist"
     fi
@@ -156,4 +156,4 @@ for i in "${misc[@]}"; do
     fi
 done
 echo "****** Restarting Splunk *******"
-sudo /opt/splunkforwarder/bin/splunk restart
+sudo /opt/splunkforwarder/bin/splunk start
