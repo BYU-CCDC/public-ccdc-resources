@@ -2,6 +2,7 @@
 os=""
 lpm=""
 
+log="./harden_log.txt"
 
 function detect_os {
 if [ -f /etc/os-release ]; then
@@ -72,8 +73,12 @@ then
 
 else
     echo "The /etc/os-release file does not exist. Unable to determine the Linux distribution."
+    echo "The /etc/os-release file does not exist. Unable to determine the Linux distribution." >> $log
     exit
 fi
+
+echo $os $lpm >> $log
+
 
 }
 function backup {
@@ -87,20 +92,24 @@ function backup {
     if [ -d "$1" ]; then
         # If $1 is a directory, copy it recursively to the backup directory
         sudo cp -r "$1" "$backup_dir/"
+        echo "Made backup: $backup_dir/$1"  >> $log
     else
         # If $1 is a file, copy it to the backup directory with a .bak extension
         sudo cp "$1" "$backup_dir/$(basename "$1").bak"
+        echo "Made backup: $backup_dir/$(basename "$1").bak"  >> $log
+        
     fi
-
-    sudo chattr +i "$1" # Make file immutable
+    sudo chattr +i "$backup_dir/$(basename "$1").bak" # Make backup file/directory immutable
+    echo "Made backup: $backup_dir/$(basename "$1") immutable"  >> $log
 }
 
 function harden_ssh {
+    detect_os
     # Hardens ssh
     file_path="/etc/ssh/sshd_config"
     backup "$file_path"
-    old_lines=( '.*PermitRootLogin yes' '.*RSAAuthentication yes' '.*PubkeyAuthentication yes' '.*UsePAM yes' )
-    new_lines=( 'PermitRootLogin no' 'RSAAuthentication no' 'PubkeyAuthentication no' 'UsePAM no' )
+    old_lines=( '.*PermitRootLogin yes' '.*PermitRootLogin without-password' '.*RSAAuthentication yes' '.*PubkeyAuthentication yes' '.*UsePAM yes' )
+    new_lines=( 'PermitRootLogin no' 'PermitRootLogin no' 'RSAAuthentication no' 'PubkeyAuthentication no' 'UsePAM no' )
 
     # Replace old lines with new lines in the sshd_config file
     for index in "${!old_lines[@]}"; do
@@ -110,11 +119,8 @@ function harden_ssh {
     done
 
     # Add a line to allow a specific user (replace CCDCUser1 with your desired user)
-    sudo echo "AllowUsers CCDCUser1" >> "$file_path"
-
-    echo "RESTARTING SSH"
-    sleep 1
-
+    sudo sed -i '$a\AllowUsers CCDCUser1' "$file_path"
+    echo "*********** SSH config updated ***********"
     # Determine the operating system
     if [ "$os" == "fedora" ] || [ "$os" == "centos" ]; then
         if command -v systemctl &> /dev/null; then
@@ -129,10 +135,13 @@ function harden_ssh {
             sudo service ssh restart
         fi
     else
-        echo "************ SSH was not restarted. Restart Manually ************"
+        echo "************ SSH was not able to restart. Restart Manually ************"
         sleep 3
     fi
+    echo "************ SSH DONE ************"
 }
+
+
 
 
 function change_passwords {
@@ -151,7 +160,8 @@ function change_passwords {
 
         # done change passwd for user if user is in excluded users
         if [ "$exclude" == "false" ]; then
-            new_password=$(openssl rand -base64 12)
+            echo "Changed password for $user" >> $log
+            new_password=$(sudo openssl rand -base64 12)
             echo "$user:$new_password" | sudo chpasswd
         fi
 
@@ -162,7 +172,19 @@ function change_passwords {
 
 function remove_sudoers {
     users_to_exclude=("CCDCUser1")
-
+    backup /etc/passwd
+    # Check if the user exists
+    for username in "${users_to_exclude[@]}";
+        do
+            if id "$username" &>/dev/null; then
+                echo "excluding CCDCUser1"
+            else
+                echo "CCDCUser1 not found in sudoers. Adding user...."
+                sudo useradd CCDCUser1
+                sudo passwd CCDCUser1
+                sudo usermod -aG sudo CCDCUser1
+            fi
+    done
     # Iterate through all users in the target group
     for user in $(getent group sudo | cut -d: -f4 | tr ',' ' '); do
         # Check if the user should be excluded
@@ -178,6 +200,7 @@ function remove_sudoers {
         if [ "$exclude" == "false" ]; then
             sudo deluser $user sudo
             echo "Removed $user from sudo"
+            echo "Removed $user from sudo" >> $log
         fi
     done
 }
@@ -192,7 +215,9 @@ function print_options {
     echo "options are:
         full - full automated hardening
         ssh - ssh only harden
-        pass - change passwords of all non-system users"
+        pass - change passwords of all non-system users
+        backup '/dir1,/dir2/dir3,/dir1/file.txt' - backup directories
+        splunk - setup splunk forwarder"
 }
 function report {
     # Get server name (hostname)
@@ -204,18 +229,23 @@ function report {
     os_version=$(grep -oP 'VERSION_ID="\K[0-9.]+' <<< "$os_info")
 
     # Get list of running services (systemd-based systems)
-    services=$(systemctl list-units --type=service --state=running | awk '{print $1}')
-
-    # Print the collected information
+    if command -v systemctl &> /dev/null; then
+        echo -e "Running Services:\n$(systemctl list-units --type=service --state=running | awk '{print $1}')"
+    else
+        echo -e "Running Services:\n$(service --status-all)"
+    fi
     echo "Server Name: $server_name"
     echo "OS Type: $os_type"
     echo "OS Version: $os_version"
-    echo -e "Running Services:\n$services"
+
+    echo "************ END REPORT ************"
+
 }
 
 function setup_firewall {
+    detect_os
     # Set the IFS to a comma (,) to split the parameter
-    echo "What ports need to be allowed? (give list in a comma separated string i.e. "22,23,53" )"
+    echo "What ports need to be allowed for the firewall? (give list in a comma separated string i.e. "22,23,53" )"
     read ports
     IFS=',' read -ra values <<< "$ports"
     sudo $lpm install -y ufw
@@ -231,32 +261,35 @@ function setup_firewall {
     for value in "${values[@]}"; do
         sudo ufw allow $value
     done
+    echo "************ FIREWALL DONE ************"
 }
 
 function setup_splunk {
+    detect_os
     wget https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main/splunk_setup/splunkf.sh
     sudo chmod +x splunkf.sh
     if [ $os == "ubuntu" ]; then os="debian"; fi
     echo "what is the forward server ip?"
     read ip
     ./splunkf.sh $os "$ip:9997"
+    echo "************ SPLUNK DONE ************"
 }
 
 function full_harden {
-
     detect_os
-    echo "returned from dtect"
-    disable_users
-    echo "returned from dis"
+    echo "************ BEGIN SSH HARDENING ************"
     harden_ssh
-    echo "returned from hard"
-
+    echo "************ BEGIN FIREWALL SETUP ************"
     setup_firewall
-    echo "returned from fire"
     echo "Do you want to install a splunk forwarder? (y/n)"
     read opt
-    if [ $opt == "y" ]; then setup_splunk; fi
+    if [ $opt == "y" ]; then echo "************ BEGIN SPLUNK SETUP ************"; setup_splunk; fi
+    echo "************ BEGIN USER HARDENING ************"
+    disable_users # placed here bc if the user running the script is removed from 
+                  # the sudoers before end of execution theres a possibility the script will fail
     report
+    echo "************ REPORT CAN BE FOUND AT $log ************"
+    echo "************ END OF SCRIPT ************"
 }
 ######## MAIN ########
 
@@ -276,11 +309,22 @@ case $1 in
     "ssh")
         harden_ssh
     ;;
-    "pass")
-        change_passwords
-    ;;
     "splunk")
         setup_splunk
+    ;;
+    "backup")
+        # Check if the array argument is provided
+        if [ -z "$2" ]; then
+            echo "No array provided as an argument for backup. format should be \"/dir1,/dir2/file.txt,/dir3/dir2/\""
+            exit 1
+        fi
+        IFS=','
+        # Split the argument into an array
+        read -a my_array <<< "$1"
+        # Display the array elements
+        for element in "${my_array[@]}"; do
+            backup "$element"
+        done
     ;;
     *)
         echo "not an option"

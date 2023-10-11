@@ -109,7 +109,7 @@ sudo chgrp -R CCDCUser1 /opt/splunkforwarder
 sudo /opt/splunkforwarder/bin/splunk start --accept-license
 
 echo "Beginning to run configuration adjustments"
-sudo /opt/splunkforwarder/bin/splunk add forward-server $2:9997
+sudo /opt/splunkforwarder/bin/splunk add forward-server "$2:9997"
 # enables logging in mysql
 path=""
 if [[ -d /etc/mysql ]]; then
