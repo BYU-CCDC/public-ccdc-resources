@@ -1,8 +1,40 @@
 #!/bin/bash
 os=""
 lpm=""
+log="/backups/harden_log.txt"
 
-log="./harden_log.txt"
+function locate_services {
+    services=('mysql' 'phpmyadmin' 'apache2')
+    echo "Preparing to locate services:
+    -- Default added services are:"
+    for item in "${services[@]}"; do
+        echo "      - $item"
+    done
+    l="true"
+    while [ "$l" != "false" ]; do
+        read -r -p "Enter additional services to search for (one entry per line; hit enter to continue): " userInput
+
+        if [[ "$userInput" == "" ]]; then
+            l="false"
+        else
+            services+=("$userInput")
+        fi
+    done
+
+    for service in "${services[@]}"; do
+        result=$(locate "$service" | head -n 1)
+        if [ -n "$result" ]; then
+            echo "First folder containing '$service': $result"
+            echo "First folder containing '$service': $result" >> $log
+        else
+            echo "No folder found containing '$service'."
+            echo "No folder found containing '$service'." >> $log
+        fi
+    done
+    echo "************ DONE LOCATING SERVICES ************"
+
+}
+
 
 function detect_os {
 if [ -f /etc/os-release ]; then
@@ -77,10 +109,54 @@ else
     exit
 fi
 
-echo $os $lpm >> $log
+}
 
+function full_backup {
+    backup_dirs=('/etc/apache2' '/var/www/html' '/var/lib/mysql' '/bin')
+    echo -e "\nWould you like to append more directories to backup? (y/n)
+    -- Default added directoriesn are:"
+    for item in "${backup_dirs[@]}"; do
+        echo "      - $item"
+    done
+    read -r option
+    if [ "$option" == "y" ]; then
+        l="true"
+        while [ "$l" != "false" ]; do
+            read -r -e -p "\nEnter additional directory (one entry per line; enter  to continue script): " userInput
+
+            if [[ "$userInput" == "" ]]; then
+                l="false"
+            else
+                backup_dirs+=("$userInput")
+            fi
+        done
+    fi
+    for dir in "${backup_dirs[@]}"; do
+        if [ -d $dir ]; then
+            echo "Attempting to back up $dir" >> $log
+            echo "Attempting to back up $dir"
+            backup "$dir"
+        else
+            echo "$dir was not found" >> $log
+            echo "$dir was not found"
+        fi
+    done
+    #mysql database
+    echo "Do you know the mysql user password?(y/n)"
+    read -r option
+    if [ "$option" == 'y' ];
+    then
+        echo "Attempting to back up MYSQL database" >> $log
+        echo "Attempting to back up MYSQL database"
+        echo "enter username:"
+        read -r MYSQL_USER
+        echo "enter password:"
+        read -r -s MYSQL_PASSWORD
+        mysqldump -u "$MYSQL_USER" -p "$MYSQL_PASSWORD" --all-databases > "/backups/mysql-original-$DATE.sql"
+    fi
 
 }
+
 function backup {
     local backup_dir="/backups"
 
@@ -91,16 +167,19 @@ function backup {
 
     if [ -d "$1" ]; then
         # If $1 is a directory, copy it recursively to the backup directory
-        sudo cp -r "$1" "$backup_dir/"
-        echo "Made backup: $backup_dir/$1"  >> $log
-    else
+        path_with_dashes=$(echo "$1" | sed 's/\//-/g') # helps preserve whats backuped without the complexity of putting it in the correct directory...just trust me
+        sudo zip -r "$backup_dir/$path_with_dashes"_backup.zip "$1"
+        echo "Made backup for dir: $backup_dir$1"  >> $log
+        echo "Made backup for dir: $backup_dir$1"
+    elif [ -f "$1" ]; then
         # If $1 is a file, copy it to the backup directory with a .bak extension
         sudo cp "$1" "$backup_dir/$(basename "$1").bak"
-        echo "Made backup: $backup_dir/$(basename "$1").bak"  >> $log
-        
+        echo "Made backup for file: $backup_dir/$(basename "$1").bak"  >> $log
+        echo "Made backup for file: $backup_dir/$(basename "$1").bak"
+    else
+        echo "Either $1 doesn not exist or failed to make backup for $1"
+        echo "Either $1 doesn not exist or failed to make backup for $1" >> $log
     fi
-    sudo chattr +i "$backup_dir/$(basename "$1").bak" # Make backup file/directory immutable
-    echo "Made backup: $backup_dir/$(basename "$1") immutable"  >> $log
 }
 
 function harden_ssh {
@@ -108,35 +187,36 @@ function harden_ssh {
     # Hardens ssh
     file_path="/etc/ssh/sshd_config"
     backup "$file_path"
-    old_lines=( '.*PermitRootLogin yes' '.*PermitRootLogin without-password' '.*RSAAuthentication yes' '.*PubkeyAuthentication yes' '.*UsePAM yes' )
-    new_lines=( 'PermitRootLogin no' 'PermitRootLogin no' 'RSAAuthentication no' 'PubkeyAuthentication no' 'UsePAM no' )
-
-    # Replace old lines with new lines in the sshd_config file
-    for index in "${!old_lines[@]}"; do
-        old_line="${old_lines[index]}"
-        new_line="${new_lines[index]}"
-        sudo sed -i "s/$old_line/$new_line/g" "$file_path"
-    done
-
-    # Add a line to allow a specific user (replace CCDCUser1 with your desired user)
-    sudo sed -i '$a\AllowUsers CCDCUser1' "$file_path"
-    echo "*********** SSH config updated ***********"
-    # Determine the operating system
-    if [ "$os" == "fedora" ] || [ "$os" == "centos" ]; then
-        if command -v systemctl &> /dev/null; then
-            sudo systemctl restart sshd
+    new_config="https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main/linux/sshd_config"
+    wget -O sshd_config $new_config
+    if [ $? -eq 0 ]; then
+        sudo mv "$(pwd)"/sshd_config /etc/ssh/sshd_config
+        sudo sed -i '$a\AllowUsers CCDCUser1' "$file_path"
+        echo "*********** SSH config updated ***********"
+        # Determine the lpm and restart command
+        if [ "$os" == "fedora" ] || [ "$os" == "centos" ]; then
+            if command -v systemctl &> /dev/null; then
+                sudo systemctl restart sshd
+            else
+                sudo service sshd restart
+            fi
+        elif [ "$os" == "debian" ] || [ "$os" == "ubuntu" ]; then
+            if command -v systemctl &> /dev/null; then
+                sudo systemctl restart ssh
+            else
+                sudo service ssh restart
+            fi
         else
-            sudo service sshd restart
-        fi
-    elif [ "$os" == "debian" ] || [ "$os" == "ubuntu" ]; then
-        if command -v systemctl &> /dev/null; then
-            sudo systemctl restart ssh
-        else
-            sudo service ssh restart
+            echo "************ SSH was not able to restart. Restart Manually ************"
+            sleep 3
         fi
     else
-        echo "************ SSH was not able to restart. Restart Manually ************"
+        echo "SSH config download failed with exit status $?."
+        echo "SSH config download failed with exit status $?." >> $log
+        echo "************ SSH CONFIG UPDATE FAILED! UPDATE MANUALLY ************"
+        echo "************ SSH CONFIG UPDATE FAILED! UPDATE MANUALLY ************" >> $log
         sleep 3
+
     fi
     echo "************ SSH DONE ************"
 }
@@ -174,17 +254,6 @@ function remove_sudoers {
     users_to_exclude=("CCDCUser1")
     backup /etc/passwd
     # Check if the user exists
-    for username in "${users_to_exclude[@]}";
-        do
-            if id "$username" &>/dev/null; then
-                echo "excluding CCDCUser1"
-            else
-                echo "CCDCUser1 not found in sudoers. Adding user...."
-                sudo useradd CCDCUser1
-                sudo passwd CCDCUser1
-                sudo usermod -aG sudo CCDCUser1
-            fi
-    done
     # Iterate through all users in the target group
     for user in $(getent group sudo | cut -d: -f4 | tr ',' ' '); do
         # Check if the user should be excluded
@@ -206,7 +275,21 @@ function remove_sudoers {
 }
 
 function disable_users {
+    bash_users=('CCDCUser1')
+    l="true"
+    while [ "$l" != "false" ]; do
+        read -r -e -p "\nEnter additional users who need bash access (one entry per line; hit enter to continue script): " userInput
+
+        if [[ "$userInput" == "" ]]; then
+            l="false"
+        else
+            bash_users+=("$userInput")
+        fi
+    done
     awk -F ':' '/bash/{print $1}' /etc/passwd | while read line; do sudo usermod -s /usr/bin/nologin $line; done
+    for user in "${bash_users[@]}"; do
+        sudo usermod -s /bin/bash $user;
+    done
     change_passwords
     remove_sudoers
     
@@ -244,23 +327,31 @@ function report {
 
 function setup_firewall {
     detect_os
-    # Set the IFS to a comma (,) to split the parameter
-    echo "What ports need to be allowed for the firewall? (give list in a comma separated string i.e. "22,23,53" )"
-    read ports
-    IFS=',' read -ra values <<< "$ports"
     sudo $lpm install -y ufw
+    default_ports=('22/tcp' '80/tcp' '443/tcp')
+    echo "Do you want to add other ports? (y/n)"
+    for item in "${default_ports[@]}"; do
+        echo "      - $item"
+    done
+    read -r option
+    if [ "$option" == "y" ]; then
+        echo "What ports need to be allowed for the firewall? (give list in a comma separated string i.e. "22/tcp,23/tcp,53/udp" )"
+        # Set the IFS to a comma (,) to split the parameter
+        read -r ports
+        IFS=',' read -ra new_ports <<< "$ports"
+        for port in "${new_ports[@]}"; do
+            sudo ufw allow "$port"
+        done
+    fi
     #obvious ports
     sudo ufw allow 22/tcp
     sudo ufw allow 80/tcp
     sudo ufw allow 443/tcp
     sudo ufw logging on
     sudo ufw limit ssh
-
-
-    # Iterate through the array of values
-    for value in "${values[@]}"; do
-        sudo ufw allow $value
-    done
+cat
+    #enable rules
+    sudo ufw enable
     echo "************ FIREWALL DONE ************"
 }
 
@@ -276,7 +367,8 @@ function setup_splunk {
 }
 
 function full_harden {
-    detect_os
+    echo "************ BEGIN USER HARDENING ************"
+    disable_users
     echo "************ BEGIN SSH HARDENING ************"
     harden_ssh
     echo "************ BEGIN FIREWALL SETUP ************"
@@ -284,13 +376,16 @@ function full_harden {
     echo "Do you want to install a splunk forwarder? (y/n)"
     read opt
     if [ $opt == "y" ]; then echo "************ BEGIN SPLUNK SETUP ************"; setup_splunk; fi
-    echo "************ BEGIN USER HARDENING ************"
-    disable_users # placed here bc if the user running the script is removed from 
-                  # the sudoers before end of execution theres a possibility the script will fail
+    echo "************ BEGIN FULL BACKUP ************"
+    full_backup
+    echo "************ BEGIN LOCATING SERVICES ************"
+    locate_services
+
     report
     echo "************ REPORT CAN BE FOUND AT $log ************"
     echo "************ END OF SCRIPT ************"
 }
+
 ######## MAIN ########
 
 # Check if there are at least two arguments
@@ -299,6 +394,29 @@ if [ $# -lt 1 ]; then
     print_options
     exit 1
 fi
+#prereqs
+detect_os
+sudo mkdir /backups/
+sudo chown -R "$(whoami):$(whoami)" /backups
+sudo chmod -R 744 /backups
+if id "CCDCUser1" &>/dev/null; then
+    echo "CCDCUser1 already created"
+else
+    echo "CCDCUser1 not found. Attempting to create..."
+    sudo useradd CCDCUser1
+    sudo passwd CCDCUser1
+    sudo usermod -aG sudo CCDCUser1
+fi
+if command -v zip &> /dev/null; then
+    echo "zip is installed. Proceeding"
+else
+    echo "zip is not installed. Installing..."
+    sudo $lpm install -y zip
+fi
+
+#end prereqs
+
+
 case $1 in
     "options")
         print_options
@@ -312,19 +430,8 @@ case $1 in
     "splunk")
         setup_splunk
     ;;
-    "backup")
-        # Check if the array argument is provided
-        if [ -z "$2" ]; then
-            echo "No array provided as an argument for backup. format should be \"/dir1,/dir2/file.txt,/dir3/dir2/\""
-            exit 1
-        fi
-        IFS=','
-        # Split the argument into an array
-        read -a my_array <<< "$1"
-        # Display the array elements
-        for element in "${my_array[@]}"; do
-            backup "$element"
-        done
+    "full_backup")
+        full_backup
     ;;
     *)
         echo "not an option"
