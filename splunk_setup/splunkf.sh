@@ -104,12 +104,18 @@ fi
 echo "****** Starting Splunk ******"
 # needed here since we will disable root after the script is run
 # and it gives us full access over splunk
-sudo chown -R CCDCUser1 /opt/splunkforwarder
-sudo chgrp -R CCDCUser1 /opt/splunkforwarder
+if id "CCDCUser1" >/dev/null 2>&1; then
+    sudo chown -R CCDCUser1 /opt/splunk
+    sudo chgrp -R CCDCUser1 /opt/splunk
+else
+    sudo useradd CCDCUser1
+    sudo usermod -aG sudo
+    sudo chown -R CCDCUser1 /opt/splunk
+    sudo chgrp -R CCDCUser1 /opt/splunk
+fi
 sudo /opt/splunkforwarder/bin/splunk start --accept-license
 
 echo "Beginning to run configuration adjustments"
-sudo /opt/splunkforwarder/bin/splunk add forward-server "$2:9997"
 # enables logging in mysql
 path=""
 if [[ -d /etc/mysql ]]; then
@@ -142,7 +148,7 @@ done
 
 for i in "${logs[@]}"; do
     if [[ -f $i || -d $i ]]; then
-        sudo /opt/splunkforwarder/bin/splunk add monitor $i -index "auth"
+        sudo /opt/splunkforwarder/bin/splunk add monitor $i -index "service_auth"
     else
         echo "$i does not exist"
     fi
@@ -155,5 +161,7 @@ for i in "${misc[@]}"; do
         echo "$i does not exist"
     fi
 done
+echo "****** Adding Forward Server *******"
+sudo /opt/splunkforwarder/bin/splunk add forward-server $2:9997
 echo "****** Restarting Splunk *******"
-sudo /opt/splunkforwarder/bin/splunk start
+sudo /opt/splunkforwarder/bin/splunk restart
