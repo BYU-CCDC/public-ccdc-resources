@@ -231,7 +231,25 @@ function harden_ssh {
 function change_passwords {
     # change all non-system user passwords
     users_to_exclude=("CCDCUser1" "CCDCUser2")
-    non_system_users=$(awk -F: '$3 >= 1000 && $1 != "nobody" {print $1}' /etc/passwd)
+    echo -e "\nWould you like to append more users to exclude? (y/n)
+    -- Default excluded users are:"
+    for item in "${users_to_exclude[@]}"; do
+        echo "      - $item"
+    done
+    read -r option
+    if [ "$option" == "y" ]; then
+        l="true"
+        while [ "$l" != "false" ]; do
+            read -r -e -p "\nEnter additional user (one entry per line; enter  to continue script): " userInput
+
+            if [[ "$userInput" == "" ]]; then
+                l="false"
+            else
+                users_to_exclude+=("$userInput")
+            fi
+        done
+    fi
+    non_system_users=$(awk -F: '$3 >= 1000 && $1 != "nobody" && $1 != "nfsnobody" {print $1}' /etc/passwd)
     for user in $non_system_users; do
         # Generate a random password (change as needed)
         exclude=false
@@ -250,13 +268,29 @@ function change_passwords {
         fi
 
     done
-
-
 }
 
 function remove_sudoers {
     users_to_exclude=("CCDCUser1")
-    backup /etc/passwd
+    echo -e "\nWould you like to append more users to exclude from being removed from the $sudo_group group? (y/n)
+    -- Default excluded users are:"
+    for item in "${users_to_exclude[@]}"; do
+        echo "      - $item"
+    done
+    read -r option
+    if [ "$option" == "y" ]; then
+        l="true"
+        while [ "$l" != "false" ]; do
+            read -r -e -p "\nEnter additional user (one entry per line; enter  to continue script): " userInput
+
+            if [[ "$userInput" == "" ]]; then
+                l="false"
+            else
+                users_to_exclude+=("$userInput")
+            fi
+        done
+    fi
+    backup "/etc/passwd"
     # Check if the user exists
     # Iterate through all users in the target group
     for user in $(getent group sudo | cut -d: -f4 | tr ',' ' '); do
@@ -401,6 +435,8 @@ function setup_splunk {
     wget https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main/splunk_setup/splunkf.sh
     sudo chmod +x splunkf.sh
     if [ $os == "ubuntu" ]; then os="debian"; fi
+    if  [ $os == "fedora" ] ||   [ $os == "centos" ] ; then os="rpm"; fi
+
     echo "what is the forward server ip?"
     read ip
     ./splunkf.sh $os "$ip:9997"
