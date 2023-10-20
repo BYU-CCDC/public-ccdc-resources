@@ -342,7 +342,7 @@ function setup_firewall {
         done
         read -r option
         if [ "$option" == "y" ]; then
-            echo "What ports need to be allowed for the firewall? (give list in a comma separated string i.e. "22/tcp,23/tcp,53/udp" )"
+            echo "What other ports need to be allowed for the firewall? (give list in a comma separated string i.e. "22/tcp,23/tcp,53/udp" )"
             # Set the IFS to a comma (,) to split the parameter
             read -r ports
             IFS=',' read -ra new_ports <<< "$ports"
@@ -359,42 +359,38 @@ function setup_firewall {
         #enable rules
         sudo ufw enable
 
-        else
-            echo "Package UFW failed to install. Trying ip tables"
-            default_ports=('22' '80' '443' '53')
-            echo "Do you want to add other ports? (y/n) 
-            Defaults:"
-            for item in "${default_ports[@]}"; do
-                echo "      - $item"
+    else
+        echo "Package UFW failed to install. Trying ip tables"
+        default_ports=('22' '80' '443' '53')
+        echo "Do you want to add other ports? (y/n) 
+        Defaults:"
+        for item in "${default_ports[@]}"; do
+            echo "      - $item"
+        done
+        read -r option
+        if [ "$option" == "y" ]; then
+            echo "What other ports need to be allowed for the firewall? (give list in a comma separated string i.e. "22,23,53" )"
+            # Set the IFS to a comma (,) to split the parameter
+            read -r ports
+            IFS=',' read -ra new_ports <<< "$ports"
+            for port in "${new_ports[@]}"; do
+                # general rule
+                sudo iptables -A INPUT -p tcp --dport "$port" -j ACCEPT
+                sudo iptables -A OUTPUT -p tcp --sport "$port" -j ACCEPT
+                echo "Rule added for port $port. (incoming & outgoing)" >> $log
+                echo "Rule added for port $port. (incoming & outgoing)"
+
             done
-            read -r option
-            if [ "$option" == "y" ]; then
-                echo "What ports need to be allowed for the firewall? (give list in a comma separated string i.e. "22,23,53" )"
-                # Set the IFS to a comma (,) to split the parameter
-                read -r ports
-                IFS=',' read -ra new_ports <<< "$ports"
-                for port in "${new_ports[@]}"; do
-                    # general rule
-                    sudo iptables -A INPUT -p tcp --dport "$port" -j ACCEPT
-                    sudo iptables -A OUTPUT -p tcp --sport "$port" -j ACCEPT
-                    echo "Rule added for port $port. (incoming & outgoing)" >> $log
-                    echo "Rule added for port $port. (incoming & outgoing)"
-
-                done
-                sudo iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
-                sudo iptables -A INPUT -i lo -j ACCEPT # allow loopback
-                sudo iptables -A INPUT -p icmp --icmp-type 8 -j ACCEPT # allow ping
-                sudo iptables -A OUTPUT -j DROP # default deny outgoing
-                sudo iptables -P INPUT DROP # default deny incoming
-            fi
-
-            # Save the iptables rules to make them persistent
-            service iptables save
-            service iptables restart
-
-            
-            # You can add error handling or other actions here
+            sudo iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+            sudo iptables -A INPUT -i lo -j ACCEPT # allow loopback
+            sudo iptables -A INPUT -p icmp --icmp-type 8 -j ACCEPT # allow ping
+            sudo iptables -A OUTPUT -j DROP # default deny outgoing
+            sudo iptables -P INPUT DROP # default deny incoming
         fi
+        # Save the iptables rules to make them persistent
+        service iptables save
+        service iptables restart
+    fi
     
     
     echo "************ FIREWALL DONE ************"
@@ -459,7 +455,6 @@ fi
 
 #end prereqs
 
-
 case $1 in
     "options")
         print_options
@@ -485,12 +480,3 @@ case $1 in
     ;;
 
 esac
-
-
-
-
-
-
-
-
-
