@@ -2,6 +2,7 @@
 os=""
 lpm=""
 log="/backups/harden_log.txt"
+sudo_group=""
 
 function locate_services {
     services=('mysql' 'phpmyadmin' 'apache2')
@@ -49,22 +50,25 @@ if [ -f /etc/os-release ]; then
             echo "This is a Debian-based Linux distribution (case-insensitive)."
             lpm="apt"
             os="debian"
+            sudo_group="sudo"
             ;;
         ubuntu)
             echo "This is an Ubuntu Linux distribution (case-insensitive)."
             lpm="apt"
             os="ubuntu"
-
+            sudo_group="sudo"            
             ;;
         fedora)
             echo "This is a Fedora-based Linux distribution (case-insensitive)."
             lpm="dnf"
             os="fedora"
+            sudo_group="wheel"
             ;;
         centos)
             echo "This is a CentOS-based Linux distribution (case-insensitive)."
             lpm="yum"
             os="centos"
+            sudo_group="wheel"            
             ;;
         *)
             echo "This is neither Debian-based, Ubuntu-based, Fedora-based, nor CentOS-based (case-insensitive)."
@@ -267,9 +271,9 @@ function remove_sudoers {
 
         # Remove the user from the group if not excluded
         if [ "$exclude" == "false" ]; then
-            sudo deluser $user sudo
-            echo "Removed $user from sudo"
-            echo "Removed $user from sudo" >> $log
+            sudo deluser $user $sudo_group
+            echo "Removed $user from $sudo_group"
+            echo "Removed $user from $sudo_group" >> $log
         fi
     done
 }
@@ -328,30 +332,71 @@ function report {
 function setup_firewall {
     detect_os
     sudo $lpm install -y ufw
-    default_ports=('22/tcp' '80/tcp' '443/tcp')
-    echo "Do you want to add other ports? (y/n)"
-    for item in "${default_ports[@]}"; do
-        echo "      - $item"
-    done
-    read -r option
-    if [ "$option" == "y" ]; then
-        echo "What ports need to be allowed for the firewall? (give list in a comma separated string i.e. "22/tcp,23/tcp,53/udp" )"
-        # Set the IFS to a comma (,) to split the parameter
-        read -r ports
-        IFS=',' read -ra new_ports <<< "$ports"
-        for port in "${new_ports[@]}"; do
+    if [ $? -eq 0 ]; then
+        default_ports=('22/tcp' '80/tcp' '443/tcp' '53/udp')
+        echo "Package UFW installed successfully."
+        echo "Do you want to add other ports? (y/n) 
+        Defaults:"
+        for item in "${default_ports[@]}"; do
+            echo "      - $item"
+        done
+        read -r option
+        if [ "$option" == "y" ]; then
+            echo "What ports need to be allowed for the firewall? (give list in a comma separated string i.e. "22/tcp,23/tcp,53/udp" )"
+            # Set the IFS to a comma (,) to split the parameter
+            read -r ports
+            IFS=',' read -ra new_ports <<< "$ports"
+            for port in "${new_ports[@]}"; do
+                sudo ufw allow "$port"
+            done
+        fi
+        #obvious ports
+        for port in "${default_ports[@]}"; do
             sudo ufw allow "$port"
         done
-    fi
-    #obvious ports
-    sudo ufw allow 22/tcp
-    sudo ufw allow 80/tcp
-    sudo ufw allow 443/tcp
-    sudo ufw logging on
-    sudo ufw limit ssh
-cat
-    #enable rules
-    sudo ufw enable
+        sudo ufw logging on
+        sudo ufw limit ssh
+        #enable rules
+        sudo ufw enable
+
+        else
+            echo "Package UFW failed to install. Trying ip tables"
+            default_ports=('22' '80' '443' '53')
+            echo "Do you want to add other ports? (y/n) 
+            Defaults:"
+            for item in "${default_ports[@]}"; do
+                echo "      - $item"
+            done
+            read -r option
+            if [ "$option" == "y" ]; then
+                echo "What ports need to be allowed for the firewall? (give list in a comma separated string i.e. "22,23,53" )"
+                # Set the IFS to a comma (,) to split the parameter
+                read -r ports
+                IFS=',' read -ra new_ports <<< "$ports"
+                for port in "${new_ports[@]}"; do
+                    # general rule
+                    sudo iptables -A INPUT -p tcp --dport "$port" -j ACCEPT
+                    sudo iptables -A OUTPUT -p tcp --sport "$port" -j ACCEPT
+                    echo "Rule added for port $port. (incoming & outgoing)" >> $log
+                    echo "Rule added for port $port. (incoming & outgoing)"
+
+                done
+                sudo iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+                sudo iptables -A INPUT -i lo -j ACCEPT # allow loopback
+                sudo iptables -A INPUT -p icmp --icmp-type 8 -j ACCEPT # allow ping
+                sudo iptables -A OUTPUT -j DROP # default deny outgoing
+                sudo iptables -P INPUT DROP # default deny incoming
+            fi
+
+            # Save the iptables rules to make them persistent
+            service iptables save
+            service iptables restart
+
+            
+            # You can add error handling or other actions here
+        fi
+    
+    
     echo "************ FIREWALL DONE ************"
 }
 
@@ -396,17 +441,15 @@ if [ $# -lt 1 ]; then
 fi
 #prereqs
 detect_os
-sudo mkdir /backups/
-sudo chown -R "$(whoami):$(whoami)" /backups
-sudo chmod -R 744 /backups
 if id "CCDCUser1" &>/dev/null; then
     echo "CCDCUser1 already created"
 else
     echo "CCDCUser1 not found. Attempting to create..."
     sudo useradd CCDCUser1
     sudo passwd CCDCUser1
-    sudo usermod -aG sudo CCDCUser1
+    sudo usermod -aG $sudo_group CCDCUser1
 fi
+
 if command -v zip &> /dev/null; then
     echo "zip is installed. Proceeding"
 else
@@ -432,6 +475,10 @@ case $1 in
     ;;
     "full_backup")
         full_backup
+        sudo su CCDCUser1
+        sudo mkdir /backups/
+        sudo chown -R "CCDCUser1:CCDCUser1" /backups
+        sudo chmod -R 744 /backups
     ;;
     *)
         echo "not an option"
