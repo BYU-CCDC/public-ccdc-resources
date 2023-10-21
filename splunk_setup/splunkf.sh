@@ -37,7 +37,7 @@ if [[ ! -d /opt/splunkforwarder ]]; then
             echo "******* Installing forwarder for rpm based machines *******"
             echo
             sudo wget -O splunkf.rpm "$rpm"
-            sudo rpm -i splunkf.rpm
+            sudo yum install ./splunkf.rpm -y
         ;;
         # prints the url in case there are problems with the install
         -p)
@@ -105,13 +105,13 @@ echo "****** Starting Splunk ******"
 # needed here since we will disable root after the script is run
 # and it gives us full access over splunk
 if id "CCDCUser1" >/dev/null 2>&1; then
-    sudo chown -R CCDCUser1 /opt/splunk
-    sudo chgrp -R CCDCUser1 /opt/splunk
+    sudo chown -R CCDCUser1 /opt/splunkforwarder
+    sudo chgrp -R CCDCUser1 /opt/splunkforwarder
 else
     sudo useradd CCDCUser1
     sudo usermod -aG sudo
-    sudo chown -R CCDCUser1 /opt/splunk
-    sudo chgrp -R CCDCUser1 /opt/splunk
+    sudo chown -R CCDCUser1 /opt/splunkforwarder
+    sudo chgrp -R CCDCUser1 /opt/splunkforwarder
 fi
 sudo /opt/splunkforwarder/bin/splunk start --accept-license
 
