@@ -174,6 +174,7 @@ function full_backup {
     tar -czvf backups.tar.gz "$HOME/backups" #zip
     read -r -s -p "Enter Password for encrypting backups: " enc
     openssl enc -aes-256-cbc -salt -in backups.tar.gz -out backups.tar.gz.enc -k "$enc"
+    sudo rm backups.tar.gz
     echo "backups encrypted"
 }
 
