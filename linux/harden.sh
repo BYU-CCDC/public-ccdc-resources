@@ -1,7 +1,7 @@
 #!/bin/bash
 os=""
 lpm=""
-log="$HOME/backups/harden_log.txt"
+log="$HOME/harden_log.txt"
 backup_dir="$HOME/backups"
 sudo_group=""
 
@@ -164,14 +164,17 @@ function full_backup {
         echo "Attempting to back up MYSQL database"
         read -r -p "enter username: " MYSQL_USER
         read -r -s -p "enter password: " MYSQL_PASSWORD
-        # no space between the p and the password is required
+        # no space between the -p and the password is required
         touch "$HOME/backups/mysql-bkp.sql"
         mysqldump -u "$MYSQL_USER" -p"$MYSQL_PASSWORD" --all-databases > "$HOME/backups/mysql-bkp.sql"
     fi
     # revert ownership to user who ran script
     sudo chown -R "$(whoami):$(whoami)" "$HOME/backups"
     sudo chmod -R 744 "$HOME/backups"
-
+    tar -czvf backups.tar.gz "$HOME/backups" #zip
+    read -r -s -p "Enter Password for encrypting backups: " enc
+    openssl enc -aes-256-cbc -salt -in backups.tar.gz -out backups.tar.gz.enc -k "$enc"
+    echo "backups encrypted"
 }
 
 function backup {
