@@ -458,13 +458,14 @@ function cleanup_files {
 function decrypt_file {
     read -r -p "Enter destination file name: (ex. file.txt.enc would be file.txt) " dest_file
     read -r -p "Enter the full path for the file you would like to decrypt: " file_path
-    openssl enc -d -aes-256-cbc -in "$file_path" -out "$(pwd)/$dest_file" -k "$file_path"
+    read -r -s -p "What is the decryption key: " password
+    openssl enc -d -aes-256-cbc -in "$file_path" -out "$(pwd)/$dest_file" -k "$password"
     if [ $? -eq 0 ]; then
         echo "$file_path successfully decrypted to $(pwd)/$dest_file"
     else
         echo "Decryption failed for some reason"
         echo "Try decrypting manually with the following command:
-                openssl enc -d -aes-256-cbc -in <encrypted_file_path> -out <destination_file_path> -k $file_path"
+                openssl enc -d -aes-256-cbc -in <encrypted_file_path> -out <destination_file_path> -k <password>"
     fi
 }
 
