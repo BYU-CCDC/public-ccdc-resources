@@ -456,12 +456,19 @@ function cleanup_files {
 }
 
 function decrypt_file {
-    read -r -p "Enter destination file name: (ex. file.txt.enc would be file.txt) " dest_file
-    read -r -p "Enter the full path for the file you would like to decrypt: " file_path
-    read -r -s -p "What is the decryption key: " password
-    openssl enc -d -aes-256-cbc -in "$file_path" -out "$(pwd)/$dest_file" -k "$password"
+
+    echo "************ Starting Decryption ************"
+    echo "Current directory: 
+$(ls -1)" #spacing is weird i know. just trust me
+    echo "What is the full path for the \"in\" file (usually ends with .enc; i.e. /path/to/file.txt.enc)? " 
+    read -r -p "File Path: " file_path
+    echo "What is the full path for the \"out\" file (in file excluding the .enc; i.e /path/to/file.txt)? "
+    read -r -p "File Path: " dest_path
+    read -r -s -p "What is the decryption password: " password
+    echo " "
+    openssl enc -d -aes-256-cbc -in "$file_path" -out "$dest_path" -k "$password"
     if [ $? -eq 0 ]; then
-        echo "$file_path successfully decrypted to $(pwd)/$dest_file"
+        echo "$file_path successfully decrypted to $dest_path"
     else
         echo "Decryption failed for some reason"
         echo "Try decrypting manually with the following command:
@@ -557,6 +564,9 @@ case $1 in
     ;;
     "full_backup")
         full_backup
+    ;;
+    "decrypt")
+        decrypt_file
     ;;
     *)
         echo "not an option"
