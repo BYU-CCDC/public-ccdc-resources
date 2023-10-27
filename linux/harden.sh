@@ -15,31 +15,31 @@ function detect_os {
 
         case $dist_id_lower in
             debian)
-                echo "This is a Debian-based Linux distribution (case-insensitive)." >> "$log"
+                echo "This is a Debian-based Linux distribution." >> "$log"
                 lpm="apt"
                 os="debian"
                 sudo_group="sudo"
                 ;;
             ubuntu)
-                echo "This is an Ubuntu Linux distribution (case-insensitive)." >> "$log"
+                echo "This is an Ubuntu Linux distribution." >> "$log"
                 lpm="apt"
                 os="ubuntu"
                 sudo_group="sudo"            
                 ;;
             fedora)
-                echo "This is a Fedora-based Linux distribution (case-insensitive)." >> "$log"
+                echo "This is a Fedora-based Linux distribution." >> "$log"
                 lpm="dnf"
                 os="fedora"
                 sudo_group="wheel"
                 ;;
             centos)
-                echo "This is a CentOS-based Linux distribution (case-insensitive)." >> "$log"
+                echo "This is a CentOS-based Linux distribution." >> "$log"
                 lpm="yum"
                 os="centos"
                 sudo_group="wheel"            
                 ;;
             *)
-                echo "This is neither Debian-based, Ubuntu-based, Fedora-based, nor CentOS-based (case-insensitive)." >> "$log"
+                echo "** Cannot Detect the Current OS." >> "$log"
                 exit
                 ;;
         esac
@@ -49,39 +49,39 @@ function detect_os {
         dist_id_lower=$(echo "$distrib_id" | tr '[:upper:]' '[:lower:]')
             case $dist_id_lower in
             debian)
-                echo "This is a Debian-based Linux distribution (case-insensitive)." >> "$log"
+                echo "This is a Debian-based Linux distribution." >> "$log"
                 lpm="apt"
                 os="debian"
                 ;;
             ubuntu)
-                echo "This is an Ubuntu Linux distribution (case-insensitive)." >> "$log"
+                echo "This is an Ubuntu Linux distribution." >> "$log"
                 lpm="apt"
                 os="ubuntu"
 
                 ;;
             fedora)
-                echo "This is a Fedora-based Linux distribution (case-insensitive)." >> "$log"
+                echo "This is a Fedora-based Linux distribution." >> "$log"
                 lpm="yum"
                 os="fedora"
                 ;;
             centos)
-                echo "This is a CentOS-based Linux distribution (case-insensitive)." >> "$log"
+                echo "This is a CentOS-based Linux distribution." >> "$log"
                 lpm="yum"
                 os="centos"
                 ;;
             *)
-                echo "This is neither Debian-based, Ubuntu-based, Fedora-based, nor CentOS-based (case-insensitive)." >> "$log"
+                echo "This is neither Debian-based, Ubuntu-based, Fedora-based, nor CentOS-based." >> "$log"
                 exit
                 ;;
         esac
     elif [ -f /etc/centos-release ]; then
-        echo "This is a CentOS-based Linux distribution (case-insensitive)." >> "$log"
+        echo "This is a CentOS-based Linux distribution." >> "$log"
         lpm="yum"
         os="centos"
         sudo_group="wheel"
     else
-        echo "The /etc/os-release file does not exist. Unable to determine the Linux distribution."
-        echo "The /etc/os-release file does not exist. Unable to determine the Linux distribution." >> "$log"
+        echo "** The /etc/os-release file does not exist. Unable to determine the Linux distribution."
+        echo "** The /etc/os-release file does not exist. Unable to determine the Linux distribution." >> "$log"
         exit
     fi
 
@@ -95,6 +95,7 @@ function locate_services {
         echo "      - $item"
     done
     read -r -p "(y/n): " option
+    option=$(echo "$option" | tr -d ' ') #truncates any spaces accidentally put in
     l="true"
     if [ "$option" == "y" ]; then
         while [ "$l" != "false" ]; do
@@ -133,11 +134,12 @@ function full_backup {
     done
     echo "      - /bin"
     read -r -p "(y/n): " option
+    option=$(echo "$option" | tr -d ' ') #truncates any spaces accidentally put in
     sudo cp -r /bin "$backup_dir/bin_copy"
     if [ "$option" == "y" ]; then
         l="true"
         while [ "$l" != "false" ]; do
-            read -r -e -p "Enter additional directory (one entry per line; enter  to continue script): " userInput
+            read -r -e -p "Enter directory's full path (one entry per line; enter  to continue script): " userInput
 
             if [[ "$userInput" == "" ]]; then
                 l="false"
@@ -157,7 +159,7 @@ function full_backup {
         fi
     done
     #mysql database
-    read -r -p "Do you know the mysql user password?(y/n)" option
+    read -r -p "Do you know the mysql user password? (y/n): " option
     if [ "$option" == 'y' ];
     then
         echo "Attempting to back up MYSQL database" >> "$log"
@@ -171,11 +173,11 @@ function full_backup {
     # revert ownership to user who ran script
     sudo chown -R "$(whoami):$(whoami)" "$HOME/backups"
     sudo chmod -R 744 "$HOME/backups"
-    tar -czvf backups.tar.gz "$HOME/backups" #zip
+    tar -czvf backups.tar.gz "$HOME/backups" &>/dev/null #zip
     read -r -s -p "Enter Password for encrypting backups: " enc
-    openssl enc -aes-256-cbc -salt -in backups.tar.gz -out backups.tar.gz.enc -k "$enc"
-    sudo rm backups.tar.gz
-    sudo rm backups
+    openssl enc -aes-256-cbc -salt -in "$HOME/backups.tar.gz" -out "$HOME/backups.tar.gz".enc -k "$enc"
+    sudo rm "$HOME/backups.tar.gz"
+    sudo rm -rf "$HOME/backups"
     echo "backups encrypted"
 }
 
@@ -184,17 +186,17 @@ function backup {
     if [ -d "$1" ]; then
         # If $1 is a directory, copy it recursively to the backup directory
         path_with_dashes=$(echo "$1" | sed 's/\//-/g') # helps preserve whats backuped without the complexity of putting it in the correct directory...just trust me
-        sudo zip -r "$backup_dir/$path_with_dashes"_backup.zip "$1"
+        sudo zip -r "$backup_dir/$path_with_dashes"_backup.zip "$1" &>/dev/null
         echo "Made backup for dir: $backup_dir$1"  >> "$log"
         echo "Made backup for dir: $backup_dir$1"
     elif [ -f "$1" ]; then
         # If $1 is a file, copy it to the backup directory with a .bak extension
-        sudo cp "$1" "$backup_dir/$(basename "$1").bak"
+        sudo cp "$1" "$backup_dir/$(basename "$1").bak" &>/dev/null
         echo "Made backup for file: $backup_dir/$(basename "$1").bak"  >> "$log"
         echo "Made backup for file: $backup_dir/$(basename "$1").bak"
     else
-        echo "Either $1 doesn not exist or failed to make backup for $1"
-        echo "Either $1 doesn not exist or failed to make backup for $1" >> "$log"
+        echo "** Either $1 doesn not exist or failed to make backup for $1"
+        echo "** Either $1 doesn not exist or failed to make backup for $1" >> "$log"
     fi
 }
 
@@ -207,6 +209,7 @@ function change_passwords {
         echo "      - $item"
     done
     read -r -p "(y/n): " option
+    option=$(echo "$option" | tr -d ' ') #truncates any spaces accidentally put in
     if [ "$option" == "y" ]; then
         l="true"
         while [ "$l" != "false" ]; do
@@ -235,9 +238,14 @@ function change_passwords {
             echo "Changed password for $user" >> "$log"
             new_password=$(sudo openssl rand -base64 12)
             echo "$user:$new_password" | sudo chpasswd
+            echo "$user:$new_password" >> passwd_changed.txt
         fi
-
     done
+    read -r -s -p "Enter Password for encrypting user passwords: " enc
+    openssl enc -aes-256-cbc -salt -in "$HOME/passwd_changed.txt" -out "$HOME/passwd_changed.txt.enc" -k "$enc"
+    sudo rm "$HOME/passwd_changed.txt"
+    echo "backups encrypted"
+
 }
 
 function remove_sudoers {
@@ -248,6 +256,7 @@ function remove_sudoers {
         echo "      - $item"
     done
     read -r -p "(y/n): " option
+    option=$(echo "$option" | tr -d ' ') #truncates any spaces accidentally put in #truncates any spaces accidentally put in
     if [ "$option" == "y" ]; then
         l="true"
         while [ "$l" != "false" ]; do
@@ -276,15 +285,15 @@ function remove_sudoers {
         # Remove the user from the group if not excluded
         if [ "$exclude" == "false" ]; then
             if [ $os == "debian" ]; then
-                sudo deluser $user $sudo_group
+                sudo deluser "$user" $sudo_group
                 echo "Removed $user from $sudo_group"
                 echo "Removed $user from $sudo_group" >> "$log"
             elif [ $os != "debian" ]; then
-                sudo gpasswd -d $user $sudo_group
+                sudo gpasswd -d "$user" $sudo_group
                 echo "Removed $user from $sudo_group"
                 echo "Removed $user from $sudo_group" >> "$log"
             else
-                echo "Failed to remove $user from $sudo_group"
+                echo "** Failed to remove $user from $sudo_group"
             fi
         fi
     done
@@ -300,6 +309,7 @@ function disable_users {
     done
     l="true"
     read -r -p "(y/n): " option
+    option=$(echo "$option" | tr -d ' ') #truncates any spaces accidentally put in
     if [ "$option" == "y" ]; then
         while [ "$l" != "false" ]; do
             read -r -e -p "Enter additional users (one entry per line; hit enter to continue script): " userInput
@@ -311,22 +321,15 @@ function disable_users {
             fi
         done    
     fi
-    awk -F ':' '/bash/{print $1}' /etc/passwd | while read line; do sudo usermod -s /usr/bin/nologin $line; done
+    awk -F ':' '/bash/{print $1}' /etc/passwd | while read -r line; do sudo usermod -s /usr/bin/nologin "$line"; done
     for user in "${bash_users[@]}"; do
-        sudo usermod -s /bin/bash $user;
+        sudo usermod -s /bin/bash "$user";
     done
     change_passwords
     remove_sudoers
     
 }
-function print_options {
-    echo "options are:
-        full - full automated hardening
-        ssh - ssh only harden
-        pass - change passwords of all non-system users
-        backup '/dir1,/dir2/dir3,/dir1/file.txt' - backup directories
-        splunk - setup splunk forwarder"
-}
+
 function report {
     # Get server name (hostname)
     server_name=$(hostname)
@@ -354,6 +357,7 @@ function setup_firewall {
     detect_os
     sudo $lpm install -y ufw
     default_ports=('22/tcp' '80/tcp' '443/tcp' '53/udp' '9997/tcp')
+    l="true"
     if command -v ufw &>/dev/null; then
         default_ports=('22/tcp' '80/tcp' '443/tcp' '53/udp' '9997/tcp')
         echo "Package UFW installed successfully."
@@ -364,6 +368,7 @@ function setup_firewall {
         done
         
         read -r -p "(y/n): " option
+    option=$(echo "$option" | tr -d ' ') #truncates any spaces accidentally put in
         if [ "$option" == "y" ]; then
             while [ "$l" != "false" ]; do
                 read -r -e -p "Enter additional ports (ex. 22/tcp; hit enter to continue script): " userInput
@@ -393,6 +398,7 @@ function setup_firewall {
             echo "    - $item"
         done
         read -r -p "(y/n): " option
+    option=$(echo "$option" | tr -d ' ') #truncates any spaces accidentally put in
         if [ "$option" == "y" ]; then
             while [ "$l" != "false" ]; do
                 read -r -e -p "Enter additional ports (ex. 53/udp; hit enter to continue script): " userInput
@@ -405,7 +411,7 @@ function setup_firewall {
             done
         fi
         for port in "${default_ports[@]}"; do
-            sudo firewall-cmd --add-port=$port
+            sudo firewall-cmd --add-port="$port"
             echo "Rule added for port $port"
             echo "Rule added for port $port" >> "$log"
         done
@@ -430,17 +436,36 @@ function setup_firewall {
     echo "************ FIREWALL DONE ************"
 }
 
-function setup_splunk {
+function setup_splunk_forwarder {
     detect_os
     wget https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main/splunk_setup/splunkf.sh
     sudo chmod +x splunkf.sh
     if [ $os == "ubuntu" ]; then os="debian"; fi
     if [ $os == "fedora" ] || [ $os == "centos" ] ; then os="rpm"; fi
 
-    echo "what is the forward server ip?"
-    read ip
-    ./splunkf.sh $os "$ip:9997"
+    read -r -p "what is the forward server ip?" ip
+    ./splunkf.sh $os "$ip"
     echo "************ SPLUNK DONE ************"
+    cleanup_files ./splunkf.sh
+    
+
+}
+function cleanup_files {
+    #use to move used scripts to folder to help declutter home directory
+    if [[ -f "$1" ]]; then sudo mv "$1" "$HOME/scripts/"; else echo "Couldnt cleanup $1" >> "$log"; fi
+}
+
+function decrypt_file {
+    read -r -p "Enter destination file name: (ex. file.txt.enc would be file.txt) " dest_file
+    read -r -p "Enter the full path for the file you would like to decrypt: " file_path
+    openssl enc -d -aes-256-cbc -in "$file_path" -out "$(pwd)/$dest_file" -k "$file_path"
+    if [ $? -eq 0 ]; then
+        echo "$file_path successfully decrypted to $(pwd)/$dest_file"
+    else
+        echo "Decryption failed for some reason"
+        echo "Try decrypting manually with the following command:
+                openssl enc -d -aes-256-cbc -in <encrypted_file_path> -out <destination_file_path> -k $file_path"
+    fi
 }
 
 function full_harden {
@@ -448,21 +473,24 @@ function full_harden {
     disable_users
     echo "************ BEGIN FIREWALL SETUP ************"
     setup_firewall
-    read -r -p "Do you want to install a splunk forwarder? (y/n)" opt
-    if [ $opt == "y" ]; then echo "************ BEGIN SPLUNK SETUP ************"; setup_splunk; fi
-    echo "************ BEGIN FULL BACKUP ************"
-    full_backup
+    read -r -p "Do you want to install a splunk forwarder? (y/n): " opt
+    if [ "$opt" == "y" ]; then echo "************ BEGIN SPLUNK SETUP ************"; setup_splunk_forwarder; fi
     echo "************ BEGIN LOCATING SERVICES ************"
     locate_services
-
     report
-    echo "************ REPORT CAN BE FOUND AT "$log" ************"
+    echo "************ BEGIN FULL BACKUP ************" 
+    full_backup
+    echo "************ REPORT CAN BE FOUND AT $log ************"
     echo "************ END OF SCRIPT ************"
-    echo ""
+    echo " "
     echo "***********************************************************"
     echo "************ SSH NEEDS TO BE HARDENED MANUALLY ************"
     echo "************        PLEASE DO SO NOW           ************"
     echo "***********************************************************"
+    cleanup=('harden.sh' 'splunkf.sh' 'splunkf.deb')
+    for file in "${cleanup[@]}"; do
+        cleanup_files "$file"
+    done
 }
 
 ######## MAIN ########
@@ -491,12 +519,23 @@ else
     sudo $lpm install -y zip
 fi
 if [ ! -d "$backup_dir" ]; then mkdir -p "$backup_dir"; fi
+if [ ! -d "$HOME/scripts" ]; then mkdir -p "$HOME/scripts"; fi
 if [ ! -f "$HOME/backups/harden_log.txt" ]; then touch "$log"; fi
 sudo chown -R "$(whoami):$(whoami)" "$HOME/backups"
 sudo chmod -R 744 "$HOME/backups"
+if [ ! -f "$HOME/passwd_changed.txt" ]; then touch "$log"; fi
+
 
 #end prereqs
 
+function print_options {
+    echo "options are:
+        full - full semi-automated hardening
+        firewall - automate firewall hardening
+        full_backup - backup all designated files
+        splunk - setup splunk forwarder
+        decrypt - decrypt file"
+}
 case $1 in
     "options")
         print_options
@@ -507,14 +546,20 @@ case $1 in
     "firewall")
         setup_firewall
     ;;
-    "splunk")
-        setup_splunk
+    "splunk") 
+        setup_splunk_forwarder
+    ;;
+    "indexer")
+        wget https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main/splunk_setup/build.sh
+        sudo chmod +x build.sh
+        ./build.sh
     ;;
     "full_backup")
         full_backup
     ;;
     *)
         echo "not an option"
+        print_options
     ;;
 
 esac
