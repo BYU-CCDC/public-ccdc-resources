@@ -8,14 +8,19 @@ $CurrentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
 # Load userfile and portdata
 [string[]]$UserArray = Get-Content -Path ".\users.txt"
 $PortsObject = Get-Content -Path ".\ports.json" -Raw | ConvertFrom-Json
+
+# Get all computer names in the domain
+$ADcomputers = Get-ADComputer -Filter * | Select-Object -ExpandProperty Name
+
+# Set GPO Name
 $GPOName = "Good-GPO"
 
 # Generate a random password with a mix of characters
 function GeneratePassword {
     try {
         #define parameters
-        param([int]$PasswordLength = 10)
-    
+        $PasswordLength = 10
+
         #ASCII Character set for Password
         $CharacterSet = @{
                 Uppercase   = (97..122) | Get-Random -Count 10 | % {[char]$_}
@@ -23,10 +28,10 @@ function GeneratePassword {
                 Numeric     = (48..57)  | Get-Random -Count 10 | % {[char]$_}
                 SpecialChar = (33..47)+(58..64)+(91..96)+(123..126) | Get-Random -Count 10 | % {[char]$_}
         }
-    
+
         #Frame Random Password from given character set
         $StringSet = $CharacterSet.Uppercase + $CharacterSet.Lowercase + $CharacterSet.Numeric + $CharacterSet.SpecialChar
-    
+
         $password = -join(Get-Random -Count $PasswordLength -InputObject $StringSet)
         return $password
     } catch {
@@ -39,8 +44,8 @@ function GeneratePassword {
 function MassDisable {
     try {
     $currentSamAccountName = $CurrentUser.Split('\')[-1]
-    
-    Get-ADUser -Filter {SamAccountName -ne $currentSamAccountName} | 
+
+    Get-ADUser -Filter {SamAccountName -ne $currentSamAccountName} |
     ForEach-Object { Disable-ADAccount -Identity $_ }
     } catch {
         Write-Host $_.Exception.Message -ForegroundColor Yellow
@@ -68,7 +73,7 @@ function Get-Set-Password {
     param($user)
 
     try {
-        $pw = Read-Host -AsSecureString -Prompt "New password for '$user'?" 
+        $pw = Read-Host -AsSecureString -Prompt "New password for '$user'?"
         $conf = Read-Host -AsSecureString -Prompt "Confirm password"
         # Convert SecureString to plain text
         $pwPlainText = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($pw))
@@ -106,7 +111,7 @@ function Add-Competition-Users {
                 Enabled = $true
             }
             New-ADUser @splat
-        
+
             if ($UserArray.indexOf($user) -eq 0) {
                 Add-ADGroupMember -Identity "Administrators" -Members $user
                 Add-ADGroupMember -Identity "Schema Admins" -Members $user
@@ -114,15 +119,15 @@ function Add-Competition-Users {
                 Add-ADGroupMember -Identity "Domain Admins" -Members $user
                 Add-ADGroupMember -Identity "Remote Desktop Users" -Members $user
                 Add-ADGroupMember -Identity "Group Policy Creator Owners" -Members $user
-        
+
                 while ($true) {
                     Get-Set-Password -user $user
                 }
             }
-        
+
             if ($UserArray.indexOf($user) -eq 1) {
                 Add-ADGroupMember -Identity "Remote Desktop Users" -Members $user
-        
+
                 while ($true) {
                     Get-Set-Password -user $user
                 }
@@ -182,7 +187,7 @@ function Prompt-Yes-No {
         [Parameter(Mandatory=$true)]
         [string]$Message
     )
-    
+
     try {
         do {
             $response = Read-Host -Prompt $Message
@@ -255,11 +260,11 @@ function Configure-Firewall {
         :outer while ($true) {
             $desigPorts = Get-Comma-Separated-List -message "List needed port numbers for firewall config. Separate by commas."
             $usualPorts = @(53, 3389, 80, 445, 139, 22, 88)
-            
+
             foreach ($item in $usualPorts) {
                 if ($ports -notcontains $item) {
                     $confirmation = $(Write-Host "Need " -NoNewline) + $(Write-Host "$item" -ForegroundColor Green -NoNewline) + $(Write-Host ", " -NoNewline) + $(Write-Host "$($PortsObject.ports.$item.description)? " -ForegroundColor Cyan -NoNewline) + $(Write-Host "(y/n)" -ForegroundColor Yellow; Read-Host)
-                
+
                     while($true) {
                         if ($confirmation.toLower() -eq "y") {
                             $desigPorts = @($desigPorts) + $item
@@ -304,16 +309,16 @@ function Configure-Firewall {
             # Iterate through each port in the PortsObject and create the appropriate rules
             foreach ($port in $desigPorts) {
                 $description = $PortsObject.ports.$port.description
-        
+
                 # Inbound rules
-                netsh advfirewall firewall add rule name="$description TCP Inbound" dir=in action=allow protocol=TCP localport=$port
-                netsh advfirewall firewall add rule name="$description UDP Inbound" dir=in action=allow protocol=UDP localport=$port
-        
+                netsh advfirewall firewall add rule name="TCP Inbound $description" dir=in action=allow protocol=TCP localport=$port
+                netsh advfirewall firewall add rule name="UDP Inbound $description" dir=in action=allow protocol=UDP localport=$port
+
                 # Outbound rules
-                netsh advfirewall firewall add rule name="$description TCP Outbound" dir=out action=allow protocol=TCP localport=$port
-                netsh advfirewall firewall add rule name="$description UDP Outbound" dir=out action=allow protocol=UDP localport=$port
+                netsh advfirewall firewall add rule name="TCP Outbound $description" dir=out action=allow protocol=TCP localport=$port
+                netsh advfirewall firewall add rule name="UDP Outbound $description" dir=out action=allow protocol=UDP localport=$port
             }
-        
+
             # Re-enable the firewall profiles
             netsh advfirewall set allprofiles state on
         }
@@ -367,7 +372,7 @@ function Create-Good-GPO {
     }
 }
 
-function Handle-RDP-Users {
+function Configure-Secure-GPO {
     try {
         # Install RSAT features
         Install-WindowsFeature -Name RSAT -IncludeAllSubFeature
@@ -396,14 +401,14 @@ function Handle-RDP-Users {
 10. Apply
 "@
         }
-    
+
         # Get the GPO's GUID
         $gpo = Get-GPO -Name $gpoName
         $gpoId = $gpo.Id
-    
+
         # Construct full path
         $fullPath = "\\$($env:USERDNSDOMAIN)\sysvol\$($env:USERDNSDOMAIN)\Policies\{$gpoId}\Machine\Microsoft\Windows NT\SecEdit\GptTmpl.inf"
-    
+
         # Backup the file
         Copy-Item -Path $fullPath -Destination "${fullPath}.backup"
 
@@ -417,7 +422,7 @@ function Handle-RDP-Users {
         if ($lines -contains "[Privilege Rights]") {
             # Get the index of the section
             $index = $lines.IndexOf("[Privilege Rights]") + 1
-            
+
             # Insert the permission setting after the section
             $lines = $lines[0..$index] + $permission + $lines[($index + 1)..$lines.Length]
         } else {
@@ -427,12 +432,12 @@ function Handle-RDP-Users {
 
         # Write the content back to the file
         $lines | Set-Content -Path $fullPath
-    
+
         # Get all computer names in the domain
         $computers = Get-ADComputer -Filter * | Select-Object -ExpandProperty Name
-    
+
         # Invoke gpupdate on each computer
-        Invoke-Command -ComputerName $computers -ScriptBlock {
+        Invoke-Command -ComputerName $ADcomputers -ScriptBlock {
             gpupdate /force
         } -AsJob  # Executes as background jobs to avoid waiting for each to finish
     } catch {
@@ -444,30 +449,41 @@ function Handle-RDP-Users {
 function Download-Install-Setup-Splunk {
     param([string]$IP)
     try {
-    $downloadURL = "https://download.splunk.com/products/universalforwarder/releases/9.0.1/windows/splunkforwarder-9.0.1-82c987350fde-x64-release.msi"
-    $splunkServer = "$($IP):9997" # Replace with your Splunk server IP and receiving port
+        $downloadURL = "https://download.splunk.com/products/universalforwarder/releases/9.0.1/windows/splunkforwarder-9.0.1-82c987350fde-x64-release.msi"
+        $splunkServer = "$($IP):9997" # Replace with your Splunk server IP and receiving port
 
-    # Download the Splunk Forwarder
-    $tempFile = "$env:TEMP\splunkforwarder.msi"
-    Invoke-WebRequest -Uri $downloadURL -OutFile $tempFile
+        $securedValue = Read-Host -AsSecureString "Please enter a password for the new splunk user"
+        $bstr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($securedValue)
+        $password = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr)
+        # Download the Splunk Forwarder
+        $path = "$env:TEMP\splunkforwarder.msi"
 
-    # Install Splunk Forwarder
-    Start-Process -Wait msiexec -ArgumentList "/i $tempFile AGREETOLICENSE=Yes"
+        Write-Host "Grabbing the installer file. Downloading it to $path" -ForegroundColor Cyan
+        $wc = New-Object net.webclient
+        $wc.Downloadfile($downloadURL, $path)
 
-    # Configure the forwarder to send data to your Splunk server
-    & "$env:ProgramFiles\SplunkUniversalForwarder\bin\splunk" add forward-server $splunkServer
+        Write-Host "Installing Splunk Forwarder with username" -ForegroundColor Cyan -NoNewline
+        Write-Host " splunkf" -ForegroundColor Green -NoNewline
+        Write-Host " and the" -ForegroundColor Cyan -NoNewline
+        Write-Host " password" -ForegroundColor Green -NoNewline
+        Write-Host " you provided above" -ForegroundColor Cyan
+        # Install Splunk Forwarder
+        Start-Process -Wait msiexec -ArgumentList "/i $path SPLUNKUSERNAME=splunkf SPLUNKPASSWORD=$password AGREETOLICENSE=Yes /quiet"
 
-    # Add monitored logs based on your original script. Note: These are some general sourcetypes. You might need to adjust as per your needs.
-    & "$env:ProgramFiles\SplunkUniversalForwarder\bin\splunk" add monitor "C:\Windows\System32\winevt\Logs\Security.evtx" -index main -sourcetype WinEventLog:Security
-    & "$env:ProgramFiles\SplunkUniversalForwarder\bin\splunk" add monitor "C:\Windows\System32\winevt\Logs\Application.evtx" -index main -sourcetype WinEventLog:Application
-    & "$env:ProgramFiles\SplunkUniversalForwarder\bin\splunk" add monitor "C:\Windows\System32\winevt\Logs\System.evtx" -index main -sourcetype WinEventLog:System
-    # Add more logs as necessary based on the auditing you've enabled
+        # Configure the forwarder to send data to your Splunk server
+        & "$env:ProgramFiles\SplunkUniversalForwarder\bin\splunk" add forward-server $splunkServer
 
-    # Start Splunk forwarder service
-    Start-Service SplunkForwarder
+        # Add monitored logs based on your original script. Note: These are some general sourcetypes. You might need to adjust as per your needs.
+        & "$env:ProgramFiles\SplunkUniversalForwarder\bin\splunk" add monitor "C:\Windows\System32\winevt\Logs\Security.evtx" -index main -sourcetype WinEventLog:Security
+        & "$env:ProgramFiles\SplunkUniversalForwarder\bin\splunk" add monitor "C:\Windows\System32\winevt\Logs\Application.evtx" -index main -sourcetype WinEventLog:Application
+        & "$env:ProgramFiles\SplunkUniversalForwarder\bin\splunk" add monitor "C:\Windows\System32\winevt\Logs\System.evtx" -index main -sourcetype WinEventLog:System
+        # Add more logs as necessary based on the auditing you've enabled
 
-    # Clean up the downloaded MSI file
-    Remove-Item $tempFile
+        # Start Splunk forwarder service
+        Start-Service SplunkForwarder
+
+        # Clean up the downloaded MSI file
+        Remove-Item $path
     } catch {
         Write-Host $_.Exception.Message -ForegroundColor Yellow
         Write-Host "Error Occurred..."
@@ -475,67 +491,106 @@ function Download-Install-Setup-Splunk {
 }
 
 function Install-EternalBluePatch {
+    try {
+        # Determine patch URL based on OS version keywords
+        $patchURL = switch -Regex ($osVersion) {
+            '(?i)Vista'  { "https://catalog.s.download.windowsupdate.com/d/msdownload/update/software/secu/2017/02/windows6.0-kb4012598-x64_6a186ba2b2b98b2144b50f88baf33a5fa53b5d76.msu" }
+            'Windows 7'  { "https://catalog.s.download.windowsupdate.com/d/msdownload/update/software/secu/2017/02/windows6.1-kb4012212-x64_2decefaa02e2058dcd965702509a992d8c4e92b3.msu" }
+            'Windows 8'  { "https://catalog.s.download.windowsupdate.com/c/msdownload/update/software/secu/2017/02/windows8.1-kb4012213-x64_5b24b9ca5a123a844ed793e0f2be974148520349.msu" }
+            '2008 R2'    { "https://catalog.s.download.windowsupdate.com/d/msdownload/update/software/secu/2017/02/windows6.1-kb4012212-x64_2decefaa02e2058dcd965702509a992d8c4e92b3.msu" }
+            '2008'       { "https://catalog.s.download.windowsupdate.com/d/msdownload/update/software/secu/2017/02/windows6.0-kb4012598-x64_6a186ba2b2b98b2144b50f88baf33a5fa53b5d76.msu" }
+            '2012 R2'    { "https://catalog.s.download.windowsupdate.com/c/msdownload/update/software/secu/2017/02/windows8.1-kb4012213-x64_5b24b9ca5a123a844ed793e0f2be974148520349.msu" }
+            '2012'       { "https://catalog.s.download.windowsupdate.com/c/msdownload/update/software/secu/2017/02/windows8-rt-kb4012214-x64_b14951d29cb4fd880948f5204d54721e64c9942b.msu" }
+            default { throw "Unsupported OS version: $osVersion" }
+        }
 
-    # Determine patch URL based on OS version keywords
-    $patchURL = switch -Regex ($osVersion) {
-        '7$'         { "http://patches.microsoft.com/download/win7-eternalblue-patch.msu" }
-        '8$'         { "http://patches.microsoft.com/download/win8-eternalblue-patch.msu" }
-        '8\.1'       { "http://patches.microsoft.com/download/win8.1-eternalblue-patch.msu" }
-        '10'         { "http://patches.microsoft.com/download/win10-eternalblue-patch.msu" }
-        '2008 R2'    { "https://catalog.s.download.windowsupdate.com/d/msdownload/update/software/secu/2017/02/windows6.1-kb4012212-x64_2decefaa02e2058dcd965702509a992d8c4e92b3.msu" }
-        '2008$'      { "https://catalog.s.download.windowsupdate.com/d/msdownload/update/software/secu/2017/02/windows6.0-kb4012598-x64_6a186ba2b2b98b2144b50f88baf33a5fa53b5d76.msu" }
-        '2012 R2'    { "https://catalog.s.download.windowsupdate.com/c/msdownload/update/software/secu/2017/02/windows8.1-kb4012213-x64_5b24b9ca5a123a844ed793e0f2be974148520349.msu" }
-        '2012$'      { "https://catalog.s.download.windowsupdate.com/c/msdownload/update/software/secu/2017/02/windows8-rt-kb4012214-x64_b14951d29cb4fd880948f5204d54721e64c9942b.msu" }
-        '2016'       { "http://patches.microsoft.com/download/win2016-eternalblue-patch.msu" }
-        default { throw "Unsupported OS version: $osVersion" }
+        # Download the patch to a temporary location
+        $path = "$env:TEMP\eternalblue_patch.msu"
+
+        Write-Host "Grabbing the patch file. Downloading it to $path" -ForegroundColor Cyan
+        $wc = New-Object net.webclient
+        $wc.Downloadfile($patchURL, $path)
+
+        # Install the patch
+        Start-Process -Wait -FilePath "wusa.exe" -ArgumentList "$path /quiet /norestart"
+
+        # Cleanup
+        Remove-Item -Path $path -Force
+
+        Write-Output "Patch for $OSVersion installed successfully!"
+    } catch {
+        Write-Host $_.Exception.Message -ForegroundColor Yellow
+        Write-Host "Error Occurred..."
     }
-
-    # Download the patch to a temporary location
-    $tempFile = "$env:TEMP\eternalblue_patch.msu"
-    Invoke-WebRequest -Uri $patchURL -OutFile $tempFile
-
-    # Install the patch
-    Start-Process -Wait -FilePath "wusa.exe" -ArgumentList "$tempFile /quiet /norestart"
-
-    # Cleanup
-    Remove-Item -Path $tempFile -Force
-
-    Write-Output "Patch for $OSVersion installed successfully!"
 }
 
-# Mass disable users if confirmed
-Disable-Users
+function Upgrade-SMB {
+    # Step 1: Detect the current SMB version
+    $smbv1Enabled = (Get-SmbServerConfiguration).EnableSMB1Protocol
+    $smbv2Enabled = (Get-SmbServerConfiguration).EnableSMB2Protocol
+    $restart = $false
 
-# Add competition-specific users and set their privileges
-Write-Host "`n***Adding Competition Users...***" -ForegroundColor Red
-Add-Competition-Users
+    # Step 2: Decide on the upgrade path based on the detected version
 
-# Remove non-specified users from the RDP group
-Write-Host "`n***Removing every user from RDP group except $($UserArray[0]) and $($UserArray[1])...***" -ForegroundColor Red
-Remove-RDP-Users
+    # Enable SMBv2 (assuming that by enabling SMBv2, SMBv3 will also be enabled if supported)
+    if ($smbv2Enabled -eq $false) {
+        Set-SmbServerConfiguration -EnableSMB2Protocol $true -Force
+        Write-Host "Upgraded to SMBv2/SMBv3." -ForegroundColor Green
+        $restart = $true
+    } elseif ($smbv2Enabled -eq $true) {
+        Write-Host "SMBv2 detected. No upgrade required if SMBv3 is supported alongside." -ForegroundColor Cyan
+    }
 
-# Configure firewall
-Write-Host "`n***Configuring firewall***" -ForegroundColor Red
-Configure-Firewall
+    if ($smbv1Enabled -eq $true) {
+        Write-Host "SMBv1 detected. disabling..." -ForegroundColor Yellow
 
-# Disable unnecessary services
-Write-Host "`n***Disabling unnecessary services***" -ForegroundColor Red
-Disable-Unnecessary-Services
+        # Disable SMBv1
+        Set-SmbServerConfiguration -EnableSMB1Protocol $false -Force
+        $restart = $true
+    }
 
-Write-Host "`n***Creating Blank GPO and applying to Root of domain***" -ForegroundColor Red
+    # Restart might be required after these changes
+    if ($restart -eq $true) {
+        Write-Host "Please consider restarting the machine for changes to take effect." -ForegroundColor Red
+    }
+}
+
+
+# Disable-Users
+
+# Write-Host "`n***Adding Competition Users...***" -ForegroundColor Magenta
+# Add-Competition-Users
+
+# Write-Host "`n***Removing every user from RDP group except $($UserArray[0]) and $($UserArray[1])...***" -ForegroundColor Magenta
+# Remove-RDP-Users
+
+# Write-Host "`n***Configuring firewall***" -ForegroundColor Magenta
+# Configure-Firewall
+
+# Write-Host "`n***Disabling unnecessary services***" -ForegroundColor Magenta
+# Disable-Unnecessary-Services
+
+Write-Host "`n***Creating Blank GPO and applying to Root of domain***" -ForegroundColor Magenta
 Create-Good-GPO
 
-Write-Host "`n***Disallowing RDP on the domain except for Admins and RDP users***" -ForegroundColor Red
-Handle-RDP-Users
+Write-Host "`n***Configuring Secure GPO***" -ForegroundColor Magenta
+Configure-Secure-GPO
 
-# Enable some juicy auditing
-Write-Host "`n***Enabling advanced auditing***" -ForegroundColor Red
-.\advancedAuditing.ps1
+# Write-Host "`n***Enabling advanced auditing***" -ForegroundColor Magenta
+# .\advancedAuditing.ps1
 
-# Download, install, setup splunk
-Write-Host "`n***Configuring Splunk***" -ForegroundColor Red
-$SplunkIP = Read-Host "Input IP address of Splunk Server" -ForegroundColor Cyan
-Download-Install-Setup-Splunk -IP $SplunkIP
+# Write-Host "`n***Configuring Splunk***" -ForegroundColor Magenta
+# $SplunkIP = Read-Host "`nInput IP address of Splunk Server"
+# Download-Install-Setup-Splunk -IP $SplunkIP
+
+# Write-Host "`n***Installing EternalBlue Patch***" -ForegroundColor Magenta
+# Install-EternalBluePatch
+
+# Write-Host "`n***Upgrading SMB***" -ForegroundColor Magenta
+# Upgrade-SMB
+
+# Write-Host "Setting Execution Policy back to Restricted" -ForegroundColor Magenta
+# Set-ExecutionPolicy Restricted
 
 Write-Host "`n***Installing EternalBlue Patch***" -ForegroundColor Red
 Install-EternalBluePatch
