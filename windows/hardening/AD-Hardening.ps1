@@ -556,19 +556,19 @@ function Upgrade-SMB {
 }
 
 
-# Disable-Users
+Disable-Users
 
-# Write-Host "`n***Adding Competition Users...***" -ForegroundColor Magenta
-# Add-Competition-Users
+Write-Host "`n***Adding Competition Users...***" -ForegroundColor Magenta
+Add-Competition-Users
 
-# Write-Host "`n***Removing every user from RDP group except $($UserArray[0]) and $($UserArray[1])...***" -ForegroundColor Magenta
-# Remove-RDP-Users
+Write-Host "`n***Removing every user from RDP group except $($UserArray[0]) and $($UserArray[1])...***" -ForegroundColor Magenta
+Remove-RDP-Users
 
-# Write-Host "`n***Configuring firewall***" -ForegroundColor Magenta
-# Configure-Firewall
+Write-Host "`n***Configuring firewall***" -ForegroundColor Magenta
+Configure-Firewall
 
-# Write-Host "`n***Disabling unnecessary services***" -ForegroundColor Magenta
-# Disable-Unnecessary-Services
+Write-Host "`n***Disabling unnecessary services***" -ForegroundColor Magenta
+Disable-Unnecessary-Services
 
 Write-Host "`n***Creating Blank GPO and applying to Root of domain***" -ForegroundColor Magenta
 Create-Good-GPO
@@ -576,21 +576,21 @@ Create-Good-GPO
 Write-Host "`n***Configuring Secure GPO***" -ForegroundColor Magenta
 Configure-Secure-GPO
 
-# Write-Host "`n***Enabling advanced auditing***" -ForegroundColor Magenta
-# .\advancedAuditing.ps1
+Write-Host "`n***Enabling advanced auditing***" -ForegroundColor Magenta
+.\advancedAuditing.ps1
 
-# Write-Host "`n***Configuring Splunk***" -ForegroundColor Magenta
-# $SplunkIP = Read-Host "`nInput IP address of Splunk Server"
-# Download-Install-Setup-Splunk -IP $SplunkIP
+Write-Host "`n***Configuring Splunk***" -ForegroundColor Magenta
+$SplunkIP = Read-Host "`nInput IP address of Splunk Server"
+Download-Install-Setup-Splunk -IP $SplunkIP
 
-# Write-Host "`n***Installing EternalBlue Patch***" -ForegroundColor Magenta
-# Install-EternalBluePatch
+Write-Host "`n***Installing EternalBlue Patch***" -ForegroundColor Magenta
+Install-EternalBluePatch
 
-# Write-Host "`n***Upgrading SMB***" -ForegroundColor Magenta
-# Upgrade-SMB
+Write-Host "`n***Upgrading SMB***" -ForegroundColor Magenta
+Upgrade-SMB
 
-# Write-Host "Setting Execution Policy back to Restricted" -ForegroundColor Magenta
-# Set-ExecutionPolicy Restricted
+Write-Host "Setting Execution Policy back to Restricted" -ForegroundColor Magenta
+Set-ExecutionPolicy Restricted
 
 Write-Host "`n***Installing EternalBlue Patch***" -ForegroundColor Red
 Install-EternalBluePatch
