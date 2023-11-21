@@ -12,7 +12,6 @@ p5p="https://download.splunk.com/products/universalforwarder/releases/9.0.1/sola
 sparcz="https://download.splunk.com/products/universalforwarder/releases/9.0.1/solaris/splunkforwarder-9.0.1-82c987350fde-SunOS-sparc.tar.Z"
 sparcp5p="https://download.splunk.com/products/universalforwarder/releases/9.0.1/solaris/splunkforwarder-9.0.1-82c987350fde-solaris-sparc.p5p"
 aix="https://download.splunk.com/products/universalforwarder/releases/9.0.1/aix/splunkforwarder-9.0.1-82c987350fde-AIX-powerpc.tgz"
-
 ###################### INDEXES ######################
 
 # In Bash 4.3.8, associative arrays were introduced, but they do not support nested structures directly so we have to be hacky about it to ensure older versions work
@@ -58,8 +57,6 @@ function add_monitors {
             fi
         done
     fi
-    echo "AFTER ADDING"
-    print_sources  "${log_sources[@]}"
     isFirst=true
     for source in "${log_sources[@]}"; do
         if [ "$isFirst" = true ]; then
@@ -210,30 +207,6 @@ function setup_forwarder {
     echo "############# Restarting Splunk #############*"
     sudo /opt/splunkforwarder/bin/splunk restart
 
-}
-
-function setup_fim {
-    monitors=('/etc/passwd' '/etc/group' '/etc/sudoers')
-    options=""
-    echo "Would you like to add additional log locations for FIM:"
-    echo "   -- Default log locations are:"
-    print_sources  "${monitors[@]}"
-    read -r -p "(y/n): " option
-    option=$(echo "$option" | tr -d ' ') #truncates any spaces accidentally put in
-    l="true"
-    if [ "$option" == "y" ]; then
-        while [ "$l" != "false" ]; do
-            read -r -p "Enter additional files/dirs to monitor (one entry per line; hit enter to continue): " userInput
-            if [[ "$userInput" == "" ]]; then
-                l="false"
-            else
-                log_sources+=("$userInput")
-            fi
-        done
-    fi
-    # TODO: Build out FIM with auditd. Add audit log to splunk 
-    # https://docs.rapid7.com/insightidr/fim-for-linux/
-    # https://uit.stanford.edu/service/ossec/install-source
 }
 
 function check_user {
