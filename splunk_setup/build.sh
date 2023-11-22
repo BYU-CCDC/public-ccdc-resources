@@ -37,8 +37,8 @@ function build_indexer {
 }
 
 function check_user {
-    if [[ "$(whoami)" != "CCDCUser1" && "$(whoami)" != "CCDCUser2" ]]; then
-        echo "Please run this with our privileged user CCDCUser1 or CCDCUser2"
+    if [[ "$(whoami)" != "CCDCUser1" ]]; then
+        echo "Please run this with our privileged user"
         exit 1
     fi
 }
