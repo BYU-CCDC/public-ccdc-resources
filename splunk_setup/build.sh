@@ -1,7 +1,7 @@
 #!/bin/bash
 function build_indexer {
     indexes=('misc' 'service_auth' 'service')
-    echo "Run this script as sudo user, exit and rerun if not sudo user (should be CCDCUserXX). Script will begin in 3 seconds"
+    echo "Run this script as sudo user, exit and rerun if not sudo user (should be CCDCUser1). Script will begin in 3 seconds"
     sleep 3
     spl_url="https://download.splunk.com/products/splunk/releases/9.0.4.1/linux/splunk-9.0.4.1-419ad9369127-linux-2.6-amd64.deb"
     echo "############# Installing Splunk #############"

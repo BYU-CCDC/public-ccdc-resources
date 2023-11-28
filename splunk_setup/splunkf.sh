@@ -62,11 +62,7 @@ function add_monitors {
         if [ "$isFirst" = true ]; then
             isFirst=false # ignores the name of the index and only adds the logs sources
         else
-            if [ -e "$source" ]; then # checks is path exists
-                sudo /opt/splunkforwarder/bin/splunk add monitor "$source" -index "${log_sources[0]}"
-            else
-                echo "Path $source not found. Skipping......"
-            fi
+            sudo /opt/splunkforwarder/bin/splunk add monitor "$source" -index "${log_sources[0]}"
         fi
     done
 }
@@ -183,7 +179,7 @@ function add_mysql_logs {
 }
 
 function setup_forwarder {
-    echo "Run this script as sudo user, exit and rerun if not sudo user (should be CCDCUserXX). Script will begin in 3 seconds"
+    echo "Run this script as sudo user, exit and rerun if not sudo user (should be CCDCUser1). Script will begin in 3 seconds"
     sleep 3
     if [[ $2 == "" ]]; then 
         echo "Error please provide the IP of the central splunk instance"
