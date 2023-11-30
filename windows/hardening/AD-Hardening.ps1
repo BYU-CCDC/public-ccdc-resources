@@ -474,9 +474,9 @@ function Download-Install-Setup-Splunk {
         & "$env:ProgramFiles\SplunkUniversalForwarder\bin\splunk" add forward-server $splunkServer
 
         # Add monitored logs based on your original script. Note: These are some general sourcetypes. You might need to adjust as per your needs.
-        & "$env:ProgramFiles\SplunkUniversalForwarder\bin\splunk" add monitor "C:\Windows\System32\winevt\Logs\Security.evtx" -index main -sourcetype WinEventLog:Security
-        & "$env:ProgramFiles\SplunkUniversalForwarder\bin\splunk" add monitor "C:\Windows\System32\winevt\Logs\Application.evtx" -index main -sourcetype WinEventLog:Application
-        & "$env:ProgramFiles\SplunkUniversalForwarder\bin\splunk" add monitor "C:\Windows\System32\winevt\Logs\System.evtx" -index main -sourcetype WinEventLog:System
+        & "$env:ProgramFiles\SplunkUniversalForwarder\bin\splunk" add monitor "C:\Windows\System32\winevt\Logs\Security.evtx" -index service_auth -sourcetype WinEventLog:Security
+        & "$env:ProgramFiles\SplunkUniversalForwarder\bin\splunk" add monitor "C:\Windows\System32\winevt\Logs\Application.evtx" -index service -sourcetype WinEventLog:Application
+        & "$env:ProgramFiles\SplunkUniversalForwarder\bin\splunk" add monitor "C:\Windows\System32\winevt\Logs\System.evtx" -index misc -sourcetype WinEventLog:System
         # Add more logs as necessary based on the auditing you've enabled
 
         # Start Splunk forwarder service
