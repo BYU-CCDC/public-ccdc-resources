@@ -16,10 +16,10 @@ aix="https://download.splunk.com/products/universalforwarder/releases/9.0.1/aix/
 
 # In Bash 4.3.8, associative arrays were introduced, but they do not support nested structures directly so we have to be hacky about it to ensure older versions work
 # put name of index in the first [0] position
-# index names should correspond to line 1 in the build.sh script otherwise the splunk indexer will not recieve logs correctly
-service_indexes=( 'service' '/etc/services/' '/etc/init.d' '/var/log/apache/access.log' '/var/log/apache/error.log' '/var/log/mysql/error' '/var/www/' ) #service
-service_auth_indexes=( 'service_auth' '/var/log/auth.log' '/var/log/secure/' '/var/log/audit/audit.log' ) # service_auth
-misc_indexes=( 'misc' '/tmp' '/etc/passwd' ) # misc
+# INDEX NAMES SHOULD CORRESPOND TO LINE 2 IN THE BUILD.SH SCRIPT OTHERWISE THE SPLUNK INDEXER WILL NOT RECIEVE LOGS CORRECTLY
+service_monitors=( 'service' '/etc/services/' '/etc/init.d' '/var/log/apache/access.log' '/var/log/apache/error.log' '/var/log/mysql/error' '/var/www/' ) #service
+service_auth_monitors=( 'service_auth' '/var/log/auth.log' '/var/log/secure/' '/var/log/audit/audit.log' ) # service_auth
+misc_monitors=( 'misc' '/tmp' '/etc/passwd' ) # misc
 
 #####################################################
 
@@ -40,7 +40,6 @@ function print_sources {
 function add_monitors {
     log_sources=("$@")
     isFirst=true
-    options=""
     echo "Would you like to add additional log locations for index: ${log_sources[0]}"
     echo "   -- Default log locations are:"
     print_sources  "${log_sources[@]}"
@@ -71,19 +70,22 @@ function install_forwarder {
     if [[ ! -d /opt/splunkforwarder ]]; then
         case "$1" in
             debian )
-                echo "******* Installing forwarder for Debian ********"
+                print_banner "Installing forwarder for Debian"
                 echo
                 sudo wget -O splunkf.deb "$deb"
                 sudo dpkg -i ./splunkf.deb
             ;;
             linux )
-                echo "******* Installing generic forwarder(.tgz) for linux *******"
+                print_banner "Installing generic forwarder (.tgz) for linux*"
                 echo
                 sudo wget -O splunkf.tgz "$linux"
-                sudo tar -xfvz splunkf.tgz -C /opt/
+                echo "******* Extracting to /opt/splunkforwarder *******"
+                sleep 2
+                sudo tar -xvf splunkf.tgz -C /opt/ &> /dev/null
+                sudo chown -R "$(whoami):$(whoami)" /opt/splunkforwarder
             ;;
             rpm )
-                echo "******* Installing forwarder for rpm based machines *******"
+                print_banner "Installing forwarder for rpm based machines"
                 echo
                 sudo wget -O splunkf.rpm "$rpm"
                 sudo yum install ./splunkf.rpm -y
@@ -132,21 +134,14 @@ function install_forwarder {
             ;;
             # catch all statement that provides the user with a list of potential command line options
             *)
-                echo "Usage: ./splunkf.sh <option> <forward-server-ip>"
-                echo "OPTIONS:
-                    -> debian
-                    -> linux (general tgz file)
-                    -> rpm
-                    -> other (shows list of other forwarder urls)
-                    -> -p (prints the specified url debian, linux or rpm in case something is not working)
-                    "
-                exit
-                ;;
+                print_options
+            ;;
         esac
     else
             echo "Install already exists. Proceeding to configure forwarder"
     fi
 }
+
 
 
 function add_mysql_logs {
@@ -178,41 +173,96 @@ function add_mysql_logs {
     fi
 }
 
+
 function setup_forwarder {
-    echo "Run this script as sudo user, exit and rerun if not sudo user (should be CCDCUser1). Script will begin in 3 seconds"
-    sleep 3
+    sleep 2
     if [[ $2 == "" ]]; then 
         echo "Error please provide the IP of the central splunk instance"
         echo "Usage: ./splunkf.sh <option> <forward-server-ip>"
         exit
     fi
-    echo "############# Beginning Forwarder Install #############"
     install_forwarder "$1" "$2"
     sudo chown -R CCDCUser1 /opt/splunkforwarder #give privs to our user
     sudo chgrp -R CCDCUser1 /opt/splunkforwarder
     sudo /opt/splunkforwarder/bin/splunk start --accept-license
-
-    echo "############# Adding Monitors #############"
-    add_monitors "${misc_indexes[@]}"
-    add_monitors "${service_auth_indexes[@]}"
-    add_monitors "${service_indexes[@]}"
+    print_banner "Adding Indexes"
+    add_monitors "${misc_monitors[@]}"
+    add_monitors "${service_auth_monitors[@]}"
+    add_monitors "${service_monitors[@]}"
     add_mysql_logs
-
-    echo "############# Adding Forward Server #############*"
+    #add forward server
+    print_banner "Adding Forwarder server"
     sudo /opt/splunkforwarder/bin/splunk add forward-server $2:9997
     echo "############# Restarting Splunk #############*"
+    sleep 3
     sudo /opt/splunkforwarder/bin/splunk restart
+    print_banner "End of Script"
 
 }
 
-function check_user {
-    if [[ "$(whoami)" != "CCDCUser1" ]]; then
-        echo "Please run this with our privileged user"
+
+function print_options {
+
+    echo
+    echo "ERROR: Usage: ./splunkf.sh <option> <forward-server-ip>"
+    echo "OPTIONS: 
+    -> debian
+    -> linux (general tgz file)
+    -> rpm (red hat distros)
+    -> other (shows list of other forwarder urls)
+    -> -p (prints the specified url debian, linux or rpm in case something is not working)
+            " # trust the indents
+    exit 1
+}
+
+function print_banner {
+
+    echo
+    echo "#######################################"
+    echo "#"
+    echo "#   $1"
+    echo "#"
+    echo "#######################################"
+    echo
+    sleep 2
+
+}
+
+function check_prereqs {
+    # user should not be root or run `sudo ./splunf.sh` doing so makes the splunk forwarder install be owned by root
+    if [ "$EUID" == 0 ]; then
+        echo "ERROR: Please run script without sudo prefix/not as root"
         exit 1
     fi
+
+    #user needs sudo privileges to be able to run script
+    user_groups=$(groups)
+    if [[ $user_groups != *sudo* && $user_groups != *wheel* ]]; then
+        echo "ERROR: User needs sudo privileges. User not found in sudo/wheel group"
+        exit 1
+    fi
+
+    # check if home directory exists for current user. Home directory is needed for running splunk commands since the commands are aliases for http request methods;
+    # the .splunk directory contains this auth token so without it splunk fails to install
+    if [ ! -d /home/"$(whoami)" ]; then
+        echo "No home directory for user $(whoami). Creating home directory"
+        sudo mkdir -p /home/"$(whoami)"
+    fi
+    
+    if [ "$#" != 3 ]; then
+        echo "ERROR: Usage: $0 <option> <ip_address>"
+        print_options
+    fi
+
+    if [[ ! $3 =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        echo "ERROR: Invalid IP address format: $3"
+        exit 1
+    fi
+    
 }
 
 ################################# MAIN #################################
-check_user
+echo "Beginning Script"
+check_prereqs "$0" "$1" "$2"
 setup_forwarder "$1" "$2"
 ############################### END MAIN ###############################
