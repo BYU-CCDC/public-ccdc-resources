@@ -449,10 +449,11 @@ function Configure-Secure-GPO {
 function Download-Install-Setup-Splunk {
     param([string]$IP)
     try {
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
         $downloadURL = "https://download.splunk.com/products/universalforwarder/releases/9.0.1/windows/splunkforwarder-9.0.1-82c987350fde-x64-release.msi"
         $splunkServer = "$($IP):9997" # Replace with your Splunk server IP and receiving port
 
-        $securedValue = Read-Host -AsSecureString "Please enter a password for the new splunk user"
+        $securedValue = Read-Host -AsSecureString "Please enter a password for the new splunk user (splunkf)"
         $bstr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($securedValue)
         $password = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr)
         # Download the Splunk Forwarder
@@ -468,16 +469,7 @@ function Download-Install-Setup-Splunk {
         Write-Host " password" -ForegroundColor Green -NoNewline
         Write-Host " you provided above" -ForegroundColor Cyan
         # Install Splunk Forwarder
-        Start-Process -Wait msiexec -ArgumentList "/i $path SPLUNKUSERNAME=splunkf SPLUNKPASSWORD=$password AGREETOLICENSE=Yes /quiet"
-
-        # Configure the forwarder to send data to your Splunk server
-        & "$env:ProgramFiles\SplunkUniversalForwarder\bin\splunk" add forward-server $splunkServer
-
-        # Add monitored logs based on your original script. Note: These are some general sourcetypes. You might need to adjust as per your needs.
-        & "$env:ProgramFiles\SplunkUniversalForwarder\bin\splunk" add monitor "C:\Windows\System32\winevt\Logs\Security.evtx" -index service_auth -sourcetype WinEventLog:Security
-        & "$env:ProgramFiles\SplunkUniversalForwarder\bin\splunk" add monitor "C:\Windows\System32\winevt\Logs\Application.evtx" -index service -sourcetype WinEventLog:Application
-        & "$env:ProgramFiles\SplunkUniversalForwarder\bin\splunk" add monitor "C:\Windows\System32\winevt\Logs\System.evtx" -index misc -sourcetype WinEventLog:System
-        # Add more logs as necessary based on the auditing you've enabled
+        Start-Process -Wait msiexec -ArgumentList "/i $path SPLUNKUSERNAME=splunkf SPLUNKPASSWORD=$password RECEIVING_INDEXER=$splunkServer WINEVENTLOG_SEC_ENABLE=1 WINEVENTLOG_SYS_ENABLE=1 WINEVENTLOG_APP_ENABLE=1 AGREETOLICENSE=Yes /quiet"
 
         # Start Splunk forwarder service
         Start-Service SplunkForwarder

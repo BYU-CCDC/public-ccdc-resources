@@ -341,10 +341,11 @@ function report {
 
     # Get list of running services (systemd-based systems)
     if command -v systemctl &> /dev/null; then
-        echo -e "Running Services:\n$(systemctl list-units --type=service --state=running | awk '{print $1}')"
+        systemctl list-units --type=service --state=running | awk '{print $1}' >> $log
     else
-        echo -e "Running Services:\n$(service --status-all)"
+        service --status-all &>> "$log"
     fi
+    echo "Services logged to $log"
     echo "Server Name: $server_name"
     echo "OS Type: $os_type"
     echo "OS Version: $os_version"
@@ -501,25 +502,45 @@ function full_harden {
     done
 }
 
+function print_options {
+    echo "options are:
+        full - full semi-automated hardening
+        firewall - automate firewall hardening
+        full_backup - backup all designated files
+        splunk - setup splunk forwarder
+        decrypt - decrypt file"
+}
+
 ######## MAIN ########
 
 # Check if there are at least two arguments
-if [ $# -lt 1 ]; then
-    echo "Usage: $0 [OPTION]"
-    print_options
+
+if [ "$EUID" == 0 ]; then
+    echo "ERROR: Please run script without sudo prefix/not as root"
     exit 1
+fi
+
+#user needs sudo privileges to be able to run script
+user_groups=$(groups)
+if [[ $user_groups != *sudo* && $user_groups != *wheel* ]]; then
+    echo "ERROR: User needs sudo privileges. User not found in sudo/wheel group"
+    exit 1
+fi
+
+if [ $# -lt 1 ]; then
+    read -r -p "Did you mean ./harden.sh full? (y/n): " option
+    if [ "$option" == 'y' ] ; then
+        echo "Beginning full harden......"
+        sleep 2
+        full_harden=true #cant call function here. prereqs still need to run
+    else
+        echo "Usage: $0 [OPTION]"
+        print_options
+        exit 1
+    fi
 fi
 #prereqs
 detect_os
-if id "CCDCUser1" &>/dev/null; then
-    echo "CCDCUser1 already created"
-else
-    echo "CCDCUser1 not found. Attempting to create..."
-    sudo useradd CCDCUser1
-    sudo passwd CCDCUser1
-    sudo usermod -aG $sudo_group CCDCUser1
-fi
-
 if command -v zip &> /dev/null; then
     echo "zip is installed. Proceeding"
 else
@@ -535,15 +556,7 @@ if [ ! -f "$HOME/passwd_changed.txt" ]; then touch "$log"; fi
 
 
 #end prereqs
-
-function print_options {
-    echo "options are:
-        full - full semi-automated hardening
-        firewall - automate firewall hardening
-        full_backup - backup all designated files
-        splunk - setup splunk forwarder
-        decrypt - decrypt file"
-}
+if [ "$full_harden" == true ]; then full_harden; fi
 case $1 in
     "options")
         print_options
@@ -569,8 +582,7 @@ case $1 in
         decrypt_file
     ;;
     *)
-        echo "not an option"
-        print_options
+    echo "Not an option"
     ;;
 
 esac
