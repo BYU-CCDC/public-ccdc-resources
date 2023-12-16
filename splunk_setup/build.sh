@@ -1,8 +1,27 @@
 #!/bin/bash
+
+###################### INDEXES ######################
 indexes=('misc' 'service_auth' 'service')
-service_monitors=( 'service' '/etc/services/' '/etc/init.d' '/var/log/apache/access.log' '/var/log/apache/error.log' '/var/log/mysql/error' '/var/www/' ) #service
+service_monitors=( 'service' '/etc/services/' '/etc/init.d' '/var/log/apache/access.log' '/var/log/apache/error.log' '/var/log/mysql/error' '/var/www/' ) # service
 service_auth_monitors=( 'service_auth' '/var/log/auth.log' '/var/log/secure/' '/var/log/audit/audit.log' ) # service_auth
-misc_monitors=( 'misc' '/tmp' '/etc/passwd' )
+misc_monitors=( 'misc' '/tmp' '/etc/passwd' ) # misc
+
+#####################################################
+
+function print_sources {
+    index=("$@")
+    isFirst=true
+    for value in "${index[@]}"; do
+        if [ "$isFirst" = true ]; then
+            isFirst=false # ignores the name of the index and only outputs the logs sources
+        else
+            options+="$value, "
+        fi
+    done
+    options=${options%, }  # Remove the trailing comma and space
+    echo "       -- $options"
+}
+
 function build_indexer {
 
     sleep 3
@@ -69,7 +88,7 @@ function add_monitors {
         if [ "$isFirst" = true ]; then
             isFirst=false # ignores the name of the index and only adds the logs sources
         else
-            sudo /opt/splunkforwarder/bin/splunk add monitor "$source" -index "${log_sources[0]}"
+            sudo /opt/splunk/bin/splunk add monitor "$source" -index "${log_sources[0]}"
         fi
     done
 }
