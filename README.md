@@ -9,7 +9,7 @@ these repos are allowed:
 We have a [Linux hardening script](linux/harden.sh) and an [SSHD config](linux/sshd_config)
 
 ## Splunk
-We have various [Splunk scripts](splunk/)
+We have various [Splunk scripts](splunk_setup/)
 
 If you cannot download the Splunk forwarder from the Splunk server, try these links:
 [Splunk Forwarder Download Links](splunk-forwarders.md)
