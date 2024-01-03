@@ -482,6 +482,10 @@ function Download-Install-Setup-Splunk {
     }
 }
 
+Write-Host "`n***Configuring Splunk***" -ForegroundColor Magenta
+$SplunkIP = Read-Host "`nInput IP address of Splunk Server"
+Download-Install-Setup-Splunk -IP $SplunkIP
+
 function Install-EternalBluePatch {
     try {
         # Determine patch URL based on OS version keywords
