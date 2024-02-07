@@ -588,7 +588,70 @@ function Configure-Secure-GPO {
                 "Value" = 0
                 "Type" = "DWORD"
             }
+            "Enable Domain Profile Windows Defender" = @{
+                "Key" = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\DomainProfile"
+                "ValueName" = "EnableFirewall"
+                "Value" = 1
+                "Type" = "DWORD"
+            }
+            "Enable Public Profile Windows Defender" = @{
+                "Key" = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\StandardProfile"
+                "ValueName" = "EnableFirewall"
+                "Value" = 1
+                "Type" = "DWORD"
+            }
+            "Enable Private Profile Windows Defender" = @{
+                "Key" = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\PublicProfile"
+                "ValueName" = "EnableFirewall"
+                "Value" = 1
+                "Type" = "DWORD"
+            }
+            "Set Domain Profile Block Inbound" = @{
+                "Key" = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\DomainProfile"
+                "ValueName" = "DefaultInboundAction"
+                "Value" = "Block"
+                "Type" = "String"
+            }
+            "Set Domain Profile Allow Outbound" = @{
+                "Key" = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\DomainProfile"
+                "ValueName" = "DefaultOutboundAction"
+                "Value" = "Allow"
+                "Type" = "String"
+            }
+            "Set Standard Profile Block Inbound" = @{
+                "Key" = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\StandardProfile"
+                "ValueName" = "DefaultInboundAction"
+                "Value" = "Block"
+                "Type" = "String"
+            }
+            "Set Standard Profile Allow Outbound" = @{
+                "Key" = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\StandardProfile"
+                "ValueName" = "DefaultOutboundAction"
+                "Value" = "Allow"
+                "Type" = "String"
+            }
+            "Set Public Profile Block Inbound" = @{
+                "Key" = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\PublicProfile"
+                "ValueName" = "DefaultInboundAction"
+                "Value" = "Block"
+                "Type" = "String"
+            }
+            "Set Public Profile Allow Outbound" = @{
+                "Key" = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\PublicProfile"
+                "ValueName" = "DefaultOutboundAction"
+                "Value" = "Allow"
+                "Type" = "String"
+            }
+            "Enable Defender Antivirus Protection" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Real-Time Protection"
+                "ValueName" = "DisableRealtimeMonitoring"
+                "Value" = 0
+                "Type" = "DWORD"
+            }
         }
+
+# # Configure Windows Defender Antivirus settings via Group Policy to enable real-time monitoring
+
 
         $successfulConfigurations = 0
         $failedConfigurations = @()
