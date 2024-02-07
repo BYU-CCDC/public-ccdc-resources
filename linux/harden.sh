@@ -159,7 +159,8 @@ function full_backup {
         fi
     done
     #mysql database
-    read -r -p "Do you know the mysql user password? (y/n): " option
+    
+    read -r -p "Is mysql installed? (y/n): " option
     if [ "$option" == 'y' ];
     then
         echo "Attempting to back up MYSQL database" >> "$log"
@@ -174,11 +175,23 @@ function full_backup {
     sudo chown -R "$(whoami):$(whoami)" "$HOME/backups"
     sudo chmod -R 744 "$HOME/backups"
     tar -czvf backups.tar.gz "$HOME/backups" &>/dev/null #zip
-    read -r -s -p "Enter Password for encrypting backups: " enc
+    while true; do
+        read -r -s -p "Enter Password for encrypting backups: " enc
+        echo " " #new line
+        read -r -s -p "Confirm Password for encrypting backups: " enc2
+        if [ "$enc" == "$enc2" ]; then
+            echo " "
+            echo "Passwords matched"
+            break
+        else
+            echo " "
+            echo "Passwords did not match. Try again..."
+        fi
+    done   
     openssl enc -aes-256-cbc -salt -in "$HOME/backups.tar.gz" -out "$HOME/backups.tar.gz".enc -k "$enc"
     sudo rm "$HOME/backups.tar.gz"
     sudo rm -rf "$HOME/backups"
-    echo "backups encrypted"
+    echo "Backups encrypted"
 }
 
 function backup {
@@ -359,18 +372,21 @@ function disable_users {
                 fi
             done    
         fi
-        if [ -d /usr/bin/nologin ]; then
-            awk -F ':' '/bash/{print $1}' /etc/passwd | while read -r line; do sudo usermod -s /usr/bin/nologin "$line"; done
-        elif [ -d /sbin/nologin ]; then 
-            awk -F ':' '/bash/{print $1}' /etc/passwd | while read -r line; do sudo usermod -s /sbin/nologin "$line"; done
+        if [ -f /usr/sbin/nologin ]; then
+            awk -F ':' '/bash/{print $1}' /etc/passwd | while read -r line; do sudo usermod -s /usr/sbin/nologin "$line"; echo "$line set to nologin"; echo "$line set to nologin" >> "$log"; done
+        elif [ -f /sbin/nologin ]; then 
+            echo "$line set to nologin"
+            awk -F ':' '/bash/{print $1}' /etc/passwd | while read -r line; do sudo usermod -s /sbin/nologin "$line"; echo "$line set to nologin"; echo "$line set to nologin" >> "$log"; done
         else
-            echo "No usable bin for preventing bash logins aka /usr/bin/nologin & /sbin/nologin do not exist"
-            echo "No usable bin for preventing bash logins aka /usr/bin/nologin & /sbin/nologin do not exist" >> $log
+            echo "No usable bin for preventing bash logins aka /usr/sbin/nologin & /sbin/nologin do not exist"
+            echo "No usable bin for preventing bash logins aka /usr/sbin/nologin & /sbin/nologin do not exist" >> "$log"
         fi
 
   
         for user in "${bash_users[@]}"; do
             sudo usermod -s /bin/bash "$user";
+            echo "$user shell access granted"
+            echo "$user shell access granted" >> "$log";
         done
     fi
     read -r -p "Would you like to change user passwords in mass? (y/n): " opt1
@@ -395,10 +411,11 @@ function report {
 
     # Get list of running services (systemd-based systems)
     if command -v systemctl &> /dev/null; then
-        echo -e "Running Services:\n$(systemctl list-units --type=service --state=running | awk '{print $1}')"
+        systemctl list-units --type=service --state=running | awk '{print $1}' >> $log
     else
-        echo -e "Running Services:\n$(service --status-all)"
+        service --status-all &>> "$log"
     fi
+    echo "Services logged to $log"
     echo "Server Name: $server_name"
     echo "OS Type: $os_type"
     echo "OS Version: $os_version"
@@ -410,10 +427,10 @@ function report {
 function setup_firewall {
     detect_os
     sudo $lpm install -y ufw
-    default_ports=('22/tcp' '80/tcp' '443/tcp' '53/udp' '9997/tcp')
+    default_ports=('22/tcp' '53/udp' '9997/tcp')
     l="true"
     if command -v ufw &>/dev/null; then
-        default_ports=('22/tcp' '80/tcp' '443/tcp' '53/udp' '9997/tcp')
+        default_ports=('22/tcp' '53/udp' '9997/tcp')
         echo "Package UFW installed successfully."
         echo "Do you want to add other ports?
         Defaults:"
@@ -452,7 +469,7 @@ function setup_firewall {
             echo "    - $item"
         done
         read -r -p "(y/n): " option
-    option=$(echo "$option" | tr -d ' ') #truncates any spaces accidentally put in
+        option=$(echo "$option" | tr -d ' ') #truncates any spaces accidentally put in
         if [ "$option" == "y" ]; then
             while [ "$l" != "false" ]; do
                 read -r -e -p "Enter additional ports (ex. 53/udp; hit enter to continue script): " userInput
@@ -497,7 +514,7 @@ function setup_splunk_forwarder {
     if [ $os == "ubuntu" ]; then os="debian"; fi
     if [ $os == "fedora" ] || [ $os == "centos" ] ; then os="rpm"; fi
 
-    read -r -p "what is the forward server ip?" ip
+    read -r -p "what is the forward server ip? " ip
     ./splunkf.sh $os "$ip"
     echo "************ SPLUNK DONE ************"
     cleanup_files ./splunkf.sh
@@ -554,7 +571,6 @@ function full_harden {
     echo "************ Generating Report ************"
     sleep 2
     report
-    echo "************ REPORT CAN BE FOUND AT $log ************"
     echo "************ END OF SCRIPT ************"
     echo " "
     echo "***********************************************************"
@@ -569,7 +585,7 @@ function full_harden {
 
 ######## MAIN ########
 function check_prereqs {
-    #prereqs
+    echo "************ Installing Prereqs ************"
     detect_os
     if id "CCDCUser1" &>/dev/null; then
         echo "CCDCUser1 already created"
@@ -592,6 +608,8 @@ function check_prereqs {
     sudo chown -R "$(whoami):$(whoami)" "$HOME/backups"
     sudo chmod -R 744 "$HOME/backups"
     if [ ! -f "$HOME/passwd_changed.txt" ]; then touch "$log"; fi
+    echo "************ Finished Prereqs ************"
+
 }
 #end prereqs
 
@@ -611,15 +629,38 @@ function print_options {
     "
 }
 
+# Check if there are at least two arguments
 if [ $# -lt 1 ]; then
-    echo "Usage: $0 [OPTION]"
-    print_options
+    read -r -p "Did you mean ./harden.sh full? (y/n): " option
+    if [ "$option" == 'y' ] ; then
+        echo "Beginning full harden......"
+        sleep 2
+        full_harden=true #cant call function here. prereqs still need to run
+    else
+        echo "Usage: $0 [OPTION]"
+        print_options
+        exit 1
+    fi
+fi
+if [ "$EUID" == 0 ]; then
+    echo "ERROR: Please run script without sudo prefix/not as root"
     exit 1
 fi
+# ser needs sudo privileges to be able to run script
+user_groups=$(groups)
+if [[ $user_groups != *sudo* && $user_groups != *wheel* ]]; then
+    echo "ERROR: User needs sudo privileges. User not found in sudo/wheel group"
+    exit 1
+fi
+
 if [ "$1" != "help" ]; then
     check_prereqs
 fi
+#prereqs
 
+
+#end prereqs
+if [ "$full_harden" == true ]; then full_harden; fi
 case $1 in
     "help")
         print_options
@@ -648,8 +689,7 @@ case $1 in
         decrypt_file
     ;;
     *)
-        echo "not an option"
-        print_options
+    echo "Not an option"
     ;;
 
 esac
