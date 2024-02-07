@@ -1,17 +1,51 @@
 #!/bin/bash
-rpm="https://download.splunk.com/products/universalforwarder/releases/9.0.1/linux/splunkforwarder-9.0.1-82c987350fde-linux-2.6-x86_64.rpm"
-linux="https://download.splunk.com/products/universalforwarder/releases/9.0.1/linux/splunkforwarder-9.0.1-82c987350fde-Linux-x86_64.tgz"
-deb="https://download.splunk.com/products/universalforwarder/releases/9.0.1/linux/splunkforwarder-9.0.1-82c987350fde-linux-2.6-amd64.deb"
-arm="https://download.splunk.com/products/universalforwarder/releases/9.0.1/linux/splunkforwarder-9.0.1-82c987350fde-Linux-armv8.tgz"
-s90="https://download.splunk.com/products/universalforwarder/releases/9.0.1/linux/splunkforwarder-9.0.1-82c987350fde-Linux-s390x.tgz"
-ppcle="https://download.splunk.com/products/universalforwarder/releases/9.0.1/linux/splunkforwarder-9.0.1-82c987350fde-Linux-ppc64le.tgz"
-mac="https://download.splunk.com/products/universalforwarder/releases/9.0.1/osx/splunkforwarder-9.0.1-82c987350fde-darwin-universal2.tgz"
-freebsd="https://download.splunk.com/products/universalforwarder/releases/9.0.1/freebsd/splunkforwarder-9.0.1-82c987350fde-FreeBSD11-amd64.tgz"
-z="https://download.splunk.com/products/universalforwarder/releases/9.0.1/solaris/splunkforwarder-9.0.1-82c987350fde-SunOS-x86_64.tar.Z"
-p5p="https://download.splunk.com/products/universalforwarder/releases/9.0.1/solaris/splunkforwarder-9.0.1-82c987350fde-solaris-intel.p5p"
-sparcz="https://download.splunk.com/products/universalforwarder/releases/9.0.1/solaris/splunkforwarder-9.0.1-82c987350fde-SunOS-sparc.tar.Z"
-sparcp5p="https://download.splunk.com/products/universalforwarder/releases/9.0.1/solaris/splunkforwarder-9.0.1-82c987350fde-solaris-sparc.p5p"
-aix="https://download.splunk.com/products/universalforwarder/releases/9.0.1/aix/splunkforwarder-9.0.1-82c987350fde-AIX-powerpc.tgz"
+# Usage: ./splunk.sh <option> <forward-server-ip>
+# Use `indexer` as the forward-server-ip to install the indexer
+
+# Prints script options
+function print_options {
+    echo
+    echo "Usage: ./splunk.sh <option> <forward-server-ip>"
+    echo "Use \`indexer\` as the forward-server-ip to install the indexer"
+    echo "OPTIONS: 
+    -> debian
+    -> linux (general tgz file)
+    -> rpm (red hat distros)
+    -> other (shows list of other forwarder urls)
+    -> -p (prints the specified url debian, linux or rpm in case something is not working)
+            " # trust the indents
+    exit 1
+}
+
+if [ "$#" != 2 ]; then
+    print_options
+fi
+
+###################### DOWNLOAD URLS ######################
+IP="$2"
+if [ $IP == "indexer" ]; then
+    rpm="https://download.splunk.com/products/splunk/releases/9.2.0/linux/splunk-9.2.0-1fff88043d5f.x86_64.rpm"
+    linux="https://download.splunk.com/products/splunk/releases/9.2.0/linux/splunk-9.2.0-1fff88043d5f-Linux-x86_64.tgz"
+    deb="https://download.splunk.com/products/splunk/releases/9.0.1/linux/splunk-9.0.1-82c987350fde-linux-2.6-amd64.deb"
+    SPLUNKDIR="/opt/splunk"
+else
+    rpm="https://download.splunk.com/products/universalforwarder/releases/9.0.1/linux/splunkforwarder-9.0.1-82c987350fde-linux-2.6-x86_64.rpm"
+    linux="https://download.splunk.com/products/universalforwarder/releases/9.0.1/linux/splunkforwarder-9.0.1-82c987350fde-Linux-x86_64.tgz"
+    deb="https://download.splunk.com/products/universalforwarder/releases/9.0.1/linux/splunkforwarder-9.0.1-82c987350fde-linux-2.6-amd64.deb"
+    arm="https://download.splunk.com/products/universalforwarder/releases/9.0.1/linux/splunkforwarder-9.0.1-82c987350fde-Linux-armv8.tgz"
+    s90="https://download.splunk.com/products/universalforwarder/releases/9.0.1/linux/splunkforwarder-9.0.1-82c987350fde-Linux-s390x.tgz"
+    ppcle="https://download.splunk.com/products/universalforwarder/releases/9.0.1/linux/splunkforwarder-9.0.1-82c987350fde-Linux-ppc64le.tgz"
+    mac="https://download.splunk.com/products/universalforwarder/releases/9.0.1/osx/splunkforwarder-9.0.1-82c987350fde-darwin-universal2.tgz"
+    freebsd="https://download.splunk.com/products/universalforwarder/releases/9.0.1/freebsd/splunkforwarder-9.0.1-82c987350fde-FreeBSD11-amd64.tgz"
+    z="https://download.splunk.com/products/universalforwarder/releases/9.0.1/solaris/splunkforwarder-9.0.1-82c987350fde-SunOS-x86_64.tar.Z"
+    p5p="https://download.splunk.com/products/universalforwarder/releases/9.0.1/solaris/splunkforwarder-9.0.1-82c987350fde-solaris-intel.p5p"
+    sparcz="https://download.splunk.com/products/universalforwarder/releases/9.0.1/solaris/splunkforwarder-9.0.1-82c987350fde-SunOS-sparc.tar.Z"
+    sparcp5p="https://download.splunk.com/products/universalforwarder/releases/9.0.1/solaris/splunkforwarder-9.0.1-82c987350fde-solaris-sparc.p5p"
+    aix="https://download.splunk.com/products/universalforwarder/releases/9.0.1/aix/splunkforwarder-9.0.1-82c987350fde-AIX-powerpc.tgz"
+    SPLUNKDIR="/opt/splunkforwarder"
+fi
+#####################################################
+
 ###################### INDEXES ######################
 # INDEX NAMES SHOULD CORRESPOND TO LINE 2 IN THE BUILD.SH SCRIPT OTHERWISE THE SPLUNK INDEXER WILL NOT RECIEVE LOGS CORRECTLY
 INDEXES=( 'service' 'service_auth' 'network' 'misc' )
@@ -29,20 +63,6 @@ function print_banner {
     echo "#######################################"
     echo
     sleep 2
-}
-
-# Prints script options
-function print_options {
-    echo
-    echo "Usage: ./splunkf.sh <option> <forward-server-ip>"
-    echo "OPTIONS: 
-    -> debian
-    -> linux (general tgz file)
-    -> rpm (red hat distros)
-    -> other (shows list of other forwarder urls)
-    -> -p (prints the specified url debian, linux or rpm in case something is not working)
-            " # trust the indents
-    exit 1
 }
 
 # Checks that correct arguments were provided to script
@@ -78,41 +98,42 @@ function check_prereqs {
     fi
     
     if [ "$#" != 3 ]; then
-        echo "[*] ERROR: Usage: $0 <option> <ip_address>"
         print_options
     fi
-
-    if [[ ! $3 =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-        echo "[*] ERROR: Invalid IP address format: $3"
-        print_options
+    
+    if [ $IP != "indexer" ]; then
+        if [[ ! $3 =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "[*] ERROR: Invalid IP address format: $3"
+            print_options
+        fi
     fi
 }
 
-# Installs correct forwarder for specific distribution
-function install_forwarder {
-    # If forwarder does not already exist:
-    if [[ ! -d /opt/splunkforwarder ]]; then
+# Downloads and installs correct version for distribution
+function install_splunk {
+    # If splunk does not already exist:
+    if [[ ! -d $SPLUNKDIR ]]; then
         # Determine distribution type and install
         case "$1" in
             debian )
-                print_banner "Installing forwarder for Debian"
+                print_banner "Installing for Debian"
                 echo
-                sudo wget -O splunkf.deb "$deb"
-                sudo dpkg -i ./splunkf.deb
+                sudo wget -O splunk.deb "$deb"
+                sudo dpkg -i ./splunk.deb
             ;;
             linux )
-                print_banner "Installing generic forwarder (.tgz) for linux*"
+                print_banner "Installing generic (.tgz) for linux*"
                 echo
-                sudo wget -O splunkf.tgz "$linux"
-                echo "******* Extracting to /opt/splunkforwarder *******"
+                sudo wget -O splunk.tgz "$linux"
+                echo "******* Extracting to $SPLUNKDIR *******"
                 sleep 2
-                sudo tar -xvf splunkf.tgz -C /opt/ &> /dev/null
+                sudo tar -xvf splunk.tgz -C /opt/ &> /dev/null
             ;;
             rpm )
-                print_banner "Installing forwarder for rpm based machines"
+                print_banner "Installing for rpm based machines"
                 echo
-                sudo wget -O splunkf.rpm "$rpm"
-                sudo yum install ./splunkf.rpm -y
+                sudo wget -O splunk.rpm "$rpm"
+                sudo yum install ./splunk.rpm -y
             ;;
             # prints the url in case there are problems with the install
             -p)
@@ -162,20 +183,44 @@ function install_forwarder {
             ;;
         esac
     else
-        echo "[*] Install already exists. Proceeding to configure forwarder."
+        echo "[*] Install already exists. Proceeding to configure splunk."
     fi
 }
 
-# Installs forwarder and gives ownership to CCDCUser1
-function setup_forwarder {
+# Special function only called when setting up indexer
+function setup_indexer {
+    print_banner "Configuring Indexer"
+
+    echo "[*] Adding listening port 9997"
+    sudo /opt/splunk/bin/splunk enable listen 9997
+
+    echo "[*] Adding Indexes"
+    for i in "${INDEXES[@]}"; do
+        sudo /opt/splunk/bin/splunk add index "$i"
+    done
+
+    echo "[*] Installing Searches"
+    wget https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main/splunk_setup/savedsearches.conf
+    sudo mkdir -p /opt/splunk/etc/users/splunk/search/local/
+    if sudo cp /opt/splunk/etc/users/splunk/search/local/savedsearches.conf /opt/splunk/etc/users/splunk/search/local/savedsearches.bk &>/dev/null; then
+        echo "[*] Successfully backed up old savedsearches.conf as savedsearches.bk"
+    fi
+    sudo mv ./savedsearches.conf /opt/splunk/etc/users/splunk/search/local/savedsearches.conf
+}
+
+# Installs splunk and gives ownership to CCDCUser1
+function setup_splunk {
     sleep 2
     if [[ $2 == "" ]]; then 
         echo "[*] ERROR: Please provide the IP of the central splunk instance"
-        echo "Usage: ./splunkf.sh <option> <forward-server-ip>"
+        echo "Usage: ./splunk.sh <option> <forward-server-ip>"
         exit
     fi
-    install_forwarder "$1" "$2"
-    sudo /opt/splunkforwarder/bin/splunk start --accept-license
+    install_splunk "$1" "$2"
+    sudo $SPLUNKDIR/bin/splunk start --accept-license
+    if [ $IP == "indexer" ]; then
+        setup_indexer
+    fi
 }
 
 # Checks for existence of a file or directory and add it as a monitor if it exists
@@ -186,7 +231,7 @@ function add_monitor {
     source=$1
     index=$2
     if [ -e "${source}" ]; then
-        sudo /opt/splunkforwarder/bin/splunk add monitor "$source" -index "$index"
+        sudo $SPLUNKDIR/bin/splunk add monitor "$source" -index "$index"
         # echo "[*] Added monitor for ${source}"
     else
         echo "[*] ERROR: No file or dir found at ${source}"
@@ -280,7 +325,7 @@ function add_ssh_key_logs {
     for dir in /home/*; do
         if [ -d "$dir" ]; then
             if [ -d "$dir/.ssh" ]; then
-                echo "[*] Adding ${dir}"
+                echo "[*] Adding ${dir}/.ssh/"
                 add_monitor "${dir}" "${INDEX}"
             fi
         fi
@@ -376,6 +421,17 @@ function add_mysql_logs {
     fi
 }
 
+# Adds monitors for the Splunk indexer service itself
+function add_indexer_web_logs {
+    print_banner "Adding indexer web logs"
+
+    INDEX="service"
+    SPLUNK_WEB_ACCESS="/opt/splunk/var/log/splunk/web_access.log"
+
+    echo "[*] Adding monitors for Splunk web logs"
+    add_monitor "${SPLUNK_WEB_ACCESS}" "${INDEX}"
+}
+
 # Asks the user to specify additional logs to add
 function add_additional_logs {
     print_banner "Adding additional logs"
@@ -414,6 +470,11 @@ function setup_monitors {
     add_ssh_key_logs
     add_web_logs
     add_mysql_logs
+
+    if [ $IP == "indexer" ]; then
+        add_indexer_web_logs
+    fi
+
     add_additional_logs
 }
 
@@ -421,23 +482,26 @@ function setup_monitors {
 # Arguments:
 #   $1: IP address of server
 function setup_forward_server {
-    IP=$1
     print_banner "Adding Forward Server"
-    sudo /opt/splunkforwarder/bin/splunk add forward-server $IP:9997
-    print_banner "Restarting Splunk"
-    sleep 3
-    sudo /opt/splunkforwarder/bin/splunk restart
+    sudo $SPLUNKDIR/bin/splunk add forward-server $1:9997
 }
 
 ################################# MAIN #################################
 echo "[*] Starting script"
 check_prereqs "$0" "$1" "$2"
-setup_forwarder "$1" "$2"
+setup_splunk "$1" "$2"
 setup_monitors
-setup_forward_server "$2"
-sudo chown -R CCDCUser1 /opt/splunkforwarder # Give privs to our user
-sudo chgrp -R CCDCUser1 /opt/splunkforwarder
+if [ $IP != "indexer" ]; then
+    setup_forward_server "$2"
+fi
+sudo chown -R CCDCUser1 $SPLUNKDIR # Give privs to our user
+sudo chgrp -R CCDCUser1 $SPLUNKDIR
+
+print_banner "Restarting Splunk"
+sleep 3
+sudo $SPLUNKDIR/bin/splunk restart
+
 print_banner "End of script"
-echo "[*] You can add future additional monitors with 'sudo /opt/splunkforwarder/bin/splunk add monitor <PATH> -index <INDEX>'"
+echo "[*] You can add future additional monitors with 'sudo $SPLUNKDIR/bin/splunk add monitor <PATH> -index <INDEX>'"
 echo
 ############################### END MAIN ###############################
