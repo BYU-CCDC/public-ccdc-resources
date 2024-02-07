@@ -313,7 +313,7 @@ function add_web_logs {
     elif [ -d "/var/log/nginx" ]; then
         echo "[*] Adding monitors for Nginx logs"
         NGINX_ACCESS="/var/log/nginx/access.log"
-        NGINX_ERROR="/var/log/nginx/error_log"
+        NGINX_ERROR="/var/log/nginx/error.log"
         add_monitor "${NGINX_ACCESS}" "${INDEX}"
         add_monitor "${NGINX_ERROR}" "${INDEX}"
     else
