@@ -583,6 +583,15 @@ function full_harden {
     done
 }
 
+function print_options {
+    echo "options are:
+        full - full semi-automated hardening
+        firewall - automate firewall hardening
+        full_backup - backup all designated files
+        splunk - setup splunk forwarder
+        decrypt - decrypt file"
+}
+
 ######## MAIN ########
 function check_prereqs {
     echo "************ Installing Prereqs ************"
@@ -642,11 +651,12 @@ if [ $# -lt 1 ]; then
         exit 1
     fi
 fi
+
 if [ "$EUID" == 0 ]; then
     echo "ERROR: Please run script without sudo prefix/not as root"
     exit 1
 fi
-# ser needs sudo privileges to be able to run script
+# user needs sudo privileges to be able to run script
 user_groups=$(groups)
 if [[ $user_groups != *sudo* && $user_groups != *wheel* ]]; then
     echo "ERROR: User needs sudo privileges. User not found in sudo/wheel group"
@@ -656,10 +666,7 @@ fi
 if [ "$1" != "help" ]; then
     check_prereqs
 fi
-#prereqs
 
-
-#end prereqs
 if [ "$full_harden" == true ]; then full_harden; fi
 case $1 in
     "help")
