@@ -199,10 +199,31 @@ function backup {
         echo "** Either $1 doesn not exist or failed to make backup for $1" >> "$log"
     fi
 }
+function generate_word {
+    shuf -n1 /usr/share/dict/words
+}
+
+# Function to generate a random password in the format: word-word-word
+function generate_passphrase {
+    word1=$(generate_word)
+    word2=$(generate_word)
+    word3=$(generate_word)
+    new_password="${word1}-${word2}-${word3}"
+    echo "Changed password for $user" >> "$log"
+    echo "$user:$new_password" | sudo chpasswd
+    echo "$user:$new_password" >> passwd_changed.txt    
+}
 
 function change_passwords {
     # change all non-system user passwords
     users_to_exclude=("CCDCUser1" "CCDCUser2")
+    wget -O "list.txt" "https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main/linux/list.txt" # grab a wordlist
+    if [ $? -eq 0 ]; then
+        echo -r -p "Would you like a passphrase or password for the new passwords? (1-passpharase; 2-password)" opt1
+    else
+        echo "Failed to download wordlist. Password will be used as the default option for password changes"
+        opt1=2
+    fi
     echo -e "Would you like to append more users to exclude from a password change?
     -- Default excluded users are:"
     for item in "${users_to_exclude[@]}"; do
@@ -224,29 +245,44 @@ function change_passwords {
     fi
     non_system_users=$(awk -F: '$3 >= 1000 && $1 != "nobody" && $1 != "nfsnobody" {print $1}' /etc/passwd)
     for user in $non_system_users; do
-        # Generate a random password (change as needed)
         exclude=false
+        # dont change passwd for user if user is in excluded users
         for excluded_user in "${users_to_exclude[@]}"; do
             if [ "$user" == "$excluded_user" ]; then
                 exclude=true
                 break
             fi
         done
-
-        # done change passwd for user if user is in excluded users
-        if [ "$exclude" == "false" ]; then
+        # if opt1 == 1 then do a passphrase as the password i.e. apple-house-pants
+        if [ "$opt1" = 1 ]; then
+            generate_passphrase
+        else
             echo "Changed password for $user" >> "$log"
             new_password=$(sudo openssl rand -base64 12)
             echo "$user:$new_password" | sudo chpasswd
             echo "$user:$new_password" >> passwd_changed.txt
         fi
     done
-    read -r -s -p "Enter Password for encrypting user passwords: " enc
+    # recursive check that the encryption password was typed correctly
+    while true; do
+        read -r -s -p "Enter Password for encrypting user passwords: " enc
+        echo " " #new line
+        read -r -s -p "Confirm Password for encrypting user passwords: " enc2
+        if [ "$enc" == "$enc2" ]; then
+            echo " "
+            echo "Passwords matched"
+            break
+        else
+            echo " "
+            echo "Passwords did not match. Try again..."
+        fi
+    done   
     openssl enc -aes-256-cbc -salt -in "$HOME/passwd_changed.txt" -out "$HOME/passwd_changed.txt.enc" -k "$enc"
     sudo rm "$HOME/passwd_changed.txt"
-    echo "backups encrypted"
+    echo "Password file successfully encrypted"
 
 }
+
 
 function remove_sudoers {
     users_to_exclude=("CCDCUser1")
@@ -300,33 +336,51 @@ function remove_sudoers {
 }
 
 function disable_users {
-    bash_users=('CCDCUser1')
-    
-    echo -e "Would you like to append more users who need bash access? 
-    -- Default excluded users are:"
-    for item in "${bash_users[@]}"; do
-        echo "      - $item"
-    done
-    l="true"
-    read -r -p "(y/n): " option
-    option=$(echo "$option" | tr -d ' ') #truncates any spaces accidentally put in
-    if [ "$option" == "y" ]; then
-        while [ "$l" != "false" ]; do
-            read -r -e -p "Enter additional users (one entry per line; hit enter to continue script): " userInput
+    read -r -p "Would you like to remove bash access for users? (y/n): " opt
+    if [ "$opt" == "y" ]; then
+        bash_users=('CCDCUser1')
+        
+        echo -e "Would you like to append more users who need bash access? 
+        -- Default excluded users are:"
+        for item in "${bash_users[@]}"; do
+            echo "      - $item"
+        done
+        l="true"
+        read -r -p "(y/n): " option
+        option=$(echo "$option" | tr -d ' ') #truncates any spaces accidentally put in
+        if [ "$option" == "y" ]; then
+            while [ "$l" != "false" ]; do
+                read -r -e -p "Enter additional users (one entry per line; hit enter to continue script): " userInput
 
-            if [[ "$userInput" == "" ]]; then
-                l="false"
-            else
-                bash_users+=("$userInput")
-            fi
-        done    
+                if [[ "$userInput" == "" ]]; then
+                    l="false"
+                else
+                    bash_users+=("$userInput")
+                fi
+            done    
+        fi
+        if [ -d /usr/bin/nologin ]; then
+            awk -F ':' '/bash/{print $1}' /etc/passwd | while read -r line; do sudo usermod -s /usr/bin/nologin "$line"; done
+        elif [ -d /sbin/nologin ]; then 
+            awk -F ':' '/bash/{print $1}' /etc/passwd | while read -r line; do sudo usermod -s /sbin/nologin "$line"; done
+        else
+            echo "No usable bin for preventing bash logins aka /usr/bin/nologin & /sbin/nologin do not exist"
+            echo "No usable bin for preventing bash logins aka /usr/bin/nologin & /sbin/nologin do not exist" >> $log
+        fi
+
+  
+        for user in "${bash_users[@]}"; do
+            sudo usermod -s /bin/bash "$user";
+        done
     fi
-    awk -F ':' '/bash/{print $1}' /etc/passwd | while read -r line; do sudo usermod -s /usr/bin/nologin "$line"; done
-    for user in "${bash_users[@]}"; do
-        sudo usermod -s /bin/bash "$user";
-    done
-    change_passwords
-    remove_sudoers
+    read -r -p "Would you like to change user passwords in mass? (y/n): " opt1
+    if [ "$opt1" == "y" ]; then 
+        change_passwords
+    fi
+    read -r -p "Would you like to remove sudoers? (y/n): " opt2
+    if [ "$opt2" == "y" ]; then
+        remove_sudoers
+    fi
     
 }
 
@@ -466,6 +520,7 @@ $(ls -1)" #spacing is weird i know. just trust me
     read -r -p "File Path: " dest_path
     read -r -s -p "What is the decryption password: " password
     echo " "
+    
     openssl enc -d -aes-256-cbc -in "$file_path" -out "$dest_path" -k "$password"
     if [ $? -eq 0 ]; then
         echo "$file_path successfully decrypted to $dest_path"
@@ -480,14 +535,25 @@ function full_harden {
     echo "************ BEGIN USER HARDENING ************"
     disable_users
     echo "************ BEGIN FIREWALL SETUP ************"
-    setup_firewall
-    read -r -p "Do you want to install a splunk forwarder? (y/n): " opt
-    if [ "$opt" == "y" ]; then echo "************ BEGIN SPLUNK SETUP ************"; setup_splunk_forwarder; fi
+    read -r -p "Would you like to setup a firewall? (y/n): " opt1
+    if [ "$opt1" == "y" ]; then
+        setup_firewall
+    fi
+    read -r -p "Do you want to install a splunk forwarder? (y/n): " opt2
+    if [ "$opt2" == "y" ]; then echo "************ BEGIN SPLUNK SETUP ************"; setup_splunk_forwarder; fi
     echo "************ BEGIN LOCATING SERVICES ************"
-    locate_services
+    read -r -p "Would you like to locate services? (y/n): " opt3
+    if [ "$opt3" == "y" ]; then
+        locate_services
+    fi
+    echo "************ BEGIN FULL BACKUP ************"
+    read -r -p "Would you like to do a full backup? (y/n): " opt4
+    if [ "$opt4" == "y" ]; then
+        full_backup
+    fi
+    echo "************ Generating Report ************"
+    sleep 2
     report
-    echo "************ BEGIN FULL BACKUP ************" 
-    full_backup
     echo "************ REPORT CAN BE FOUND AT $log ************"
     echo "************ END OF SCRIPT ************"
     echo " "
@@ -502,50 +568,60 @@ function full_harden {
 }
 
 ######## MAIN ########
+function check_prereqs {
+    #prereqs
+    detect_os
+    if id "CCDCUser1" &>/dev/null; then
+        echo "CCDCUser1 already created"
+    else
+        echo "CCDCUser1 not found. Attempting to create..."
+        sudo useradd CCDCUser1
+        sudo passwd CCDCUser1
+        sudo usermod -aG $sudo_group CCDCUser1
+    fi
 
-# Check if there are at least two arguments
+    if command -v zip &> /dev/null; then
+        echo "zip is installed. Proceeding"
+    else
+        echo "zip is not installed. Installing..."
+        sudo $lpm install -y zip
+    fi
+    if [ ! -d "$backup_dir" ]; then mkdir -p "$backup_dir"; fi
+    if [ ! -d "$HOME/scripts" ]; then mkdir -p "$HOME/scripts"; fi
+    if [ ! -f "$HOME/backups/harden_log.txt" ]; then touch "$log"; fi
+    sudo chown -R "$(whoami):$(whoami)" "$HOME/backups"
+    sudo chmod -R 744 "$HOME/backups"
+    if [ ! -f "$HOME/passwd_changed.txt" ]; then touch "$log"; fi
+}
+#end prereqs
+
+function print_options {
+    echo "
+    Usage: $0 [OPTION]
+
+    Options:
+    full          Perform full system hardening
+    firewall      Setup firewall rules
+    splunk        Install Splunk forwarder
+    indexer       Setup Splunk indexer
+    full_backup   Perform full system backup
+    decrypt       Decrypt a file
+    chpass        Change all user passwords besides excluded users from prompt
+    help          Display this help message
+    "
+}
+
 if [ $# -lt 1 ]; then
     echo "Usage: $0 [OPTION]"
     print_options
     exit 1
 fi
-#prereqs
-detect_os
-if id "CCDCUser1" &>/dev/null; then
-    echo "CCDCUser1 already created"
-else
-    echo "CCDCUser1 not found. Attempting to create..."
-    sudo useradd CCDCUser1
-    sudo passwd CCDCUser1
-    sudo usermod -aG $sudo_group CCDCUser1
+if [ "$1" != "help" ]; then
+    check_prereqs
 fi
 
-if command -v zip &> /dev/null; then
-    echo "zip is installed. Proceeding"
-else
-    echo "zip is not installed. Installing..."
-    sudo $lpm install -y zip
-fi
-if [ ! -d "$backup_dir" ]; then mkdir -p "$backup_dir"; fi
-if [ ! -d "$HOME/scripts" ]; then mkdir -p "$HOME/scripts"; fi
-if [ ! -f "$HOME/backups/harden_log.txt" ]; then touch "$log"; fi
-sudo chown -R "$(whoami):$(whoami)" "$HOME/backups"
-sudo chmod -R 744 "$HOME/backups"
-if [ ! -f "$HOME/passwd_changed.txt" ]; then touch "$log"; fi
-
-
-#end prereqs
-
-function print_options {
-    echo "options are:
-        full - full semi-automated hardening
-        firewall - automate firewall hardening
-        full_backup - backup all designated files
-        splunk - setup splunk forwarder
-        decrypt - decrypt file"
-}
 case $1 in
-    "options")
+    "help")
         print_options
     ;;
     "full")
@@ -556,6 +632,9 @@ case $1 in
     ;;
     "splunk") 
         setup_splunk_forwarder
+    ;;
+    "chpass")
+        change_passwords
     ;;
     "indexer")
         wget https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main/splunk_setup/build.sh
