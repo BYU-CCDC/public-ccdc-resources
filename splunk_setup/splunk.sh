@@ -356,10 +356,10 @@ function add_web_logs {
     print_banner "Adding web logs"
 
     INDEX="service"
-    if [ -d "/var/log/apache/" ]; then
+    if [ -d "/var/log/apache2/" ]; then
         echo "Adding monitors for Apache logs"
-        APACHE_ACCESS="/var/log/apache/access.log"
-        APACHE_ERROR="/var/log/apache/error.log"
+        APACHE_ACCESS="/var/log/apache2/access.log"
+        APACHE_ERROR="/var/log/apache2/error.log"
         add_monitor "${APACHE_ACCESS}" "${INDEX}"
         add_monitor "${APACHE_ERROR}" "${INDEX}"
     elif [ -d "/var/log/httpd/" ]; then
