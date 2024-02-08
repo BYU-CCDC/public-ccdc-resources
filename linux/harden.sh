@@ -509,15 +509,15 @@ function setup_firewall {
 
 function setup_splunk_forwarder {
     detect_os
-    wget https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main/splunk_setup/splunkf.sh
-    sudo chmod +x splunkf.sh
+    wget https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main/splunk_setup/splunk.sh
+    sudo chmod +x splunk.sh
     if [ $os == "ubuntu" ]; then os="debian"; fi
     if [ $os == "fedora" ] || [ $os == "centos" ] ; then os="rpm"; fi
 
     read -r -p "what is the forward server ip? " ip
-    ./splunkf.sh $os "$ip"
+    ./splunk.sh $os "$ip"
     echo "************ SPLUNK DONE ************"
-    cleanup_files ./splunkf.sh
+    cleanup_files ./splunk.sh
     
 
 }
@@ -577,7 +577,7 @@ function full_harden {
     echo "************ SSH NEEDS TO BE HARDENED MANUALLY ************"
     echo "************        PLEASE DO SO NOW           ************"
     echo "***********************************************************"
-    cleanup=('harden.sh' 'splunkf.sh' 'splunkf.deb')
+    cleanup=('harden.sh' 'splunk.sh' 'splunk.deb')
     for file in "${cleanup[@]}"; do
         cleanup_files "$file"
     done
@@ -630,7 +630,6 @@ function print_options {
     full          Perform full system hardening
     firewall      Setup firewall rules
     splunk        Install Splunk forwarder
-    indexer       Setup Splunk indexer
     full_backup   Perform full system backup
     decrypt       Decrypt a file
     chpass        Change all user passwords besides excluded users from prompt
@@ -683,11 +682,6 @@ case $1 in
     ;;
     "chpass")
         change_passwords
-    ;;
-    "indexer")
-        wget https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main/splunk_setup/build.sh
-        sudo chmod +x build.sh
-        ./build.sh
     ;;
     "full_backup")
         full_backup
