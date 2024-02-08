@@ -345,7 +345,7 @@ function add_ssh_key_logs {
         if [ -d "$dir" ]; then
             if [ -d "$dir/.ssh" ]; then
                 echo "[*] Adding ${dir}/.ssh/"
-                add_monitor "${dir}" "${INDEX}"
+                add_monitor "${dir}/.ssh" "${INDEX}"
             fi
         fi
     done
