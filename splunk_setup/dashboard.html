@@ -1,0 +1,70 @@
+<dashboard version="1.1" theme="light">
+    <label>Homedash</label>
+    <row>
+      <panel>
+        <chart>
+          <title>Host logs</title>
+          <search>
+            <query>index=* | stats count by host</query>
+            <earliest>0</earliest>
+            <latest></latest>
+          </search>
+          <option name="charting.chart">pie</option>
+          <option name="charting.drilldown">none</option>
+        </chart>
+      </panel>
+      <panel>
+        <table>
+          <title>Last log by host</title>
+          <search>
+            <query>index = * | stats latest(_time) AS last_seen BY host | eval last_seen=strftime(last_seen, "%D %I:%M:%S %p") | table host last_seen</query>
+            <earliest>-24h@h</earliest>
+            <latest>now</latest>
+          </search>
+          <option name="drilldown">none</option>
+        </table>
+      </panel>
+    </row>
+    <row>
+      <panel>
+        <table>
+          <title>sudo usage</title>
+          <search>
+            <query>index=* source IN ("/var/log/auth.log" "/var/log/secure") COMMAND=* | rex "COMMAND=\S*\s(?&lt;ARGS&gt;.*)" | table _time host USER PWD COMMAND ARGS | sort - _time</query>
+            <earliest>-24h@h</earliest>
+            <latest>now</latest>
+          </search>
+          <option name="drilldown">none</option>
+          <option name="refresh.display">progressbar</option>
+        </table>
+      </panel>
+    </row>
+    <row>
+      <panel>
+        <chart>
+          <title>Apache IPs</title>
+          <search>
+            <query>index=* source IN ("/var/log/httpd/access_log" "/var/log/apache2/access.log") | rex "(?&lt;SOURCE_IP&gt;(\d+\.){3}\d+) .*\[.*\] \"(?&lt;REQUEST&gt;.*)\" (?&lt;STATUS&gt;\d\d\d) \d+ \"(?&lt;REFERRER&gt;.*)\" \"(?&lt;AGENT&gt;.*)\"" | where SOURCE_IP!="127.0.0.1" | where not isnull(SOURCE_IP) | stats count by SOURCE_IP</query>
+            <earliest>-15m</earliest>
+            <latest>now</latest>
+          </search>
+          <option name="charting.chart">pie</option>
+          <option name="charting.drilldown">none</option>
+          <option name="refresh.display">progressbar</option>
+        </chart>
+      </panel>
+    </row>
+    <row>
+      <panel>
+        <table>
+          <title>Apache access logs</title>
+          <search>
+            <query>index=* source IN ("/var/log/httpd/access_log" "/var/log/apache2/access.log") | rex "(?&lt;SOURCE_IP&gt;(\d+\.){3}\d+) .*\[.*\] \"(?&lt;REQUEST&gt;.*)\" (?&lt;STATUS&gt;\d\d\d) \d+ \"(?&lt;REFERRER&gt;.*)\" \"(?&lt;AGENT&gt;.*)\"" | where SOURCE_IP!="127.0.0.1" | where not isnull(SOURCE_IP) | table _time SOURCE_IP REQUEST STATUS REFERRER AGENT</query>
+            <earliest>-60m@m</earliest>
+            <latest>now</latest>
+          </search>
+          <option name="drilldown">none</option>
+        </table>
+      </panel>
+    </row>
+  </dashboard>

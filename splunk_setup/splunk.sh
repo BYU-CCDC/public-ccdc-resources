@@ -92,11 +92,6 @@ function check_prereqs {
         exit 1
     fi
 
-    if ! id "CCDCUser1" &>/dev/null; then
-        echo "[*] ERROR: Please add the CCDCUser1 user before using this script"
-        exit 1
-    fi
-    
     if [ "$#" != 3 ]; then
         print_options
     fi
@@ -208,7 +203,7 @@ function setup_indexer {
     sudo mv ./savedsearches.conf /opt/splunk/etc/users/splunk/search/local/savedsearches.conf
 }
 
-# Installs splunk and gives ownership to CCDCUser1
+# Installs splunk
 function setup_splunk {
     sleep 2
     if [[ $2 == "" ]]; then 
@@ -284,8 +279,9 @@ function add_firewall_logs {
         sudo ufw logging low
 
         echo "[*] Adding monitors for ufw logs"
-        sudo touch "${FIREWALL_LOG}"
+        # sudo touch "${FIREWALL_LOG}"
         add_monitor "${FIREWALL_LOG}" "${INDEX}"
+        echo "[*] ufw logs also contained in /var/log/syslog"
     elif command -v iptables &>/dev/null; then\
         echo "[*] iptables detected"
         FIREWALL_LOG="/var/log/iptables.log"
@@ -298,7 +294,7 @@ function add_firewall_logs {
         #sudo iptables -A FORWARD -j LOG --log-prefix "iptables: " --log-level $LOGGING_LEVEL
         
         echo "[*] Adding monitors for iptables"
-        sudo touch "${FIREWALL_LOG}"
+        # sudo touch "${FIREWALL_LOG}"
         add_monitor "${FIREWALL_LOG}" "${INDEX}"
     else
         echo "[*] ERROR: No firewall found. Please forward logs manually."
@@ -422,12 +418,12 @@ function add_mysql_logs {
         ERROR_LOG="/var/log/mysql/error.log"
 
         # Enable General Query Log
-        sudo echo "[mysqld]" >> "$MYSQL_CONFIG"
-        sudo echo "general_log = 1" >> "$MYSQL_CONFIG"
-        sudo echo "general_log_file = $GENERAL_LOG" >> "$MYSQL_CONFIG"
+        echo "[mysqld]" | sudo tee -a "$MYSQL_CONFIG"
+        echo "general_log = 1" | sudo tee -a "$MYSQL_CONFIG"
+        echo "general_log_file = $GENERAL_LOG" | sudo tee -a "$MYSQL_CONFIG"
 
         # Enable Error Log
-        sudo echo "log_error = $ERROR_LOG" >> "$MYSQL_CONFIG"
+        echo "log_error = $ERROR_LOG" | sudo tee -a "$MYSQL_CONFIG"
 
         # Restart MySQL service
         if command -v systemctl &> /dev/null; then
@@ -438,8 +434,8 @@ function add_mysql_logs {
             echo "[*] ERROR: Unable to restart MySQL. Please restart the MySQL service manually."
         fi
 
-        sudo touch "${GENERAL_LOG}"
-        sudo touch "${ERROR_LOG}"
+        # sudo touch "${GENERAL_LOG}"
+        # sudo touch "${ERROR_LOG}"
         add_monitor "${GENERAL_LOG}" "${INDEX}"
         add_monitor "${ERROR_LOG}" "${INDEX}"
     else
@@ -520,8 +516,6 @@ setup_monitors
 if [ $IP != "indexer" ]; then
     setup_forward_server "$2"
 fi
-sudo chown -R CCDCUser1 $SPLUNKDIR # Give privs to our user
-sudo chgrp -R CCDCUser1 $SPLUNKDIR
 
 print_banner "Restarting Splunk"
 sleep 3
