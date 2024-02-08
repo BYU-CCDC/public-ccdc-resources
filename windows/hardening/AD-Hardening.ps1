@@ -1,6 +1,27 @@
 Import-Module ActiveDirectory
 Import-Module GroupPolicy
 
+$ccdcRepoWindowsHardeningPath = "https://github.com/BYU-CCDC/public-ccdc-resources/tree/main/windows/hardening/"
+$portsFile = "ports.json"
+$usersFile = "users.txt"
+$advancedAuditingFile = "advancedAuditing.ps1"
+$patchURLFile = "patchURLs.json"
+
+$neededFiles = @($portsFile, $usersFile, $advancedAuditingFile, $patchURLFile)
+foreach ($file in $neededFiles) {
+    try {
+        if (-not (Test-Path "$pwd\$file")) {
+            $wc = New-Object net.webclient
+            $wc.DownloadFile("$ccdcRepoWindowsHardeningPath/$file", "$pwd\$file")
+        }
+    } catch {
+        Write-Host $_.Exception.Message -ForegroundColor Yellow
+        Write-Host "Error Occurred..."
+        Write-Host "Download $file from $ccdcRepoWindowsHardeningPath"
+        exit
+    }
+}
+
 # Get OS version and current user
 $OSVersion = (Get-WmiObject -class Win32_OperatingSystem).Caption
 $CurrentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
@@ -60,7 +81,7 @@ function Disable-Users {
                 MassDisable
                 Write-Host "All users disabled but your own" -ForegroundColor Red
             } else {
-                Write-Host "Skipping..."
+                Write-Host "Skipping..." -ForegroundColor Red
             }
     } catch {
         Write-Host $_.Exception.Message
@@ -133,8 +154,7 @@ function Add-Competition-Users {
                 }
             }
         }
-
-        Print-Users
+        $userInfos = Print-Users
 
         $confirmation = Prompt-Yes-No -Message "Any users you'd like to enable (y/n)?"
         if ($confirmation.ToLower() -eq "y") {
@@ -142,7 +162,7 @@ function Add-Competition-Users {
 
             $enableUsers | ForEach-Object {
                 Enable-ADAccount $_
-                Print-Users
+                $userInfos = Print-Users
             }
 
         } else {
@@ -155,12 +175,18 @@ function Add-Competition-Users {
 
             $disableUsers | ForEach-Object {
                 Disable-ADAccount $_
-                Print-Users
+                $userInfos = Print-Users
             }
 
         } else {
             Write-Host "Skipping...`n"
         }
+		$userOutput = Print-Users
+		if ($userOutput -ne $null) {
+			$outputText = $userOutput -join "`n`n"
+			$outputText | Out-File -FilePath "UserPerms.txt" -Encoding UTF8
+			Write-Host "`nUser permissions have been exported to .\UserPerms.txt" -ForegroundColor Green
+		}
     } catch {
         Write-Host $_.Exception.Message -ForegroundColor Yellow
         Write-Host "Error Occurred..."
@@ -190,8 +216,7 @@ function Prompt-Yes-No {
 
     try {
         do {
-            $response = Read-Host -Prompt $Message
-            Write-Host $response
+            $response = $(Write-Host $Message -ForegroundColor Yellow -NoNewline; Read-Host)
             if ($response -ieq 'y' -or $response -ieq 'n') {
                 return $response
             } else {
@@ -207,30 +232,44 @@ function Prompt-Yes-No {
 # Print enabled and disabled users with their group memberships
 function Print-Users {
     try {
-    Write-Host "`n==== Enabled Users ====" -ForegroundColor Green
-    Get-ADUser -Filter {Enabled -eq $true } -Properties Name | ForEach-Object {
-        Write-Host $_.Name -ForegroundColor Cyan
-        $groups = Get-ADPrincipalGroupMembership $_ | Select-Object -ExpandProperty Name
-        $groups | ForEach-Object {
-            Write-Host "   - $_"
+        $output = @()
+
+        Write-Host "`n==== Enabled Users ====" -ForegroundColor Green
+        $enabledUsersOutput = "==== Enabled Users ===="
+        $enabledUsers = Get-ADUser -Filter {Enabled -eq $true} -Properties Name | ForEach-Object {
+            $userOutput = $_.Name
+            $groups = Get-ADPrincipalGroupMembership $_ | Select-Object -ExpandProperty Name
+            $groups | ForEach-Object {
+                $userOutput += "`n   - $_"
+            }
+            Write-Host $userOutput -ForegroundColor Cyan
+            [System.GC]::Collect()
+            $enabledUsersOutput += "`n$userOutput"
+            $_.Name, $groups -join "`n"
         }
-        # Force garbage collection after processing each user
-        [System.GC]::Collect()
-    }
-    Write-Host "`n==== Disabled Users ====" -ForegroundColor Red
-    Get-ADUser -Filter {Enabled -eq $false } -Properties Name | ForEach-Object {
-        Write-Host $_.Name -ForegroundColor Cyan
-        $groups = Get-ADPrincipalGroupMembership $_ | Select-Object -ExpandProperty Name
-        $groups | ForEach-Object {
-        Write-Host "   - $_"
+        $output += $enabledUsersOutput
+
+        Write-Host "`n==== Disabled Users ====" -ForegroundColor Red
+        $disabledUsersOutput = "==== Disabled Users ===="
+        $disabledUsers = Get-ADUser -Filter {Enabled -eq $false} -Properties Name | ForEach-Object {
+            $userOutput = $_.Name
+            $groups = Get-ADPrincipalGroupMembership $_ | Select-Object -ExpandProperty Name
+            $groups | ForEach-Object {
+                $userOutput += "`n   - $_"
+            }
+            Write-Host $userOutput -ForegroundColor Cyan
+            [System.GC]::Collect()
+            $disabledUsersOutput += "`n$userOutput"
+            $_.Name, $groups -join "`n"
         }
-    # Force garbage collection after processing each user
-    [System.GC]::Collect()
-    }
-    Write-Host "`n"
+        $output += $disabledUsersOutput
+
+        return $output
+
     } catch {
         Write-Host $_.Exception.Message -ForegroundColor Yellow
         Write-Host "Error Occurred..."
+        return $null
     }
 }
 
@@ -245,7 +284,7 @@ function Get-Comma-Separated-List {
         return $userInput.Split(",") | ForEach-Object { $_.Trim() }
 
     } elseif ($category -ne "") {
-        $userInput = Read-Host "List $category. Separate by commas if multiple."
+        $userInput = Read-Host "List $category. Separate by commas if multiple. NO SPACES"
         return $userInput.Split(",") | ForEach-Object { $_.Trim() }
     }
     } catch {
@@ -259,10 +298,25 @@ function Configure-Firewall {
     try {
         :outer while ($true) {
             $desigPorts = Get-Comma-Separated-List -message "List needed port numbers for firewall config. Separate by commas."
-            $usualPorts = @(53, 3389, 80, 445, 139, 22, 88)
-
+            $usualPorts = @(53, 3389, 80, 445, 139, 22, 88, 67, 68, 135, 139, 389, 636, 3268, 3269, 464) | Sort-Object
+            $commonScored = @(53, 3389, 80, 22)
+            $commonADorDC = @(139, 88, 67, 68, 135, 139, 389, 445, 636, 3268, 3269, 464)
+            Write-Host "All the following ports that we suggest are either common scored services, or usually needed for AD processes. We will say which is which"
             foreach ($item in $usualPorts) {
-                if ($ports -notcontains $item) {
+                if ($desigPorts -notcontains $item) {
+                    if ($item -in $commonScored) {
+                        Write-Host "`nCommon Scored Service" -ForegroundColor Green
+                    }
+                    if ($item -in $commonADorDC) {
+						if ($item -eq 445) {
+							Write-Host "`nCommon Scored Service" -ForegroundColor Green -NoNewline
+							Write-Host " and" -ForegroundColor Cyan -NoNewline
+							Write-Host " Common port needed for CD/AD processes" -ForegroundColor Red
+						}
+						else {
+							Write-Host "`nCommon port needed for DC/AD processes" -ForegroundColor Red
+						}
+                    }
                     $confirmation = $(Write-Host "Need " -NoNewline) + $(Write-Host "$item" -ForegroundColor Green -NoNewline) + $(Write-Host ", " -NoNewline) + $(Write-Host "$($PortsObject.ports.$item.description)? " -ForegroundColor Cyan -NoNewline) + $(Write-Host "(y/n)" -ForegroundColor Yellow; Read-Host)
 
                     while($true) {
@@ -278,7 +332,7 @@ function Configure-Firewall {
             }
 
             Write-Host "`n==== Designated Ports ====" -ForegroundColor Cyan
-            Write-Host ($desigPorts -join "`n")
+            Write-Host ($desigPorts -join "`n") | Sort-Object
 
             $confirmation = ""
             while($true) {
@@ -354,41 +408,23 @@ function Disable-Unnecessary-Services {
     }
 }
 
-function Create-Good-GPO {
+function Handle-First-Policy-in-GPO {
     try {
-        Write-Host "Creating GPO named '$GPOName'..." -ForegroundColor Green
-        New-GPO -Name $GPOName
+    # Install RSAT features
+    Install-WindowsFeature -Name RSAT -IncludeAllSubFeature
 
-        Write-Host "Fetching distinguished name of the domain..." -ForegroundColor Green
-        $domainDN = (Get-ADDomain).DistinguishedName
+    # Define GPO and settings
+    $gpoName = $GPOName
 
-        Write-Host "Linking GPO to the domain..." -ForegroundColor Green
-        New-GPLink -Name $GPOName -Target $domainDN
+    $report = Get-GPOReport -Name $gpoName -ReportType xml
 
-        Write-Host "GPO linked successfully!" -ForegroundColor Green
-    } catch {
-        Write-Host $_.Exception.Message -ForegroundColor Yellow
-        Write-Host "Error Occurred..."
-    }
-}
-
-function Configure-Secure-GPO {
-    try {
-        # Install RSAT features
-        Install-WindowsFeature -Name RSAT -IncludeAllSubFeature
-
-        # Define GPO and settings
-        $gpoName = $GPOName
-
-        $report = Get-GPOReport -Name $gpoName -ReportType xml
-
-        # Check if there are any settings in the report
-        if ($report -like "*Enabled=True*") {
-            Write-Host "$gpoName has settings defined." -ForegroundColor Green
-        } else {
-            Write-Host "$gpoName does not have any settings defined.`n" -ForegroundColor Red
-            Write-Host "Press Enter ONLY after doing the following:" -ForegroundColor Yellow
-            Read-Host @"
+    # Check if there are any settings in the report
+    if ($report -like "*Enabled=True*") {
+        Write-Host "$gpoName has settings defined." -ForegroundColor Green
+    } else {
+        Write-Host "$gpoName does not have any settings defined.`n" -ForegroundColor Red
+        Write-Host "Press Enter ONLY after doing the following:" -ForegroundColor Yellow
+        Read-Host @"
 1. Win + R
 2. Type gpmc.msc
 3. Find Good-GPO
@@ -400,46 +436,298 @@ function Configure-Secure-GPO {
 9. Type Administrators
 10. Apply
 "@
-        }
+    }
 
-        # Get the GPO's GUID
-        $gpo = Get-GPO -Name $gpoName
-        $gpoId = $gpo.Id
+    # Get the GPO's GUID
+    $gpo = Get-GPO -Name $gpoName
+    $gpoId = $gpo.Id
 
-        # Construct full path
-        $fullPath = "\\$($env:USERDNSDOMAIN)\sysvol\$($env:USERDNSDOMAIN)\Policies\{$gpoId}\Machine\Microsoft\Windows NT\SecEdit\GptTmpl.inf"
+    # Construct full path
+    $fullPath = "\\$($env:USERDNSDOMAIN)\sysvol\$($env:USERDNSDOMAIN)\Policies\{$gpoId}\Machine\Microsoft\Windows NT\SecEdit\GptTmpl.inf"
 
-        # Backup the file
-        Copy-Item -Path $fullPath -Destination "${fullPath}.backup"
+    # Backup the file
+    Copy-Item -Path $fullPath -Destination "${fullPath}.backup"
 
-       # Read the content of the file
-        $lines = Get-Content $fullPath
+   # Read the content of the file
+    $lines = Get-Content $fullPath
 
-        # Define the permission setting
-        $permission = "SeRemoteInteractiveLogonRight = Domain Admins,*S-1-5-32-555"
+    # Define the permission setting
+    $permission = "SeRemoteInteractiveLogonRight = Domain Admins,*S-1-5-32-555"
 
-        # Check if the section exists
-        if ($lines -contains "[Privilege Rights]") {
-            # Get the index of the section
-            $index = $lines.IndexOf("[Privilege Rights]") + 1
+    # Check if the section exists
+    if ($lines -contains "[Privilege Rights]") {
+        # Get the index of the section
+        $index = $lines.IndexOf("[Privilege Rights]") + 1
 
-            # Insert the permission setting after the section
-            $lines = $lines[0..$index] + $permission + $lines[($index + 1)..$lines.Length]
-        } else {
-            # If the section doesn't exist, append the section and the permission at the end
-            $lines += "[Privilege Rights]", $permission
-        }
+        # Insert the permission setting after the section
+        $lines = $lines[0..$index] + $permission + $lines[($index + 1)..$lines.Length]
+    } else {
+        # If the section doesn't exist, append the section and the permission at the end
+        $lines += "[Privilege Rights]", $permission
+    }
 
-        # Write the content back to the file
-        $lines | Set-Content -Path $fullPath
+    # Write the content back to the file
+    $lines | Set-Content -Path $fullPath
+    } catch {
+        Write-Host $_.Exception.Message -ForegroundColor Yellow
+        Write-Host "Error Occurred..."
+    }
+}
 
-        # Get all computer names in the domain
-        $computers = Get-ADComputer -Filter * | Select-Object -ExpandProperty Name
-
+function Global-Gpupdate {
+    try {
         # Invoke gpupdate on each computer
         Invoke-Command -ComputerName $ADcomputers -ScriptBlock {
             gpupdate /force
         } -AsJob  # Executes as background jobs to avoid waiting for each to finish
+    } catch {
+        Write-Host $_.Exception.Message -ForegroundColor Yellow
+        Write-Host "Error Occurred..."
+    }
+}
+
+function Create-Good-GPO {
+    try {
+        Write-Host "Creating GPO named '$GPOName'..." -ForegroundColor Green
+        $newGPO = New-GPO -Name $GPOName
+
+        Write-Host "Fetching distinguished name of the domain..." -ForegroundColor Green
+        $domainDN = (Get-ADDomain).DistinguishedName
+
+        Write-Host "Linking GPO to the domain..." -ForegroundColor Green
+        New-GPLink -Name $GPOName -Target $domainDN
+		Write-Host "GPO linked successfully!" -ForegroundColor Green
+
+        Write-Host "Setting permissions for GPO..." -ForegroundColor Green
+        # Get the SID of the current user
+        $userSID = (New-Object System.Security.Principal.NTAccount($CurrentUser)).Translate([System.Security.Principal.SecurityIdentifier]).Value
+
+        # Set permissions for the creating user (full control)
+		try {
+			Set-GPPermissions -Name $GPOName -TargetName $CurrentUser -TargetType User -PermissionLevel GpoEdit
+			Write-Host "Permissions set successfully." -ForegroundColor Green
+		} catch {
+			Write-Host "Error setting permissions -- $_" -ForegroundColor Yellow
+		}
+		Write-Host "Go configure the GPO, specifically to deny the 'Apply Group Policy' for current user, before continuing" -ForegroundColor Black -BackgroundColor Yellow
+		Read-Host " "
+		Set-GPLink -Name $GPOName -Target $domainDN -Enforced Yes
+		Write-Host "GPO fully and successfully configured and enforced!" -ForegroundColor Green
+    } catch {
+        Write-Host $_.Exception.Message -ForegroundColor Yellow
+        Write-Host "Error Occurred..."
+    }
+}
+
+function Configure-Secure-GPO {
+    try {
+        Handle-First-Policy-in-GPO
+
+        # Define configurations
+        $configurations = @{
+            "Moderating Access to Control Panel" = @{
+                "Key" = "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer"
+                "ValueName" = "NoControlPanel"
+                "Value" = 1
+                "Type" = "DWORD"
+            }
+            "Prevent Windows from Storing LAN Manager Hash" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Control\Lsa"
+                "ValueName" = "NoLMHash"
+                "Value" = 1
+                "Type" = "DWORD"
+            }
+            "Control Access to Command Prompt" = @{
+                "Key" = "HKCU\Software\Policies\Microsoft\Windows\System"
+                "ValueName" = "DisableCMD"
+                "Value" = 2
+                "Type" = "DWORD"
+            }
+            "Disable Forced System Restarts" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU"
+                "ValueName" = "NoAutoRebootWithLoggedOnUsers"
+                "Value" = 1
+                "Type" = "DWORD"
+            }
+            "Disallow Removable Media Drives, DVDs, CDs, and Floppy Drives" = @{
+                "Key" = "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer"
+                "ValueName" = "NoViewOnDrive"
+                "Value" = 12
+                "Type" = "DWORD"
+            }
+            "Restrict Software Installations" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows\Installer"
+                "ValueName" = "DisableMSI"
+                "Value" = 1
+                "Type" = "DWORD"
+            }
+            "Disable Guest Account" = @{
+                "Key" = "HKLM\Software\Microsoft\Windows NT\CurrentVersion\Winlogon"
+                "ValueName" = "AllowGuest"
+                "Value" = 0
+                "Type" = "DWORD"
+            }
+            "Set Minimum Password Length to Higher Limits" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft Services\AdmPwd"
+                "ValueName" = "MinimumPasswordLength"
+                "Value" = 8
+                "Type" = "DWORD"
+            }
+            "Set Maximum Password Age to Lower Limits" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft Services\AdmPwd"
+                "ValueName" = "MaximumPasswordAge"
+                "Value" = 90
+                "Type" = "DWORD"
+            }
+            "Set Password History to 3 Passwords" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft Services\AdmPwd"
+                "ValueName" = "PasswordHistorySize"
+                "Value" = 3
+                "Type" = "DWORD"
+            }
+            "Add Complexity Requirements" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft Services\AdmPwd"
+                "ValueName" = "PasswordComplexity"
+                "Value" = 1
+                "Type" = "DWORD"
+            }
+            "Set Minimum Password Length to 8 Characters" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft Services\AdmPwd"
+                "ValueName" = "PasswordLength"
+                "Value" = 8
+                "Type" = "DWORD"
+            }
+            "Store Password Using Reversible Encryption" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft Services\AdmPwd"
+                "ValueName" = "ClearTextPassword"
+                "Value" = 0
+                "Type" = "DWORD"
+            }
+            "Disable Anonymous SID Enumeration" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Control\Lsa"
+                "ValueName" = "RestrictAnonymousSAM"
+                "Value" = 1
+                "Type" = "DWORD"
+            }
+            "Enable Event Logs" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Services\Eventlog\Application"
+                "ValueName" = "AutoBackupLogFiles"
+                "Value" = 1
+                "Type" = "DWORD"
+            }
+            "Disable Anonymous Account in Everyone Group" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Control\Lsa"
+                "ValueName" = "EveryoneIncludesAnonymous"
+                "Value" = 0
+                "Type" = "DWORD"
+            }
+            "Enable User Account Control" = @{
+                "Key" = "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System"
+                "ValueName" = "EnableLUA"
+                "Value" = 1
+                "Type" = "DWORD"
+            }
+            "Disable Powershell" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows\PowerShell"
+                "ValueName" = "EnableScripts"
+                "Value" = 0
+                "Type" = "DWORD"
+            }
+            "Enable Domain Profile Windows Defender" = @{
+                "Key" = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\DomainProfile"
+                "ValueName" = "EnableFirewall"
+                "Value" = 1
+                "Type" = "DWORD"
+            }
+            "Enable Public Profile Windows Defender" = @{
+                "Key" = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\StandardProfile"
+                "ValueName" = "EnableFirewall"
+                "Value" = 1
+                "Type" = "DWORD"
+            }
+            "Enable Private Profile Windows Defender" = @{
+                "Key" = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\PublicProfile"
+                "ValueName" = "EnableFirewall"
+                "Value" = 1
+                "Type" = "DWORD"
+            }
+            "Set Domain Profile Block Inbound" = @{
+                "Key" = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\DomainProfile"
+                "ValueName" = "DefaultInboundAction"
+                "Value" = "Block"
+                "Type" = "String"
+            }
+            "Set Domain Profile Allow Outbound" = @{
+                "Key" = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\DomainProfile"
+                "ValueName" = "DefaultOutboundAction"
+                "Value" = "Allow"
+                "Type" = "String"
+            }
+            "Set Standard Profile Block Inbound" = @{
+                "Key" = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\StandardProfile"
+                "ValueName" = "DefaultInboundAction"
+                "Value" = "Block"
+                "Type" = "String"
+            }
+            "Set Standard Profile Allow Outbound" = @{
+                "Key" = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\StandardProfile"
+                "ValueName" = "DefaultOutboundAction"
+                "Value" = "Allow"
+                "Type" = "String"
+            }
+            "Set Public Profile Block Inbound" = @{
+                "Key" = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\PublicProfile"
+                "ValueName" = "DefaultInboundAction"
+                "Value" = "Block"
+                "Type" = "String"
+            }
+            "Set Public Profile Allow Outbound" = @{
+                "Key" = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\PublicProfile"
+                "ValueName" = "DefaultOutboundAction"
+                "Value" = "Allow"
+                "Type" = "String"
+            }
+            "Enable Defender Antivirus Protection" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Real-Time Protection"
+                "ValueName" = "DisableRealtimeMonitoring"
+                "Value" = 0
+                "Type" = "DWORD"
+            }
+        }
+
+# # Configure Windows Defender Antivirus settings via Group Policy to enable real-time monitoring
+
+
+        $successfulConfigurations = 0
+        $failedConfigurations = @()
+
+        # Loop through configurations
+        foreach ($configName in $configurations.Keys) {
+            $config = $configurations[$configName]
+            $keyPath = $config["Key"]
+
+            # Check if key path exists
+            if (-not (Test-Path "Registry::$keyPath")) {
+                $failedConfigurations += $configName
+                continue
+            }
+
+            # Set GPO registry value
+            Set-GPRegistryValue -Name $GPOName -Key $config["Key"] -ValueName $config["ValueName"] -Value $config["Value"] -Type $config["Type"]
+            $successfulConfigurations++
+        }
+
+        Write-Host "$successfulConfigurations configurations successfully applied." -ForegroundColor Green
+
+        if ($failedConfigurations.Count -gt 0) {
+            Write-Host "`nConfigurations that couldn't be applied due to missing registry key paths:" -ForegroundColor Red
+            $failedConfigurations
+        } else {
+            Write-Host "All configurations applied successfully." -ForegroundColor Green
+        }
+
+		Write-Host "Applying gpupdate across all machines on the domain" -ForegroundColor Magenta
+        Global-Gpupdate
     } catch {
         Write-Host $_.Exception.Message -ForegroundColor Yellow
         Write-Host "Error Occurred..."
@@ -482,23 +770,21 @@ function Download-Install-Setup-Splunk {
     }
 }
 
-Write-Host "`n***Configuring Splunk***" -ForegroundColor Magenta
-$SplunkIP = Read-Host "`nInput IP address of Splunk Server"
-Download-Install-Setup-Splunk -IP $SplunkIP
-
 function Install-EternalBluePatch {
     try {
+        $patchURLs = Get-Content -Raw -Path "patchURLs.json" | ConvertFrom-Json
         # Determine patch URL based on OS version keywords
         $patchURL = switch -Regex ($osVersion) {
-            '(?i)Vista'  { "https://catalog.s.download.windowsupdate.com/d/msdownload/update/software/secu/2017/02/windows6.0-kb4012598-x64_6a186ba2b2b98b2144b50f88baf33a5fa53b5d76.msu" }
-            'Windows 7'  { "https://catalog.s.download.windowsupdate.com/d/msdownload/update/software/secu/2017/02/windows6.1-kb4012212-x64_2decefaa02e2058dcd965702509a992d8c4e92b3.msu" }
-            'Windows 8'  { "https://catalog.s.download.windowsupdate.com/c/msdownload/update/software/secu/2017/02/windows8.1-kb4012213-x64_5b24b9ca5a123a844ed793e0f2be974148520349.msu" }
-            '2008 R2'    { "https://catalog.s.download.windowsupdate.com/d/msdownload/update/software/secu/2017/02/windows6.1-kb4012212-x64_2decefaa02e2058dcd965702509a992d8c4e92b3.msu" }
-            '2008'       { "https://catalog.s.download.windowsupdate.com/d/msdownload/update/software/secu/2017/02/windows6.0-kb4012598-x64_6a186ba2b2b98b2144b50f88baf33a5fa53b5d76.msu" }
-            '2012 R2'    { "https://catalog.s.download.windowsupdate.com/c/msdownload/update/software/secu/2017/02/windows8.1-kb4012213-x64_5b24b9ca5a123a844ed793e0f2be974148520349.msu" }
-            '2012'       { "https://catalog.s.download.windowsupdate.com/c/msdownload/update/software/secu/2017/02/windows8-rt-kb4012214-x64_b14951d29cb4fd880948f5204d54721e64c9942b.msu" }
+            '(?i)Vista'  { $patchURLs.Vista; break }
+            'Windows 7'  { $patchURLs.'Windows 7'; break }
+            'Windows 8'  { $patchURLs.'Windows 8'; break }
+            '2008 R2'    { $patchURLs.'2008 R2'; break }
+            '2008'       { $patchURLs.'2008'; break }
+            '2012 R2'    { $patchURLs.'2012 R2'; break }
+            '2012'       { $patchURLs.'2012'; break }
             default { throw "Unsupported OS version: $osVersion" }
         }
+		Write-Host $patchURL
 
         # Download the patch to a temporary location
         $path = "$env:TEMP\eternalblue_patch.msu"
@@ -513,7 +799,7 @@ function Install-EternalBluePatch {
         # Cleanup
         Remove-Item -Path $path -Force
 
-        Write-Output "Patch for $OSVersion installed successfully!"
+        Write-Host "Patch for $OSVersion installed successfully!" -ForegroundColor Green
     } catch {
         Write-Host $_.Exception.Message -ForegroundColor Yellow
         Write-Host "Error Occurred..."
@@ -521,72 +807,251 @@ function Install-EternalBluePatch {
 }
 
 function Upgrade-SMB {
-    # Step 1: Detect the current SMB version
-    $smbv1Enabled = (Get-SmbServerConfiguration).EnableSMB1Protocol
-    $smbv2Enabled = (Get-SmbServerConfiguration).EnableSMB2Protocol
-    $restart = $false
+    try {
+        # Step 1: Detect the current SMB version
+        $smbv1Enabled = (Get-SmbServerConfiguration).EnableSMB1Protocol
+        $smbv2Enabled = (Get-SmbServerConfiguration).EnableSMB2Protocol
+        $restart = $false
 
-    # Step 2: Decide on the upgrade path based on the detected version
+        # Step 2: Decide on the upgrade path based on the detected version
 
-    # Enable SMBv2 (assuming that by enabling SMBv2, SMBv3 will also be enabled if supported)
-    if ($smbv2Enabled -eq $false) {
-        Set-SmbServerConfiguration -EnableSMB2Protocol $true -Force
-        Write-Host "Upgraded to SMBv2/SMBv3." -ForegroundColor Green
-        $restart = $true
-    } elseif ($smbv2Enabled -eq $true) {
-        Write-Host "SMBv2 detected. No upgrade required if SMBv3 is supported alongside." -ForegroundColor Cyan
+        # Enable SMBv2 (assuming that by enabling SMBv2, SMBv3 will also be enabled if supported)
+        if ($smbv2Enabled -eq $false) {
+            Set-SmbServerConfiguration -EnableSMB2Protocol $true -Force
+            Write-Host "Upgraded to SMBv2/SMBv3." -ForegroundColor Green
+            $restart = $true
+        } elseif ($smbv2Enabled -eq $true) {
+            Write-Host "SMBv2 detected. No upgrade required if SMBv3 is supported alongside." -ForegroundColor Cyan
+        }
+
+        if ($smbv1Enabled -eq $true) {
+            Write-Host "SMBv1 detected. disabling..." -ForegroundColor Yellow
+
+            # Disable SMBv1
+            Set-SmbServerConfiguration -EnableSMB1Protocol $false -Force
+            $restart = $true
+        }
+
+        # Restart might be required after these changes
+        if ($restart -eq $true) {
+            Write-Host "Please consider restarting the machine for changes to take effect." -ForegroundColor Red
+        }
+    } catch {
+        Write-Host $_.Exception.Message -ForegroundColor Yellow
+        Write-Host "Error Occurred..."
     }
+}
 
-    if ($smbv1Enabled -eq $true) {
-        Write-Host "SMBv1 detected. disabling..." -ForegroundColor Yellow
+function Patch-DCSync-Vuln {
+    try {
+        # Get all permissions in the domain, filtered to the two critical replication permissions represented by their GUIDs
+        Import-Module ActiveDirectory
+        $AllReplACLs = (Get-Acl -Path "AD:\$((Get-ADDomain).DistinguishedName)").Access | Where-Object { $_.ObjectType -eq '1131f6ad-9c07-11d1-f79f-00c04fc2dcd2' -or $_.ObjectType -eq '1131f6aa-9c07-11d1-f79f-00c04fc2dcd2' }
 
-        # Disable SMBv1
-        Set-SmbServerConfiguration -EnableSMB1Protocol $false -Force
-        $restart = $true
+        # Filter this list to RIDs above 1000 which will exclude well-known Administrator groups
+		Write-Host "Users with Replicate ACLs" -ForegroundColor Yellow
+        foreach ($ACL in $AllReplACLs) {
+            $user = New-Object System.Security.Principal.NTAccount($ACL.IdentityReference)
+            Write-Host "User:" $user # Print the user
+            $SID = $user.Translate([System.Security.Principal.SecurityIdentifier])
+            $RID = $SID.ToString().Split("-")[7]
+            if([int]$RID -gt 1000) {
+                Write-Host "Permission to Sync AD granted to:" $ACL.IdentityReference
+            }
+        }
+    } catch {
+        Write-Host $_.Exception.Message -ForegroundColor Yellow
+        Write-Host "Error Occurred..."
     }
+}
 
-    # Restart might be required after these changes
-    if ($restart -eq $true) {
-        Write-Host "Please consider restarting the machine for changes to take effect." -ForegroundColor Red
+function Patch-Mimikatz {
+    try {
+        # Define the registry key path
+        $registryPath = "HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\WDigest"
+
+        # Check if the registry key exists
+        if (Test-Path $registryPath) {
+            # Check if the UseLogonCredential value exists
+            $useLogonCredentialExists = Get-ItemProperty -Path $registryPath -Name "UseLogonCredential" -ErrorAction SilentlyContinue
+
+            if ($useLogonCredentialExists -eq $null) {
+                # Create the UseLogonCredential value and set it to 0
+                New-ItemProperty -Path $registryPath -Name "UseLogonCredential" -Value 0 -PropertyType DWord | Out-Null
+            } else {
+                # Set the UseLogonCredential value to 0
+                Set-ItemProperty -Path $registryPath -Name "UseLogonCredential" -Value 0 -Type DWord
+            }
+        } else {
+            Write-Host "Registry key path not found: $registryPath"
+        }
+    } catch {
+        Write-Host $_.Exception.Message -ForegroundColor Yellow
+        Write-Host "Error Occurred..."
+    }
+}
+
+function Run-Windows-Updates {
+    try{
+        # Restart Windows Update service
+        Restart-Service -Name wuauserv
+
+        # Clear Windows Update cache
+        Stop-Service -Name wuauserv
+        Remove-Item -Path C:\Windows\SoftwareDistribution\* -Recurse -Force
+        Start-Service -Name wuauserv
+
+        # Check for disk space
+        $diskSpace = Get-WmiObject -Class Win32_LogicalDisk -Filter "DeviceID='C:'" | Select-Object -ExpandProperty FreeSpace
+        if ($diskSpace -lt 1073741824) { # 1 GB in bytes
+            Write-Host "Insufficient disk space available on the system drive. Please free up disk space and try again."
+            exit
+        }
+
+        # Check Windows Update logs for errors
+        $updateLogPath = "C:\Windows\WindowsUpdate.log"
+        if (Test-Path $updateLogPath) {
+            $updateLogContent = Get-Content -Path $updateLogPath -Tail 50 # Read last 50 lines of the log
+            if ($updateLogContent -match "error") {
+                Write-Host "Error detected in Windows Update log. Please review the log for more details: $updateLogPath"
+                exit
+            }
+        }
+
+        # Check if updates are available
+        $wuSession = New-Object -ComObject Microsoft.Update.Session
+        $wuSearcher = $wuSession.CreateUpdateSearcher()
+        $updates = $wuSearcher.Search("IsInstalled=0")
+
+        # Install available updates
+        if ($updates.Updates.Count -gt 0) {
+            $totalUpdates = $updates.Updates.Count
+            $updateCounter = 0
+
+            # Initialize progress bar
+            Write-Progress -Activity "Installing updates" -Status "0% Complete" -PercentComplete 0
+
+            $updates.Updates | ForEach-Object {
+                $updateCounter++
+                $percentComplete = ($updateCounter / $totalUpdates) * 100
+                Write-Progress -Activity "Installing updates" -Status "$percentComplete% Complete" -PercentComplete $percentComplete
+
+                # Install update
+                $installResult = $wuSession.CreateUpdateInstaller().Install($_)
+                if ($installResult.ResultCode -ne 2) {
+                    Write-Host "Failed to install update $($_.Title). Result code: $($installResult.ResultCode)"
+                }
+            }
+            Write-Host "Updates successfully installed."
+        } else {
+            Write-Host "No updates available."
+        }
+    } catch {
+        Write-Host $_.Exception.Message -ForegroundColor Yellow
+        Write-Host "Error Occurred..."
     }
 }
 
 
 Disable-Users
 
-Write-Host "`n***Adding Competition Users...***" -ForegroundColor Magenta
-Add-Competition-Users
 
-Write-Host "`n***Removing every user from RDP group except $($UserArray[0]) and $($UserArray[1])...***" -ForegroundColor Magenta
-Remove-RDP-Users
+$confirmation = Prompt-Yes-No -Message "Enter the 'Add Competition Users' function? (y/n)"
+if ($confirmation.toLower() -eq "y") {
+    Write-Host "`n***Adding Competition Users...***" -ForegroundColor Magenta
+    Add-Competition-Users
+} else {
+    Write-Host "Skipping..." -ForegroundColor Red
+}
 
-Write-Host "`n***Configuring firewall***" -ForegroundColor Magenta
-Configure-Firewall
 
-Write-Host "`n***Disabling unnecessary services***" -ForegroundColor Magenta
-Disable-Unnecessary-Services
+$confirmation = Prompt-Yes-No -Message "Enter the 'Remove users from RDP group except $($UserArray[0]) and $($UserArray[1])' function? (y/n)"
+if ($confirmation.toLower() -eq "y") {
+    Write-Host "`n***Removing every user from RDP group except $($UserArray[0]) and $($UserArray[1])...***" -ForegroundColor Magenta
+    Remove-RDP-Users
+} else {
+    Write-Host "Skipping..." -ForegroundColor Red
+}
 
-Write-Host "`n***Creating Blank GPO and applying to Root of domain***" -ForegroundColor Magenta
-Create-Good-GPO
 
-Write-Host "`n***Configuring Secure GPO***" -ForegroundColor Magenta
-Configure-Secure-GPO
+$confirmation = Prompt-Yes-No -Message "Enter the 'Configure Firewall' function? (y/n)"
+if ($confirmation.toLower() -eq "y") {
+    Write-Host "`n***Configuring firewall***" -ForegroundColor Magenta
+    Configure-Firewall
+} else {
+    Write-Host "Skipping..." -ForegroundColor Red
+}
+
+
+$confirmation = Prompt-Yes-No -Message "Enter the 'Disable unnecessary services (NetBIOS over TCP/IP, IPv6, closed port services)' function? (y/n)"
+if ($confirmation.toLower() -eq "y") {
+    Write-Host "`n***Disabling unnecessary services***" -ForegroundColor Magenta
+    Disable-Unnecessary-Services
+} else {
+    Write-Host "Skipping..." -ForegroundColor Red
+}
+
+
+
+
+$confirmation = Prompt-Yes-No -Message "Enter the 'Create Blank GPO with Correct Permissions' function? (y/n)"
+if ($confirmation.toLower() -eq "y") {
+    Write-Host "`n***Creating Blank GPO and applying to Root of domain***" -ForegroundColor Magenta
+	Create-Good-GPO
+} else {
+    Write-Host "Skipping..." -ForegroundColor Red
+}
+
+
+# $confirmation = Prompt-Yes-No -Message "Enter the 'Configure Secure GPO' function? (y/n)"
+# if ($confirmation.toLower() -eq "y") {
+#     Write-Host "`n***Configuring Secure GPO***" -ForegroundColor Magenta
+#     Configure-Secure-GPO
+# } else {
+#     Write-Host "Skipping..." -ForegroundColor Red
+# }
+
 
 Write-Host "`n***Enabling advanced auditing***" -ForegroundColor Magenta
 .\advancedAuditing.ps1
+Write-Host "Enabling Firewall logging successful and blocked connections" -ForegroundColor Green
+Set-NetFirewallProfile -Profile Domain,Public,Private -LogAllowed True -LogBlocked True
 
-Write-Host "`n***Configuring Splunk***" -ForegroundColor Magenta
-$SplunkIP = Read-Host "`nInput IP address of Splunk Server"
-Download-Install-Setup-Splunk -IP $SplunkIP
+
+$confirmation = Prompt-Yes-No -Message "Enter the 'Configure Splunk' function? (y/n)"
+if ($confirmation.toLower() -eq "y") {
+    Write-Host "`n***Configuring Splunk***" -ForegroundColor Magenta
+    $SplunkIP = Read-Host "`nInput IP address of Splunk Server"
+    Download-Install-Setup-Splunk -IP $SplunkIP
+} else {
+    Write-Host "Skipping..." -ForegroundColor Red
+}
+
 
 Write-Host "`n***Installing EternalBlue Patch***" -ForegroundColor Magenta
 Install-EternalBluePatch
 
+
 Write-Host "`n***Upgrading SMB***" -ForegroundColor Magenta
 Upgrade-SMB
 
-Write-Host "Setting Execution Policy back to Restricted" -ForegroundColor Magenta
-Set-ExecutionPolicy Restricted
 
-Write-Host "`n***Installing EternalBlue Patch***" -ForegroundColor Red
-Install-EternalBluePatch
+Write-Host "`n***Patching DCSync Vulns***" -ForegroundColor Magenta
+Patch-DCSync-Vuln
+
+
+Write-Host "`n***Patching Mimikatz***" -ForegroundColor Magenta
+Patch-Mimikatz
+
+
+$confirmation = Prompt-Yes-No -Message "Enter the 'Run Windows Updates' function? (y/n) This might take a while"
+if ($confirmation.toLower() -eq "y") {
+    Write-Host "`n***Running Windows Updater***" -ForegroundColor Magenta
+    Run-Windows-Updates
+} else {
+    Write-Host "Skipping..." -ForegroundColor Red
+}
+
+
+Write-Host "***Setting Execution Policy back to Restricted***" -ForegroundColor Red
+Set-ExecutionPolicy Restricted
