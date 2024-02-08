@@ -65,7 +65,7 @@ function Disable-Users {
                 MassDisable
                 Write-Host "All users disabled but your own" -ForegroundColor Red
             } else {
-                Write-Host "Skipping..."
+                Write-Host "Skipping..." -ForegroundColor Red
             }
     } catch {
         Write-Host $_.Exception.Message
@@ -138,8 +138,7 @@ function Add-Competition-Users {
                 }
             }
         }
-
-        Print-Users
+        $userInfos = Print-Users
 
         $confirmation = Prompt-Yes-No -Message "Any users you'd like to enable (y/n)?"
         if ($confirmation.ToLower() -eq "y") {
@@ -147,7 +146,7 @@ function Add-Competition-Users {
 
             $enableUsers | ForEach-Object {
                 Enable-ADAccount $_
-                Print-Users
+                $userInfos = Print-Users
             }
 
         } else {
@@ -160,12 +159,18 @@ function Add-Competition-Users {
 
             $disableUsers | ForEach-Object {
                 Disable-ADAccount $_
-                Print-Users
+                $userInfos = Print-Users
             }
 
         } else {
             Write-Host "Skipping...`n"
         }
+		$userOutput = Print-Users
+		if ($userOutput -ne $null) {
+			$outputText = $userOutput -join "`n`n"
+			$outputText | Out-File -FilePath "UserPerms.txt" -Encoding UTF8
+			Write-Host "`nUser permissions have been exported to .\UserPerms.txt" -ForegroundColor Green
+		}
     } catch {
         Write-Host $_.Exception.Message -ForegroundColor Yellow
         Write-Host "Error Occurred..."
@@ -195,8 +200,7 @@ function Prompt-Yes-No {
 
     try {
         do {
-            $response = Read-Host -Prompt $Message
-            Write-Host $response
+            $response = $(Write-Host $Message -ForegroundColor Yellow -NoNewline; Read-Host)
             if ($response -ieq 'y' -or $response -ieq 'n') {
                 return $response
             } else {
@@ -212,30 +216,44 @@ function Prompt-Yes-No {
 # Print enabled and disabled users with their group memberships
 function Print-Users {
     try {
-    Write-Host "`n==== Enabled Users ====" -ForegroundColor Green
-    Get-ADUser -Filter {Enabled -eq $true } -Properties Name | ForEach-Object {
-        Write-Host $_.Name -ForegroundColor Cyan
-        $groups = Get-ADPrincipalGroupMembership $_ | Select-Object -ExpandProperty Name
-        $groups | ForEach-Object {
-            Write-Host "   - $_"
+        $output = @()
+
+        Write-Host "`n==== Enabled Users ====" -ForegroundColor Green
+        $enabledUsersOutput = "==== Enabled Users ===="
+        $enabledUsers = Get-ADUser -Filter {Enabled -eq $true} -Properties Name | ForEach-Object {
+            $userOutput = $_.Name
+            $groups = Get-ADPrincipalGroupMembership $_ | Select-Object -ExpandProperty Name
+            $groups | ForEach-Object {
+                $userOutput += "`n   - $_"
+            }
+            Write-Host $userOutput -ForegroundColor Cyan
+            [System.GC]::Collect()
+            $enabledUsersOutput += "`n$userOutput"
+            $_.Name, $groups -join "`n"
         }
-        # Force garbage collection after processing each user
-        [System.GC]::Collect()
-    }
-    Write-Host "`n==== Disabled Users ====" -ForegroundColor Red
-    Get-ADUser -Filter {Enabled -eq $false } -Properties Name | ForEach-Object {
-        Write-Host $_.Name -ForegroundColor Cyan
-        $groups = Get-ADPrincipalGroupMembership $_ | Select-Object -ExpandProperty Name
-        $groups | ForEach-Object {
-        Write-Host "   - $_"
+        $output += $enabledUsersOutput
+
+        Write-Host "`n==== Disabled Users ====" -ForegroundColor Red
+        $disabledUsersOutput = "==== Disabled Users ===="
+        $disabledUsers = Get-ADUser -Filter {Enabled -eq $false} -Properties Name | ForEach-Object {
+            $userOutput = $_.Name
+            $groups = Get-ADPrincipalGroupMembership $_ | Select-Object -ExpandProperty Name
+            $groups | ForEach-Object {
+                $userOutput += "`n   - $_"
+            }
+            Write-Host $userOutput -ForegroundColor Cyan
+            [System.GC]::Collect()
+            $disabledUsersOutput += "`n$userOutput"
+            $_.Name, $groups -join "`n"
         }
-        # Force garbage collection after processing each user
-        [System.GC]::Collect()
-    }
-    Write-Host "`n"
+        $output += $disabledUsersOutput
+
+        return $output
+
     } catch {
         Write-Host $_.Exception.Message -ForegroundColor Yellow
         Write-Host "Error Occurred..."
+        return $null
     }
 }
 
@@ -268,11 +286,18 @@ function Configure-Firewall {
             Write-Host "All the following ports that we suggest are either common scored services, or usually needed for AD processes. We will say which is which"
             foreach ($item in $usualPorts) {
                 if ($desigPorts -notcontains $item) {
-                    if ($item -in @(53, 3389, 80, 445, 22)) {
+                    if ($item -in @(53, 3389, 80, 22)) {
                         Write-Host "`nCommon Scored Service" -ForegroundColor Green
                     }
                     if ($item -in @(139, 88, 67, 68, 135, 139, 389, 445, 636, 3268, 3269, 464)) {
-                        Write-Host "`nCommon port needed for DC/AD processes" -ForegroundColor Red
+						if ($item -eq 445) {
+							Write-Host "`nCommon Scored Service" -ForegroundColor Green -NoNewline
+							Write-Host " and" -ForegroundColor Cyan -NoNewline
+							Write-Host " Common port needed for CD/AD processes" -ForegroundColor Red
+						}
+						else {
+							Write-Host "`nCommon port needed for DC/AD processes" -ForegroundColor Red
+						}
                     }
                     $confirmation = $(Write-Host "Need " -NoNewline) + $(Write-Host "$item" -ForegroundColor Green -NoNewline) + $(Write-Host ", " -NoNewline) + $(Write-Host "$($PortsObject.ports.$item.description)? " -ForegroundColor Cyan -NoNewline) + $(Write-Host "(y/n)" -ForegroundColor Yellow; Read-Host)
 
@@ -444,9 +469,6 @@ function Global-Gpupdate {
 }
 
 function Create-Good-GPO {
-    param (
-        [string] $GPOName
-    )
     try {
         Write-Host "Creating GPO named '$GPOName'..." -ForegroundColor Green
         $newGPO = New-GPO -Name $GPOName
@@ -456,18 +478,23 @@ function Create-Good-GPO {
 
         Write-Host "Linking GPO to the domain..." -ForegroundColor Green
         New-GPLink -Name $GPOName -Target $domainDN
+		Write-Host "GPO linked successfully!" -ForegroundColor Green
 
         Write-Host "Setting permissions for GPO..." -ForegroundColor Green
         # Get the SID of the current user
         $userSID = (New-Object System.Security.Principal.NTAccount($CurrentUser)).Translate([System.Security.Principal.SecurityIdentifier]).Value
 
         # Set permissions for the creating user (full control)
-        Set-GPPermissions -Name $GPOName -TargetName $userSID -TargetType User -PermissionLevel GpoEdit
-
-        # Set permissions for Domain Admins (deny Apply Group Policy)
-        Set-GPPermissions -Name $GPOName -TargetName "Domain Admins" -TargetType Group -PermissionLevel None -ApplyPolicy ApplyGroupPolicy
-
-        Write-Host "GPO linked successfully!" -ForegroundColor Green
+		try {
+			Set-GPPermissions -Name $GPOName -TargetName $CurrentUser -TargetType User -PermissionLevel GpoEdit
+			Write-Host "Permissions set successfully." -ForegroundColor Green
+		} catch {
+			Write-Host "Error setting permissions -- $_" -ForegroundColor Yellow
+		}
+		Write-Host "Go configure the GPO, specifically to deny the 'Apply Group Policy' for current user, before continuing" -ForegroundColor Black -BackgroundColor Yellow
+		Read-Host " "
+		Set-GPLink -Name $GPOName -Target $domainDN -Enforced Yes
+		Write-Host "GPO fully and successfully configured and enforced!" -ForegroundColor Green
     } catch {
         Write-Host $_.Exception.Message -ForegroundColor Yellow
         Write-Host "Error Occurred..."
@@ -675,12 +702,13 @@ function Configure-Secure-GPO {
         Write-Host "$successfulConfigurations configurations successfully applied." -ForegroundColor Green
 
         if ($failedConfigurations.Count -gt 0) {
-            Write-Host "Configurations that couldn't be applied due to missing registry key paths:"
+            Write-Host "`nConfigurations that couldn't be applied due to missing registry key paths:" -ForegroundColor Red
             $failedConfigurations
         } else {
             Write-Host "All configurations applied successfully." -ForegroundColor Green
         }
-
+		
+		Write-Host "Applying gpupdate across all machines on the domain" -ForegroundColor Magenta
         Global-Gpupdate
     } catch {
         Write-Host $_.Exception.Message -ForegroundColor Yellow
@@ -728,15 +756,16 @@ function Install-EternalBluePatch {
     try {
         # Determine patch URL based on OS version keywords
         $patchURL = switch -Regex ($osVersion) {
-            '(?i)Vista'  { "https://catalog.s.download.windowsupdate.com/d/msdownload/update/software/secu/2017/02/windows6.0-kb4012598-x64_6a186ba2b2b98b2144b50f88baf33a5fa53b5d76.msu" }
-            'Windows 7'  { "https://catalog.s.download.windowsupdate.com/d/msdownload/update/software/secu/2017/02/windows6.1-kb4012212-x64_2decefaa02e2058dcd965702509a992d8c4e92b3.msu" }
-            'Windows 8'  { "https://catalog.s.download.windowsupdate.com/c/msdownload/update/software/secu/2017/02/windows8.1-kb4012213-x64_5b24b9ca5a123a844ed793e0f2be974148520349.msu" }
-            '2008 R2'    { "https://catalog.s.download.windowsupdate.com/d/msdownload/update/software/secu/2017/02/windows6.1-kb4012212-x64_2decefaa02e2058dcd965702509a992d8c4e92b3.msu" }
-            '2008'       { "https://catalog.s.download.windowsupdate.com/d/msdownload/update/software/secu/2017/02/windows6.0-kb4012598-x64_6a186ba2b2b98b2144b50f88baf33a5fa53b5d76.msu" }
-            '2012 R2'    { "https://catalog.s.download.windowsupdate.com/c/msdownload/update/software/secu/2017/02/windows8.1-kb4012213-x64_5b24b9ca5a123a844ed793e0f2be974148520349.msu" }
-            '2012'       { "https://catalog.s.download.windowsupdate.com/c/msdownload/update/software/secu/2017/02/windows8-rt-kb4012214-x64_b14951d29cb4fd880948f5204d54721e64c9942b.msu" }
+            '(?i)Vista'  { "https://catalog.s.download.windowsupdate.com/d/msdownload/update/software/secu/2017/02/windows6.0-kb4012598-x64_6a186ba2b2b98b2144b50f88baf33a5fa53b5d76.msu"; break }
+            'Windows 7'  { "https://catalog.s.download.windowsupdate.com/d/msdownload/update/software/secu/2017/02/windows6.1-kb4012212-x64_2decefaa02e2058dcd965702509a992d8c4e92b3.msu"; break }
+            'Windows 8'  { "https://catalog.s.download.windowsupdate.com/c/msdownload/update/software/secu/2017/02/windows8.1-kb4012213-x64_5b24b9ca5a123a844ed793e0f2be974148520349.msu"; break }
+            '2008 R2'    { "https://catalog.s.download.windowsupdate.com/d/msdownload/update/software/secu/2017/02/windows6.1-kb4012212-x64_2decefaa02e2058dcd965702509a992d8c4e92b3.msu"; break }
+            '2008'       { "https://catalog.s.download.windowsupdate.com/d/msdownload/update/software/secu/2017/02/windows6.0-kb4012598-x64_6a186ba2b2b98b2144b50f88baf33a5fa53b5d76.msu"; break }
+            '2012 R2'    { "https://catalog.s.download.windowsupdate.com/c/msdownload/update/software/secu/2017/02/windows8.1-kb4012213-x64_5b24b9ca5a123a844ed793e0f2be974148520349.msu"; break }
+            '2012'       { "https://catalog.s.download.windowsupdate.com/c/msdownload/update/software/secu/2017/02/windows8-rt-kb4012214-x64_b14951d29cb4fd880948f5204d54721e64c9942b.msu"; break }
             default { throw "Unsupported OS version: $osVersion" }
         }
+		Write-Host $patchURL
 
         # Download the patch to a temporary location
         $path = "$env:TEMP\eternalblue_patch.msu"
@@ -751,7 +780,7 @@ function Install-EternalBluePatch {
         # Cleanup
         Remove-Item -Path $path -Force
 
-        Write-Output "Patch for $OSVersion installed successfully!"
+        Write-Host "Patch for $OSVersion installed successfully!" -ForegroundColor Green
     } catch {
         Write-Host $_.Exception.Message -ForegroundColor Yellow
         Write-Host "Error Occurred..."
@@ -798,10 +827,10 @@ function Patch-DCSync-Vuln {
     try {
         # Get all permissions in the domain, filtered to the two critical replication permissions represented by their GUIDs
         Import-Module ActiveDirectory
-        Set-Location (Get-ADDomain).DistinguishedName
-        $AllReplACLs = (Get-Acl).Access | Where-Object { $_.ObjectType -eq '1131f6ad-9c07-11d1-f79f-00c04fc2dcd2' -or $_.ObjectType -eq '1131f6aa-9c07-11d1-f79f-00c04fc2dcd2' }
+        $AllReplACLs = (Get-Acl -Path "AD:\$((Get-ADDomain).DistinguishedName)").Access | Where-Object { $_.ObjectType -eq '1131f6ad-9c07-11d1-f79f-00c04fc2dcd2' -or $_.ObjectType -eq '1131f6aa-9c07-11d1-f79f-00c04fc2dcd2' }
 
         # Filter this list to RIDs above 1000 which will exclude well-known Administrator groups
+		Write-Host "Users with Replicate ACLs" -ForegroundColor Yellow
         foreach ($ACL in $AllReplACLs) {
             $user = New-Object System.Security.Principal.NTAccount($ACL.IdentityReference)
             Write-Host "User:" $user # Print the user
@@ -908,67 +937,75 @@ function Run-Windows-Updates {
 Disable-Users
 
 
-$confirmation = Prompt-Yes-No -Message "Enter the 'Add Competition Users' function?"
+$confirmation = Prompt-Yes-No -Message "Enter the 'Add Competition Users' function? (y/n)"
 if ($confirmation.toLower() -eq "y") {
     Write-Host "`n***Adding Competition Users...***" -ForegroundColor Magenta
     Add-Competition-Users
 } else {
-    Write-Host "Skipping..."
+    Write-Host "Skipping..." -ForegroundColor Red
 }
 
 
-$confirmation = Prompt-Yes-No -Message "Enter the 'Remove users from RDP group except $($UserArray[0]) and $($UserArray[1])' function?"
+$confirmation = Prompt-Yes-No -Message "Enter the 'Remove users from RDP group except $($UserArray[0]) and $($UserArray[1])' function? (y/n)"
 if ($confirmation.toLower() -eq "y") {
     Write-Host "`n***Removing every user from RDP group except $($UserArray[0]) and $($UserArray[1])...***" -ForegroundColor Magenta
     Remove-RDP-Users
 } else {
-    Write-Host "Skipping..."
+    Write-Host "Skipping..." -ForegroundColor Red
 }
 
 
-$confirmation = Prompt-Yes-No -Message "Enter the 'Configure Firewall' function?"
+$confirmation = Prompt-Yes-No -Message "Enter the 'Configure Firewall' function? (y/n)"
 if ($confirmation.toLower() -eq "y") {
     Write-Host "`n***Configuring firewall***" -ForegroundColor Magenta
     Configure-Firewall
 } else {
-    Write-Host "Skipping..."
+    Write-Host "Skipping..." -ForegroundColor Red
 }
 
 
-$confirmation = Prompt-Yes-No -Message "Enter the 'Disable unnecessary services (NetBIOS over TCP/IP, IPv6, closed port services)' function?"
+$confirmation = Prompt-Yes-No -Message "Enter the 'Disable unnecessary services (NetBIOS over TCP/IP, IPv6, closed port services)' function? (y/n)"
 if ($confirmation.toLower() -eq "y") {
     Write-Host "`n***Disabling unnecessary services***" -ForegroundColor Magenta
     Disable-Unnecessary-Services
 } else {
-    Write-Host "Skipping..."
+    Write-Host "Skipping..." -ForegroundColor Red
 }
 
 
-Write-Host "`n***Creating Blank GPO and applying to Root of domain***" -ForegroundColor Magenta
-Create-Good-GPO
 
 
-$confirmation = Prompt-Yes-No -Message "Enter the 'Configure Secure GPO' function?"
+$confirmation = Prompt-Yes-No -Message "Enter the 'Create Blank GPO with Correct Permissions' function? (y/n)"
 if ($confirmation.toLower() -eq "y") {
-    Write-Host "`n***Configuring Secure GPO***" -ForegroundColor Magenta
-    Configure-Secure-GPO
+    Write-Host "`n***Creating Blank GPO and applying to Root of domain***" -ForegroundColor Magenta
+	Create-Good-GPO
 } else {
-    Write-Host "Skipping..."
+    Write-Host "Skipping..." -ForegroundColor Red
 }
+
+
+# $confirmation = Prompt-Yes-No -Message "Enter the 'Configure Secure GPO' function? (y/n)"
+# if ($confirmation.toLower() -eq "y") {
+#     Write-Host "`n***Configuring Secure GPO***" -ForegroundColor Magenta
+#     Configure-Secure-GPO
+# } else {
+#     Write-Host "Skipping..." -ForegroundColor Red
+# }
 
 
 Write-Host "`n***Enabling advanced auditing***" -ForegroundColor Magenta
 .\advancedAuditing.ps1
-Set-NetFirewallProfile -Profile Domain,Public,Private -LogAllowed $true -LogDropped $true
+Write-Host "Enabling Firewall logging successful and blocked connections" -ForegroundColor Green
+Set-NetFirewallProfile -Profile Domain,Public,Private -LogAllowed True -LogBlocked True
 
 
-$confirmation = Prompt-Yes-No -Message "Enter the 'Configure Splunk' function?"
+$confirmation = Prompt-Yes-No -Message "Enter the 'Configure Splunk' function? (y/n)"
 if ($confirmation.toLower() -eq "y") {
     Write-Host "`n***Configuring Splunk***" -ForegroundColor Magenta
     $SplunkIP = Read-Host "`nInput IP address of Splunk Server"
     Download-Install-Setup-Splunk -IP $SplunkIP
 } else {
-    Write-Host "Skipping..."
+    Write-Host "Skipping..." -ForegroundColor Red
 }
 
 
@@ -988,12 +1025,12 @@ Write-Host "`n***Patching Mimikatz***" -ForegroundColor Magenta
 Patch-Mimikatz
 
 
-$confirmation = Prompt-Yes-No -Message "Enter the 'Run Windows Updates' function? This might take a while"
+$confirmation = Prompt-Yes-No -Message "Enter the 'Run Windows Updates' function? (y/n) This might take a while"
 if ($confirmation.toLower() -eq "y") {
     Write-Host "`n***Running Windows Updater***" -ForegroundColor Magenta
     Run-Windows-Updates
 } else {
-    Write-Host "Skipping..."
+    Write-Host "Skipping..." -ForegroundColor Red
 }
 
 
