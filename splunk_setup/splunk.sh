@@ -267,21 +267,38 @@ function add_firewall_logs {
     INDEX="network"
     
     if command -v firewalld &>/dev/null; then
-        echo "[*] No monitor added; firewalld logs contained in /var/log/messages"
-    elif command -v ufw &>/dev/null; then
-        echo "[*] Adding monitors for ufw logs"
-        FIREWALL_LOG="/var/log/ufw.log"
-        sudo touch "${FIREWALL_LOG}"
-        sudo ufw logging low
+        echo "[*] firewalld detected"
+        FIREWALL_LOG="/var/log/firewalld"
+
+        echo "[*] Enabling firewalld logging"
+        sudo firewall-cmd --set-log-denied=all
+
+        echo "[*] Adding firewalld error logs"
         add_monitor "${FIREWALL_LOG}" "${INDEX}"
-    elif command -v iptables &>/dev/null; then
-        echo "[*] Adding monitors for iptables"
-        FIREWALL_LOG="/var/log/iptables.log"
-        LOGGING_LEVEL=1
+        echo "[*] firewalld access logs contained in /var/log/messages (already added)"
+    elif command -v ufw &>/dev/null; then
+        echo "[*] ufw detected"
+        FIREWALL_LOG="/var/log/ufw.log"
+
+        echo "[*] Enabling ufw logging"
+        sudo ufw logging low
+
+        echo "[*] Adding monitors for ufw logs"
         sudo touch "${FIREWALL_LOG}"
+        add_monitor "${FIREWALL_LOG}" "${INDEX}"
+    elif command -v iptables &>/dev/null; then\
+        echo "[*] iptables detected"
+        FIREWALL_LOG="/var/log/iptables.log"
+
+        echo "[*] Enabling iptables logging"
+        LOGGING_LEVEL=1
+        # Not sure if the order of where this rule is placed in the chain matters or not
         sudo iptables -A INPUT -j LOG --log-prefix "iptables: " --log-level $LOGGING_LEVEL
         #sudo iptables -A OUTPUT -j LOG --log-prefix "iptables: " --log-level $LOGGING_LEVEL
         #sudo iptables -A FORWARD -j LOG --log-prefix "iptables: " --log-level $LOGGING_LEVEL
+        
+        echo "[*] Adding monitors for iptables"
+        sudo touch "${FIREWALL_LOG}"
         add_monitor "${FIREWALL_LOG}" "${INDEX}"
     else
         echo "[*] ERROR: No firewall found. Please forward logs manually."
@@ -305,8 +322,14 @@ function add_package_logs {
         add_monitor "${PACKAGE_LOGS}" "${INDEX}"
     fi
 
-    if command -v yum &>/dev/null || command -v dnf &>/dev/null; then
-        echo "[*] Adding monitors for dnf/yum logs"
+    if command -v dnf &>/dev/null; then
+        echo "[*] Adding monitors for dnf logs"
+        PACKAGE_LOGS="/var/log/dnf.rpm.log"
+        add_monitor "${PACKAGE_LOGS}" "${INDEX}"
+    fi
+
+    if command -v yum &>/dev/null; then
+        echo "[*] Adding monitors for yum logs"
         PACKAGE_LOGS="/var/log/yum.log"
         add_monitor "${PACKAGE_LOGS}" "${INDEX}"
     fi
@@ -350,11 +373,14 @@ function add_web_logs {
         add_monitor "${APACHE_ACCESS}" "${INDEX}"
         add_monitor "${APACHE_ERROR}" "${INDEX}"
     elif [ -d "/var/log/lighttpd/" ]; then
-        echo "[*] Adding monitors for lighttpd logs"
-        LIGHTTPD_ACCESS="/var/log/lighhtpd/access_log"
-        LIGHTTPD_ERROR="/var/log/lighttpd/error_log"
-        add_monitor "${LIGHTTPD_ACCESS}" "${INDEX}"
+        echo "[*] Adding monitor for lighttpd error logs"
+        # LIGHTTPD_ACCESS="/var/log/lighhtpd/access.log"
+        LIGHTTPD_ERROR="/var/log/lighttpd/error.log"
+        # add_monitor "${LIGHTTPD_ACCESS}" "${INDEX}"
         add_monitor "${LIGHTTPD_ERROR}" "${INDEX}"
+        print_banner "Please manually modify lighttpd config file in /etc/lighttpd/lighttpd.conf."
+        echo "[*] Add "mod_accesslog" in server.modules, and at the bottom of the file add \`accesslog.filename = \"/var/log/lighttpd/access.log\"\`"
+        echo "[*] Then, add a Splunk monitor for /var/log/lighttpd/access.log"
     elif [ -d "/var/log/nginx" ]; then
         echo "[*] Adding monitors for Nginx logs"
         NGINX_ACCESS="/var/log/nginx/access.log"
