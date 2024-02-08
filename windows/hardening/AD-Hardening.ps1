@@ -1,9 +1,25 @@
 Import-Module ActiveDirectory
 Import-Module GroupPolicy
 
-if (-not (Test-Path ".\advancedAuditing.ps1") -or -not (Test-Path ".\ports.json") -or -not (Test-Path ".\users.txt")) {
-    Write-Host "Please download users.txt, ports.json, and advancedAuditing.ps1 and place them into this directory" -ForegroundColor Red
-    exit
+$ccdcRepoWindowsHardeningPath = "https://github.com/BYU-CCDC/public-ccdc-resources/tree/main/windows/hardening/"
+$portsFile = "ports.json"
+$usersFile = "users.txt"
+$advancedAuditingFile = "advancedAuditing.ps1"
+$patchURLFile = "patchURLs.json"
+
+$neededFiles = @($portsFile, $usersFile, $advancedAuditingFile, $patchURLFile)
+foreach ($file in $neededFiles) {
+    try {
+        if (-not (Test-Path "$pwd\$file")) {
+            $wc = New-Object net.webclient
+            $wc.DownloadFile("$ccdcRepoWindowsHardeningPath/$file", "$pwd\$file")
+        }
+    } catch {
+        Write-Host $_.Exception.Message -ForegroundColor Yellow
+        Write-Host "Error Occurred..."
+        Write-Host "Download $file from $ccdcRepoWindowsHardeningPath"
+        exit
+    }
 }
 
 # Get OS version and current user
@@ -283,13 +299,15 @@ function Configure-Firewall {
         :outer while ($true) {
             $desigPorts = Get-Comma-Separated-List -message "List needed port numbers for firewall config. Separate by commas."
             $usualPorts = @(53, 3389, 80, 445, 139, 22, 88, 67, 68, 135, 139, 389, 636, 3268, 3269, 464) | Sort-Object
+            $commonScored = @(53, 3389, 80, 22)
+            $commonADorDC = @(139, 88, 67, 68, 135, 139, 389, 445, 636, 3268, 3269, 464)
             Write-Host "All the following ports that we suggest are either common scored services, or usually needed for AD processes. We will say which is which"
             foreach ($item in $usualPorts) {
                 if ($desigPorts -notcontains $item) {
-                    if ($item -in @(53, 3389, 80, 22)) {
+                    if ($item -in $commonScored) {
                         Write-Host "`nCommon Scored Service" -ForegroundColor Green
                     }
-                    if ($item -in @(139, 88, 67, 68, 135, 139, 389, 445, 636, 3268, 3269, 464)) {
+                    if ($item -in $commonADorDC) {
 						if ($item -eq 445) {
 							Write-Host "`nCommon Scored Service" -ForegroundColor Green -NoNewline
 							Write-Host " and" -ForegroundColor Cyan -NoNewline
@@ -707,7 +725,7 @@ function Configure-Secure-GPO {
         } else {
             Write-Host "All configurations applied successfully." -ForegroundColor Green
         }
-		
+
 		Write-Host "Applying gpupdate across all machines on the domain" -ForegroundColor Magenta
         Global-Gpupdate
     } catch {
@@ -754,15 +772,16 @@ function Download-Install-Setup-Splunk {
 
 function Install-EternalBluePatch {
     try {
+        $patchURLs = Get-Content -Raw -Path "patchURLs.json" | ConvertFrom-Json
         # Determine patch URL based on OS version keywords
         $patchURL = switch -Regex ($osVersion) {
-            '(?i)Vista'  { "https://catalog.s.download.windowsupdate.com/d/msdownload/update/software/secu/2017/02/windows6.0-kb4012598-x64_6a186ba2b2b98b2144b50f88baf33a5fa53b5d76.msu"; break }
-            'Windows 7'  { "https://catalog.s.download.windowsupdate.com/d/msdownload/update/software/secu/2017/02/windows6.1-kb4012212-x64_2decefaa02e2058dcd965702509a992d8c4e92b3.msu"; break }
-            'Windows 8'  { "https://catalog.s.download.windowsupdate.com/c/msdownload/update/software/secu/2017/02/windows8.1-kb4012213-x64_5b24b9ca5a123a844ed793e0f2be974148520349.msu"; break }
-            '2008 R2'    { "https://catalog.s.download.windowsupdate.com/d/msdownload/update/software/secu/2017/02/windows6.1-kb4012212-x64_2decefaa02e2058dcd965702509a992d8c4e92b3.msu"; break }
-            '2008'       { "https://catalog.s.download.windowsupdate.com/d/msdownload/update/software/secu/2017/02/windows6.0-kb4012598-x64_6a186ba2b2b98b2144b50f88baf33a5fa53b5d76.msu"; break }
-            '2012 R2'    { "https://catalog.s.download.windowsupdate.com/c/msdownload/update/software/secu/2017/02/windows8.1-kb4012213-x64_5b24b9ca5a123a844ed793e0f2be974148520349.msu"; break }
-            '2012'       { "https://catalog.s.download.windowsupdate.com/c/msdownload/update/software/secu/2017/02/windows8-rt-kb4012214-x64_b14951d29cb4fd880948f5204d54721e64c9942b.msu"; break }
+            '(?i)Vista'  { $patchURLs.Vista; break }
+            'Windows 7'  { $patchURLs.'Windows 7'; break }
+            'Windows 8'  { $patchURLs.'Windows 8'; break }
+            '2008 R2'    { $patchURLs.'2008 R2'; break }
+            '2008'       { $patchURLs.'2008'; break }
+            '2012 R2'    { $patchURLs.'2012 R2'; break }
+            '2012'       { $patchURLs.'2012'; break }
             default { throw "Unsupported OS version: $osVersion" }
         }
 		Write-Host $patchURL
