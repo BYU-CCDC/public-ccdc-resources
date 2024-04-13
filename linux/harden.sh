@@ -746,7 +746,6 @@ function setup_splunk {
     wget https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main/splunk_setup/splunk.sh
     sudo chmod +x splunk.sh
     if [ $os == "redhat" ] || [ $os == "centos" ] || [ $os == "suse" ]; then type="rpm"; else type="debian"; fi
-
     read -r -p "what is the forward server ip? " ip
     ./splunk.sh $type "$ip"
     cleanup_files ./splunk.sh
@@ -755,6 +754,7 @@ function setup_splunk {
 function start_function {
     # Starts the function that is passed in as $1
     # if given $2 which is true or false it will echo letting user know they are in a sub function
+
 
     l="true"
     while [ $l == "true" ]; do
@@ -780,7 +780,6 @@ function start_function {
 
 function start_script {
     # The main brain for all the script. This function takes in all the main functions listed below and runs them in the order specified
-
     fx=("locate_services" "disable_users" "change_passwords" "remove_sudoers" "setup_firewall" "full_backup" "setup_splunk" y)
     setup
     for funct in "${fx[@]}"; do
