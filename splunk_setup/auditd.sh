@@ -1,6 +1,8 @@
 #!/bin/bash
 ###################### GLOBALS ######################
 pm=""
+GITHUB_URL='https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main'
+#####################################################
 
 ##################### FUNCTIONS #####################
 function detect_package_manager {
@@ -49,7 +51,7 @@ function add_audit_rules {
     CUSTOM_RULE_FILE='/etc/audit/rules.d/ccdc.rules'
 
     # Download custom rule file
-    sudo wget https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main/splunk_setup/ccdc.rules
+    sudo wget $GITHUB_URL/public-ccdc-resources/main/splunk_setup/ccdc.rules
     sudo mv ./ccdc.rules $CUSTOM_RULE_FILE
     sudo chown root:root $CUSTOM_RULE_FILE
     sudo chmod 600 $CUSTOM_RULE_FILE
@@ -72,6 +74,7 @@ function add_audit_rules {
     echo "[*] Applied rules:"
     sudo auditctl -l
 }
+#####################################################
 
 ####################### START #######################
 echo "[*] Beginning of script"

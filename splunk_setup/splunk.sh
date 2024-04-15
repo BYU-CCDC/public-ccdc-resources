@@ -23,9 +23,10 @@ if [ "$#" != 2 ]; then
     print_options
 fi
 
-###################### DOWNLOAD URLS ######################
+################### DOWNLOAD URLS ###################
 IP="$2"
-if [ "$IP" == "indexer" ]; then
+if [ "$IP" == "indexer" ] || [ "$IP" == "i" ]; then
+    IP="indexer"
     deb="https://download.splunk.com/products/splunk/releases/9.2.1/linux/splunk-9.2.1-78803f08aabb-linux-2.6-amd64.deb"
     rpm="https://download.splunk.com/products/splunk/releases/9.2.1/linux/splunk-9.2.1-78803f08aabb.x86_64.rpm"
     tgz="https://download.splunk.com/products/splunk/releases/9.2.1/linux/splunk-9.2.1-78803f08aabb-Linux-x86_64.tgz"
@@ -62,6 +63,7 @@ GITHUB_URL='https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/mai
 DEBUG_LOG='/tmp/splunk_log.txt'
 #####################################################
 
+###################### FUNCTIONS ######################
 # Prints text in a banner
 # Arguments:
 #   $1: Text to print
@@ -264,7 +266,8 @@ function add_monitor {
 
 # Adds monitors for system logs
 function add_system_logs {
-    print_banner "Adding various system logs (some of these will fail due to distribution differences)"
+    print_banner "Adding various system logs"
+    echo "[*] Some of these will fail due to distribution differences"
 
     INDEX="service"
     add_monitor "/etc/services" "${INDEX}"
@@ -538,6 +541,14 @@ function setup_forward_server {
     sudo $SPLUNKDIR/bin/splunk add forward-server "$1":9997
 }
 
+# Instsall auditd for file monitoring
+function install_auditd {
+    sudo wget $GITHUB_URL/splunk_setup/auditd.sh
+    sudo chmod +x auditd.sh
+    ./auditd.sh
+    add_monitor "/var/log/audit/audit.log" "auth"
+}
+
 # Install snoopy for bash logging
 function install_snoopy {
     wget -O install-snoopy.sh https://github.com/a2o/snoopy/raw/install/install/install-snoopy.sh
@@ -561,11 +572,12 @@ function install_snoopy {
     fi
     echo "[*] Snoopy installed successfully."
 }
+#####################################################
 
-################################# MAIN #################################
+######################## MAIN #######################
 function main {
-    echo "[*] Starting script"
     echo "CURRENT TIME: $(date +"%Y-%m-%d_%H:%M:%S")"
+    echo "[*] Starting script"
     check_prereqs "$0" "$1" "$2"
     setup_splunk "$1" "$2"
     setup_monitors
@@ -574,10 +586,7 @@ function main {
     fi
 
     print_banner "Installing auditd (file logger)"
-    sudo wget $GITHUB_URL/splunk_setup/auditd.sh
-    sudo chmod +x auditd.sh
-    ./auditd.sh
-    add_monitor "/var/log/audit/audit.log" "auth"
+    install_auditd
     
     print_banner "Installing Snoopy (command logger)"
     install_snoopy
@@ -592,4 +601,4 @@ function main {
 }
 
 main "$@" 2>&1 | tee -a $DEBUG_LOG 
-############################### END MAIN ###############################
+#####################################################
