@@ -49,19 +49,19 @@ function add_audit_rules {
     CUSTOM_RULE_FILE='/etc/audit/rules.d/ccdc.rules'
 
     # Download custom rule file
-    wget https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main/splunk_setup/ccdc.rules
+    sudo wget https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main/splunk_setup/ccdc.rules
     sudo mv ./ccdc.rules $CUSTOM_RULE_FILE
     sudo chown root:root $CUSTOM_RULE_FILE
     sudo chmod 600 $CUSTOM_RULE_FILE
 
     # Add home directory rules
-    echo '' >> $CUSTOM_RULE_FILE
+    echo '' | sudo tee -a $CUSTOM_RULE_FILE
     for dir in /home/*; do
         if [ -d "$dir" ]; then
-            echo "-w ${dir}/.ssh/ -p w -k CCDC_modify_ssh_user" >> $CUSTOM_RULE_FILE
+            echo "-w ${dir}/.ssh/ -p w -k CCDC_modify_ssh_user" | sudo tee -a $CUSTOM_RULE_FILE
 
             if [ -f "$dir/.bashrc" ]; then
-                echo "-w ${dir}/.bashrc -p w -k CCDC_modify_bashrc_user" >> $CUSTOM_RULE_FILE
+                echo "-w ${dir}/.bashrc -p w -k CCDC_modify_bashrc_user" | sudo tee -a $CUSTOM_RULE_FILE
             fi
         fi
     done

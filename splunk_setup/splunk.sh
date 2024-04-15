@@ -488,7 +488,7 @@ function add_indexer_web_logs {
 function add_additional_logs {
     print_banner "Adding additional logs"
 
-    echo "[*] Indexes: " "${INDEXES[@]}"
+    echo "[*] Indexes:" "${INDEXES[@]}"
     for index in "${INDEXES[@]}"; do
         echo "[*] Would you like to add additional log sources for index '${index}'?"
         read -r -p "(y/n): " option
@@ -553,8 +553,8 @@ function install_snoopy {
         echo ""
     fi
     SNOOPY_CONFIG='/etc/snoopy.ini'
-    if [ -f $SNOOPY_CONFIG ]; then
-        echo "output = file:/var/log/snoopy.log" >> $SNOOPY_CONFIG
+    if sudo [ -f $SNOOPY_CONFIG ]; then
+        echo "output = file:/var/log/snoopy.log" | sudo tee -a $SNOOPY_CONFIG
         echo "[*] Set Snoopy output to /var/log/snoopy.log."
     else
         echo "[X] ERROR: Could not find Snoopy config file. Please add \`output = file:/var/log/snoopy.log\` to the end of the config."
@@ -574,7 +574,7 @@ function main {
     fi
 
     print_banner "Installing auditd (file logger)"
-    wget $GITHUB_URL/splunk_setup/auditd.sh
+    sudo wget $GITHUB_URL/splunk_setup/auditd.sh
     sudo chmod +x auditd.sh
     ./auditd.sh
     add_monitor "/var/log/audit/audit.log" "auth"
