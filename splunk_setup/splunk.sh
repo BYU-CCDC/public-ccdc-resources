@@ -105,11 +105,11 @@ function check_prereqs {
         exit 1
     fi
 
-    if [ "$#" != 3 ]; then
+    if [ "$#" != 3 ] && [ "$2" != "print" ]; then
         print_options
     fi
     
-    if [ "$IP" != "indexer" ]; then
+    if [ "$IP" != "indexer" ] && [ "$2" != "print" ]; then
         if [[ ! $3 =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "[X] ERROR: Invalid IP address format: $3"
             print_options
@@ -196,7 +196,7 @@ function install_splunk {
             ;;
             # catch all statement that either downloads the pkg or provides the user with a list of potential command line options
             *)
-                eval "$pkg=$1"
+                eval "pkg=\$$1"
                 if [[ -z $pkg ]]; then
                     print_options
                 else
