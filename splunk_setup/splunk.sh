@@ -2,27 +2,6 @@
 # Usage: ./splunk.sh <option> <forward-server-ip>
 # Use `indexer` as the forward-server-ip to install the indexer
 
-# Prints script options
-function print_options {
-    echo "Usage: ./splunk.sh <option> <forward-server-ip>"
-    echo "Use \`indexer\` as the forward-server-ip to install the indexer"
-    echo "OPTIONS: 
-    -> deb (debian-based distros)
-    -> rpm (RHEL-based distros)
-    -> tgz (generic .tgz file)
-    -> arm_debian (deb for ARM machines)
-    -> arm_rpm (rpm for ARM machines)
-    -> arm_tgz (tgz for ARM machines)
-    -> * (replace * with name of variable obtained from print to download any package)
-    -> print (prints all urls)"
-    echo
-    exit 1
-}
-
-if [ "$#" != 2 ]; then
-    print_options
-fi
-
 ################### DOWNLOAD URLS ###################
 IP="$2"
 if [ "$IP" == "indexer" ] || [ "$IP" == "i" ]; then
@@ -64,18 +43,21 @@ DEBUG_LOG='/tmp/splunk_log.txt'
 #####################################################
 
 ###################### FUNCTIONS ######################
-# Prints text in a banner
-# Arguments:
-#   $1: Text to print
-function print_banner {
+# Prints script options
+function print_options {
+    echo "Usage: ./splunk.sh <option> <forward-server-ip>"
+    echo "Use \`indexer\` as the forward-server-ip to install the indexer"
+    echo "OPTIONS: 
+    -> deb (debian-based distros)
+    -> rpm (RHEL-based distros)
+    -> tgz (generic .tgz file)
+    -> arm_debian (deb for ARM machines)
+    -> arm_rpm (rpm for ARM machines)
+    -> arm_tgz (tgz for ARM machines)
+    -> * (replace * with name of variable obtained from print to download any package)
+    -> print (prints all urls)"
     echo
-    echo "#######################################"
-    echo "#"
-    echo "#   $1"
-    echo "#"
-    echo "#######################################"
-    echo
-    sleep 2
+    exit 1
 }
 
 # Checks that correct arguments were provided to script
@@ -105,16 +87,30 @@ function check_prereqs {
         exit 1
     fi
 
-    if [ "$#" != 3 ] && [ "$2" != "print" ]; then
+    if [ "$#" != 3 ]; then
         print_options
     fi
     
-    if [ "$IP" != "indexer" ] && [ "$2" != "print" ]; then
+    if [ "$IP" != "indexer" ]; then
         if [[ ! $3 =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "[X] ERROR: Invalid IP address format: $3"
             print_options
         fi
     fi
+}
+
+# Prints text in a banner
+# Arguments:
+#   $1: Text to print
+function print_banner {
+    echo
+    echo "#######################################"
+    echo "#"
+    echo "#   $1"
+    echo "#"
+    echo "#######################################"
+    echo
+    sleep 2
 }
 
 # Downloads and installs correct version for distribution
@@ -162,37 +158,6 @@ function install_splunk {
                 echo "******* Extracting to $SPLUNKDIR *******"
                 sleep 2
                 sudo tar -xvf splunk.tgz -C /opt/ &> /dev/null
-            ;;
-            # prints urls of the Splunk forwarders
-            print )
-                echo "Linux deb (deb): $deb"
-                echo
-                echo "Linux rpm (rpm): $rpm"
-                echo
-                echo "Linux tgz (tgz): $tgz"
-                echo
-                echo "Linux ARM deb (arm_deb): $arm_deb"
-                echo 
-                echo "Linux ARM rpm (arm_rpm): $arm_rpm"
-                echo 
-                echo "Linux ARM tgz (arm_tgz): $arm_tgz"
-                echo 
-                echo "Linux s390 (s90): $s90"
-                echo
-                echo "Linux PPCLE (ppcle): $ppcle"
-                echo
-                echo "OSX M1/Intel (mac): $mac"
-                echo
-                echo "FreeBSD (freebsd): $freebsd"
-                echo
-                echo "Solaris:
-                - Sparc .tar.Z (solaris_sparc_z): $solaris_sparc_z
-                - Sparc .p5p (solaris_sparc_p5p): $solaris_sparc_p5p
-                - 64-bit .tar.Z (solaris_64_z): $solaris_64_z
-                - 64-bit .p5p (solaris_64_p5p): $solaris_64_p5p"
-                echo
-                echo "AIX (aix): $aix"
-                exit
             ;;
             # catch all statement that either downloads the pkg or provides the user with a list of potential command line options
             *)
@@ -578,6 +543,41 @@ function install_snoopy {
 function main {
     echo "CURRENT TIME: $(date +"%Y-%m-%d_%H:%M:%S")"
     echo "[*] Starting script"
+
+    if [ "$1" == "print" ]; then
+        # prints urls of the Splunk forwarders
+        echo "Linux deb (deb): $deb"
+        echo
+        echo "Linux rpm (rpm): $rpm"
+        echo
+        echo "Linux tgz (tgz): $tgz"
+        echo
+        if [ "$IP" != "indexer" ]; then
+            echo "Linux ARM deb (arm_deb): $arm_deb"
+            echo 
+            echo "Linux ARM rpm (arm_rpm): $arm_rpm"
+            echo 
+            echo "Linux ARM tgz (arm_tgz): $arm_tgz"
+            echo 
+            echo "Linux s390 (s90): $s90"
+            echo
+            echo "Linux PPCLE (ppcle): $ppcle"
+            echo
+            echo "OSX M1/Intel (mac): $mac"
+            echo
+            echo "FreeBSD (freebsd): $freebsd"
+            echo
+            echo "Solaris:
+            - Sparc .tar.Z (solaris_sparc_z): $solaris_sparc_z
+            - Sparc .p5p (solaris_sparc_p5p): $solaris_sparc_p5p
+            - 64-bit .tar.Z (solaris_64_z): $solaris_64_z
+            - 64-bit .p5p (solaris_64_p5p): $solaris_64_p5p"
+            echo
+            echo "AIX (aix): $aix"
+        fi
+        exit
+    fi
+    
     check_prereqs "$0" "$1" "$2"
     setup_splunk "$1" "$2"
     setup_monitors
