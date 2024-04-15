@@ -530,6 +530,9 @@ function install_snoopy {
     fi
     SNOOPY_CONFIG='/etc/snoopy.ini'
     if sudo [ -f $SNOOPY_CONFIG ]; then
+        sudo touch /var/log/snoopy.log
+        # Unfortunately required by snoopy to use file other than syslog or messages
+        sudo chmod 666 /var/log/snoopy.log
         echo "output = file:/var/log/snoopy.log" | sudo tee -a $SNOOPY_CONFIG
         echo "[*] Set Snoopy output to /var/log/snoopy.log."
     else
@@ -577,7 +580,7 @@ function main {
         fi
         exit
     fi
-    
+
     check_prereqs "$0" "$1" "$2"
     setup_splunk "$1" "$2"
     setup_monitors
