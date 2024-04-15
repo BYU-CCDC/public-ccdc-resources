@@ -1,0 +1,70 @@
+###### CUSTOM CCDC RULES ######
+### SYSTEM FILES ###
+# modification of /etc/passwd file
+-w /etc/passwd -p w -k CCDC_modify_passwd
+
+# modification of /etc/shadow file
+-w /etc/shadow -p w -k CCDC_modify_shadow
+
+# modification of /etc/services file
+-w /etc/services -p w -k CCDC_modify_services
+
+# modification of /etc/systemd/ directory
+-w /etc/systemd/ -p w -k CCDC_modify_systemd
+
+# modification of /etc/init.d/ directory
+-w /etc/init.d/ -p w -k CCDC_modify_initd
+
+# modification of /etc/profile.d/ directory
+-w /etc/profile.d/ -p w -k CCDC_modify_profiled
+
+# modification of sshd config
+-w /etc/ssh/ -p w -k CCDC_modify_ssh_config
+
+# modification of global bashrc
+-w /etc/bash.bashrc -p w -k CCDC_modify_bashrc_global
+-w /etc/bashrc -p w -k CCDC_modify_bashrc_global
+
+### BINARIES ###
+# execution of passwd binary
+-w /usr/bin/passwd -p x -k CCDC_exec_passwd
+
+# execution of whoami binary
+-w /usr/bin/whoami -p x -k CCDC_exec_whoami
+
+# execution of useradd and adduser binaries
+-w /usr/sbin/useradd -p x -k CCDC_exec_useradd
+-w /usr/sbin/adduser -p x -k CCDC_exec_adduser
+
+# new shell
+-w /bin/bash -p x -k CCDC_new_shell
+
+# modification or addition of binaries
+-w /usr/sbin/ -p w -k CCDC_modify_binaries
+-w /usr/bin/ -p w -k CCDC_modify_binaries
+-w /bin/ -p w -k CCDC_modify_binaries
+
+### SYSCALLS ###
+# execve activity by web users (web shell)
+# euid=33 - www-data (apache/nginx, Debian-based)
+# euid=48 - apache (apache, RHEL-based)
+# euid=987 - nginx (nginx, RHEL-based)
+-a always,exit -F arch=b64 -F euid=33 -S execve -k CCDC_execve_web
+-a always,exit -F arch=b32 -F euid=33 -S execve -k CCDC_execve_web
+-a always,exit -F arch=b64 -F euid=48 -S execve -k CCDC_execve_web
+-a always,exit -F arch=b32 -F euid=48 -S execve -k CCDC_execve_web
+-a always,exit -F arch=b64 -F euid=987 -S execve -k CCDC_execve_web
+-a always,exit -F arch=b32 -F euid=987 -S execve -k CCDC_execve_web
+
+# outgoing Internet socket created by www-data user (reverse shell)
+-a always,exit -F arch=b32 -S socket -F a0=10 -F euid=33 -k CCDC_socket_web
+-a always,exit -F arch=b64 -S socket -F a0=10 -F euid=33 -k CCDC_socket_web
+-a always,exit -F arch=b32 -S socket -F a0=2 -F euid=33  -k CCDC_socket_web
+-a always,exit -F arch=b64 -S socket -F a0=2 -F euid=33  -k CCDC_socket_web
+
+### DYNAMIC ###
+# modification of /home/<USER>/.bashrc (replace <USER>)
+#-w /home/<USER>/.bashrc/ -p w -k CCDC_modify_bashrc_user
+
+# modification of /home/<USER>/.ssh directory (replace <USER>)
+#-w /home/<USER>/.ssh/ -p w -k CCDC_modify_ssh_user
