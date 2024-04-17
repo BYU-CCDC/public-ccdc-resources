@@ -87,6 +87,11 @@ function check_prereqs {
         exit 1
     fi
 
+    if ! command -v unzip &>/dev/null; then
+        echo "[X] ERROR: Please install unzip before using this script"
+        exit 1
+    fi
+
     if [ "$#" != 3 ]; then
         print_options
     fi
@@ -465,7 +470,7 @@ function install_ccdc_app {
 function add_scripts {
     print_banner "Adding scripted inputs"
     echo "[*] Adding logged-in users script"
-    add_script "$SPLUNKDIR/etc/apps/ccdc-app/bin/users.sh" "auth" "60"
+    add_script "$SPLUNKDIR/etc/apps/ccdc-app/bin/users.sh" "auth" "180"
 }
 
 # Adds monitors for the Splunk indexer service itself
@@ -629,6 +634,8 @@ function main {
 
     print_banner "End of script"
     echo "[*] You can add future additional monitors with 'sudo $SPLUNKDIR/bin/splunk add monitor <PATH> -index <INDEX>'"
+    echo "[*] You can add future additional scripted inputs with 'sudo $SPLUNKDIR/bin/splunk add exec <PATH> -interval <SECONDS> -index <INDEX>'"
+    echo "  - place any scripts in the $SPLUNKDIR/etc/apps/ccdc-app/bin/ directory"
     echo
 }
 
