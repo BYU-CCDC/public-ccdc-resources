@@ -27,6 +27,27 @@ function format {
     fi
 }
 
+#!/bin/bash
+
+
+# Function to display users and pause if there are more than 20 users
+function display_users {
+    # Get all users with bash access
+    users_with_bash_access=$(cat /etc/passwd | grep "/bash" | cut -d: -f1)
+    # Count the number of users
+    user_count=$(echo "$users_with_bash_access" | wc -l)
+    echo " "
+    echo "Users with bash access:"
+    echo "$users_with_bash_access" | head -n 20 | sed 's/^/\t/'
+    if [ "$user_count" -gt 20 ]; then
+        echo "Press Enter to display the rest..."
+        read
+        echo "$users_with_bash_access" | tail -n +21 | sed 's/^/\t/'
+    fi
+    echo " "
+}
+
+
 function logger {
     # Log $1 (string) into scripts audit log
 
@@ -43,15 +64,7 @@ function logger {
 
     echo "$1"
     echo "$1" >> "$log_file"
-}
-
-function cleanup_files {
-    #use to move used scripts to folder to help declutter home directory
-    cleanup=('harden.sh' 'splunkf.sh' 'splunkf.deb')
-    for file in "${cleanup[@]}"; do
-        if [[ -f "$file" ]]; then sudo mv "$file" "$backup_dir/scripts/"; else logger "Couldnt cleanup $file"; fi
-    done
-}
+} 
 
 function print_options {
     echo "
@@ -97,7 +110,7 @@ function var_check {
     # A function that checks that certain vars have been set. This is important for functionality of some functions
     # that require the OS, lpm or admin groups should they be run standalone
 
-    if [ "$log_dir" == "" ] || [ "$log_file" == "" ] || [ "$backup_dir" == "" ] ||  [ "$os" == "" ] || [ "$lpm" == "" ] || [ "$admin_group" == "" ] || [ "${#scored_users[@]}" -eq "0"  ];
+    if [ "$log_dir" == "" ] || [ "$log_file" == "" ] || [ "$backup_dir" == "" ] ||  [ "$os" == "" ] || [ "$lpm" == "" ] || [ "$admin_group" == "" ];
         then setup
     fi
 }
@@ -168,7 +181,7 @@ function test_functions {
     echo "Testing to_lower"
     test1=$(format "THISTEST")
     p=$(verify_test "$test1" "thistest")
-    if [ "$p" == "pass" ]; then echo "------Test #1 Passed----"; pass_count+=1; else echo "-----Test #1 Failed----"; fi
+    if [ "$p" == "pass" ]; then echo "------Test #1 Passed----"; (( pass_count+=1 )); else echo "-----Test #1 Failed----"; fi
 
 }
 
@@ -219,6 +232,7 @@ function get_os {
     # package manager, sudo groups, firewalls configs, etc.
     while true; do
         read -r -p "What is the OS based on? (Debian, RedHat, SuSE, CentOs): " os
+        os=$(format "$os")
         case $os in
             "debian"|"redhat"|"suse"|"centos")
                 break ;;
@@ -382,7 +396,6 @@ function  full_backup {
     # revert ownership to user who ran script
     sudo chown -R "$(whoami):$(whoami)" "$backup_dir"
     sudo chmod -R 744 "$backup_dir"
-    echo $backup_dir
     tar -czvf $backup_dir/backups.tar.gz -C "$backup_dir" backups &>/dev/null
     l="true"
     while [ $l == "true" ]; do
@@ -438,8 +451,8 @@ function change_passwords {
     done
     l="true"
     while [ "$l" == "true" ]; do
-        read -r -p "Would you like a passphrase or password for the new passwords? (1-passphrase; 2-password; 3-custom password): " opt1
-        if [ "$opt1" = "1" ]; then
+        read -r -p "Would you like a passphrase or password for the new passwords? (1-passphrase; 2-password; 3-custom password; 4-list users): " opt1
+        if [ "$opt1" == "1" ]; then
             wget -O "list.txt" "https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main/linux/list.txt" &> /dev/null # grab a wordlist
             if [ $? -eq 0 ]; then 
                 logger "Successfully grabbed wordlist. Setting option to: Passphrase"
@@ -449,7 +462,7 @@ function change_passwords {
                 opt1=3
             fi
             l="false"
-        elif [ "$opt1" = "2" ]; then
+        elif [ "$opt1" == "2" ]; then
             sudo openssl rand -base64 12 &>/dev/null
             if [ $? -eq 0 ]; then
                 logger "Command test succeeded. Setting option to: Random Password "
@@ -459,10 +472,13 @@ function change_passwords {
                 opt1=3
             fi
             l="false"
-        elif [ "$opt1" = "3" ]; then
+        elif [ "$opt1" == "3" ]; then
             logger "User Opted for custom password"
             opt1=3
             l="false"
+        elif [ "$opt1" == "4" ]; then
+            display_users
+            change_passwords
         else
             echo "Option: $opt1 is not a valid option. Try Again."
         fi
@@ -491,6 +507,8 @@ function change_passwords {
     for excluded_user in "${users_to_exclude[@]}"; do
         non_system_users=("${non_system_users[@]//$excluded_user}")
     done
+    # add root manually due to it having an SID < 1000
+    non_system_users+=("root")
     # if all users are excluded no need to run through this. niche case for an almost blank machine
     if [ "${#non_system_users[@]}" != "0" ]; then
         if [ "$opt1" == "3" ]; then
@@ -511,6 +529,7 @@ function change_passwords {
             done
             for user in "${non_system_users[@]}"; do
                 if [ "$user" != "" ]; then
+                    echo "in"
                     echo "$user:$pass" | sudo chpasswd
                     echo "$user:$pass" >> "$HOME/passwd_changed.txt"
                     logger "Changed password for $user"
@@ -635,6 +654,8 @@ function disable_users {
 
                 if [[ "$userInput" == "" ]]; then
                     l="false"
+                elif [ "$userInput" == "2" ]; then
+                    display_users
                 else
                     bash_users+=("$userInput")
                 fi
@@ -743,12 +764,23 @@ function setup_firewall {
 function setup_splunk {
 
     var_check
-    wget https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main/splunk_setup/splunk.sh
-    sudo chmod +x splunk.sh
-    if [ $os == "redhat" ] || [ $os == "centos" ] || [ $os == "suse" ]; then type="rpm"; else type="debian"; fi
-    read -r -p "what is the forward server ip? " ip
-    ./splunk.sh $type "$ip"
-    cleanup_files ./splunk.sh
+    wget https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main/splunk_setup/splunk.sh --no-check-certificate
+    if [ $? -eq 0 ]; then
+        sudo chmod +x splunk.sh
+        if [ $os == "redhat" ] || [ $os == "centos" ] || [ $os == "suse" ]; then type="rpm"; else type="debian"; fi
+        l="true"
+        while [ $l == "true" ]; do
+            read -r -p "what is the forward server ip? " ip
+            if [[ ! $ip =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                echo "[*] ERROR: Invalid IP address format: $ip"
+            else
+                l="false"
+            fi
+        done
+        ./splunk.sh $type "$ip"
+    else
+        logger "ERROR: Splunk forwarder was unable to start"
+    fi
 }
 
 function start_function {
@@ -780,7 +812,7 @@ function start_function {
 
 function start_script {
     # The main brain for all the script. This function takes in all the main functions listed below and runs them in the order specified
-    fx=("locate_services" "disable_users" "change_passwords" "remove_sudoers" "setup_firewall" "full_backup" "setup_splunk" y)
+    fx=("change_passwords" "disable_users" "remove_sudoers" "setup_firewall" "locate_services" "full_backup" "setup_splunk")
     setup
     for funct in "${fx[@]}"; do
         start_function "$funct"
