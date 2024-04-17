@@ -119,7 +119,7 @@ function install_splunk {
     if [[ ! -d $SPLUNKDIR ]]; then
         # Determine distribution type and install
         case "$1" in
-            deb )
+            deb|debian )
                 print_banner "Installing .deb package"
                 echo
                 sudo wget -O splunk.deb "$deb"
@@ -131,7 +131,7 @@ function install_splunk {
                 sudo wget -O splunk.rpm "$rpm"
                 sudo yum install ./splunk.rpm -y
             ;;
-            tgz )
+            tgz|linux )
                 print_banner "Installing generic .tgz package"
                 echo
                 sudo wget -O splunk.tgz "$tgz"
@@ -229,6 +229,18 @@ function add_monitor {
     fi
 }
 
+# Adds a scripted input to Splunk
+# Arguments:
+#   $1: Path of log source
+#   $2: Index name
+#   $3: Interval
+function add_script {
+    source=$1
+    index=$2
+    interval=$3
+    sudo $SPLUNKDIR/bin/splunk add exec "$source" -index "$index" -interval "$interval"
+}
+
 # Adds monitors for system logs
 function add_system_logs {
     print_banner "Adding various system logs"
@@ -280,7 +292,7 @@ function add_firewall_logs {
         # sudo touch "${FIREWALL_LOG}"
         add_monitor "${FIREWALL_LOG}" "${INDEX}"
         echo "[*] ufw logs also contained in /var/log/syslog"
-    elif command -v iptables &>/dev/null; then\
+    elif command -v iptables &>/dev/null; then
         echo "[*] iptables detected"
         FIREWALL_LOG="/var/log/iptables.log"
 
@@ -441,6 +453,21 @@ function add_mysql_logs {
     fi
 }
 
+# Installs custom CCDC splunk app
+function install_ccdc_app {
+    print_banner "Installing CCDC Splunk app"
+    sudo wget $GITHUB_URL/splunk_setup/ccdc-app.zip
+    sudo unzip ccdc-app.zip
+    sudo mv ccdc-app $SPLUNKDIR/etc/apps/ccdc-app
+}
+
+# Adds scripted inputs
+function add_scripts {
+    print_banner "Adding scripted inputs"
+    echo "[*] Adding logged-in users script"
+    add_script "$SPLUNKDIR/etc/apps/ccdc-app/bin/users.sh" "auth" "60"
+}
+
 # Adds monitors for the Splunk indexer service itself
 function add_indexer_web_logs {
     print_banner "Adding indexer web logs"
@@ -490,6 +517,8 @@ function setup_monitors {
     add_ssh_key_logs
     add_web_logs
     add_mysql_logs
+    install_ccdc_app
+    add_scripts
 
     if [ "$IP" == "indexer" ]; then
         add_indexer_web_logs
