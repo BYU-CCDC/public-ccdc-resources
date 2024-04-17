@@ -10,6 +10,8 @@ lpm=""
 admin_group=""
 scored_users=()
 scored_users_exist="true"
+all_users=$(awk -F':' '/.*sh/{print $1}' /etc/passwd)
+user_count=$(echo "$all_users" | wc -l)
 
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++#
 
@@ -27,24 +29,31 @@ function format {
     fi
 }
 
-#!/bin/bash
-
-
 # Function to display users and pause if there are more than 20 users
-function display_users {
-    # Get all users with bash access
-    users_with_bash_access=$(cat /etc/passwd | grep "/bash" | cut -d: -f1)
-    # Count the number of users
-    user_count=$(echo "$users_with_bash_access" | wc -l)
-    echo " "
-    echo "Users with bash access:"
-    echo "$users_with_bash_access" | head -n 20 | sed 's/^/\t/'
-    if [ "$user_count" -gt 20 ]; then
-        echo "Press Enter to display the rest..."
+function display_bash_users {
+    local users="$1"
+    local count="$2"
+    local batch_size=15
+    local start_index=$3
+
+    echo "Current Users with Bash Access:"
+    echo "$users" | sed -n "${start_index},$((start_index + batch_size - 1))p" | sed 's/^/\t/'
+
+    if [ "$((start_index + batch_size))" -le "$count" ]; then
+        echo "Press Enter to display the next $batch_size users..."
         read
-        echo "$users_with_bash_access" | tail -n +21 | sed 's/^/\t/'
+        display_bash_users "$users" "$count" "$((start_index + batch_size))"
     fi
-    echo " "
+}
+
+#TODO: Print each user on new line
+function display_sudo_users {
+    admin_members=$(getent group "$admin_group" | cut -d: -f4)
+    IFS=',' read -r -a admin_group_members <<< "$admin_members"
+    echo "Current $admin_group members:"
+    for mem in "${admin_group_members[@]}"; do
+        echo "  -- $mem"
+    done
 }
 
 
@@ -360,7 +369,7 @@ function  full_backup {
     if [ "$option" == "y" ]; then
         l="true"
         while [ "$l" == "true" ]; do
-            read -r -e -p "Enter directory's full path (one entry per line; enter  to continue script): " userInput
+            read -r -e -p "Enter directory's full path (one entry per line; hit enter to continue script): " userInput
 
             if [[ "$userInput" == "" ]]; then
                 l="false"
@@ -477,33 +486,44 @@ function change_passwords {
             opt1=3
             l="false"
         elif [ "$opt1" == "4" ]; then
-            display_users
-            change_passwords
+            display_bash_users "$all_users" "$user_count" 1
         else
             echo "Option: $opt1 is not a valid option. Try Again."
         fi
     done
 
-    echo -e "Would you like to append more users to exclude from a password change?
+    echo -e "Would you like to append more users to exclude from a password change? (enter '2' to display users)
     -- Default excluded users are:"
     for item in "${users_to_exclude[@]}"; do
         echo "      - $item"
     done
     read -r -p "(y/n): " option
     option=$(echo "$option" | tr -d ' ') #truncates any spaces accidentally put in
+    while [ "$option" != "y" ] && [ "$option" != "n" ]; do
+        display_bash_users "$all_users" "$user_count" 1
+        echo " "
+        echo -e "Would you like to append more users to exclude from a password change? (enter '2' to display users)
+    -- Default excluded users are:"
+        for item in "${users_to_exclude[@]}"; do
+            echo "      - $item"
+        done
+        read -r -p "(y/n): " option
+
+    done
     if [ "$option" == "y" ]; then
         l="true"
         while [ "$l" == "true" ]; do
-            read -r -e -p "Enter additional user (one entry per line; enter  to continue script): " userInput
-
+            read -r -e -p "Enter additional user (one entry per line; enter '2' to display users; hit enter to continue script): " userInput
             if [[ "$userInput" == "" ]]; then
                 l="false"
+            elif [ "$userInput" == "2" ]; then
+                display_bash_users "$all_users" "$user_count" 1
             else
                 users_to_exclude+=("$userInput")
             fi
         done
     fi
-    readarray -t non_system_users < <(awk -F: '$3 >= 1000 && $1 != "nobody" && $1 != "nfsnobody" {print $1}' /etc/passwd)    # remove user from users if user is in excluded users
+    readarray -t non_system_users < <(awk -F':' '/.*sh/{print $1}' /etc/passwd)    # remove user from users if user is in excluded users
     for excluded_user in "${users_to_exclude[@]}"; do
         non_system_users=("${non_system_users[@]//$excluded_user}")
     done
@@ -529,15 +549,15 @@ function change_passwords {
             done
             for user in "${non_system_users[@]}"; do
                 if [ "$user" != "" ]; then
-                    echo "in"
                     echo "$user:$pass" | sudo chpasswd
                     echo "$user:$pass" >> "$HOME/passwd_changed.txt"
+                    echo " "
                     logger "Changed password for $user"
                 fi
             done
         else
             for user in "${non_system_users[@]}"; do
-                if [ "$user" != "" ]; then # line 498 replaces entries with an empty string. this line checks if the current user is one of those blank strings
+                if [ "$user" != "" ]; then
                     if [ "$opt1" == "1" ]; then
                         generate_passphrase
                     elif [ "$opt1" == "2" ]; then
@@ -590,23 +610,37 @@ function remove_sudoers {
     for scored_user in "${scored_users[@]}"; do 
         users_to_exclude+=("$scored_user")
     done
-    echo -e "Would you like to append more users to exclude from being removed from the $admin_group group?
+    echo -e "Would you like to append more users to exclude from being removed from the $admin_group group? (enter '2' to display users) 
 -- Current excluded users are:"
     for item in "${users_to_exclude[@]}"; do
         echo "      - $item"
     done
     read -r -p "(y/n): " option
-    option=$(echo "$option" | tr -d ' ') #truncates any spaces accidentally put in #truncates any spaces accidentally put in
+    while [ "$option" != "y" ] && [ "$option" != "n" ]; do
+        display_sudo_users
+        echo " "
+        echo -e "Would you like to append more users to exclude from being removed from the $admin_group group? (enter '2' to display users)
+-- Current excluded users are:"
+        for item in "${users_to_exclude[@]}"; do
+            echo "      - $item"
+        done
+        read -r -p "(y/n): " option
+    done
+    option=$(echo "$option" | tr -d ' ') #truncates any spaces accidentally put in 
     if [ "$option" == "y" ]; then
         l="true"
         while [ "$l" == "true" ]; do
-            read -r -e -p "Enter additional user (one entry per line; enter  to continue script): " userInput
+            read -r -e -p "Enter additional user (one entry per line; enter '2' to display users; hit enter to continue script): " userInput
             if [[ "$userInput" == "" ]]; then
                 l="false"
+            elif [ "$userInput" == "2" ]; then
+                display_sudo_users
             else
                 users_to_exclude+=("$userInput")
             fi
         done
+    else
+        display_sudo_users
     fi
     backup "/etc/passwd" # in case it gets screwed up
     # Iterate through all users in the target group
@@ -638,52 +672,59 @@ function disable_users {
     for scored_user in "${scored_users[@]}"; do 
         bash_users+=("$scored_user")
     done
-    read -r -p "Would you like to remove bash access for users? (y/n): " opt
-    if [ "$opt" == "y" ]; then
-        echo -e "Would you like to append more users who need bash access? 
+    echo -e "Would you like to append more users who need bash access? (enter '2' to display users)
+    -- Current excluded users are:"
+    for item in "${bash_users[@]}"; do
+        echo "      - $item"
+    done
+    read -r -p "(y/n): " opt
+    opt=$(echo "$opt" | tr -d ' ')
+    while [ "$opt" != "y" ] && [ "$opt" != "n" ]; do
+        display_bash_users "$all_users" "$user_count" 1
+        echo " "
+        echo -e "Would you like to append more users who need bash access? (enter '2' to display users)
     -- Current excluded users are:"
         for item in "${bash_users[@]}"; do
             echo "      - $item"
         done
-        read -r -p "(y/n): " option
-        option=$(echo "$option" | tr -d ' ') #truncates any spaces accidentally put in
-        if [ "$option" == "y" ]; then
-            l="true"
-            while [ "$l" == "true" ]; do
-                read -r -e -p "Enter additional users (one entry per line; hit enter to continue script): " userInput
-
-                if [[ "$userInput" == "" ]]; then
-                    l="false"
-                elif [ "$userInput" == "2" ]; then
-                    display_users
-                else
-                    bash_users+=("$userInput")
-                fi
-            done    
-        fi
-        readarray -t remove_bash_access_user_list < <(awk -F ':' '/bash/{print $1}' /etc/passwd)
-        for bash_user in "${bash_users[@]}"; do
-            # remove users who need bash access from the to-be-removed list
-            remove_bash_access_user_list=("${remove_bash_access_user_list[@]//$bash_user}")
-            # make sure that the user has bash access
-            sudo usermod -s /bin/bash "$bash_user"
-            logger "$bash_user granted bash access"
-        done
-        # remove bash access from users
-        for user in "${remove_bash_access_user_list[@]}"; do
-            if [ "$user" != "" ]; then
-                if [ -f /usr/sbin/nologin ]; then
-                    sudo usermod -s /usr/sbin/nologin "$user"
-                    logger "$user set to nologin";
-                elif [ -f /sbin/nologin ]; then
-                    sudo usermod -s /sbin/nologin "$user"
-                    logger "$user set to nologin"
-                else
-                    logger "No usable bin for preventing bash logins aka /usr/sbin/nologin & /sbin/nologin do not exist"
+        read -r -p "(y/n): " opt
+        opt=$(echo "$opt" | tr -d ' ')
+    done
+    if [ "$opt" == "y" ]; then
+        l="true"
+        while [ "$l" == "true" ]; do
+            read -r -e -p "Enter additional users (one entry per line; enter '2' to display users; hit enter to continue script): " userInput
+            if [[ "$userInput" == "" ]]; then
+                l="false"
+            elif [ "$userInput" == "2" ]; then
+                display_bash_users "$all_users" "$user_count" 1
+            else
+                bash_users+=("$userInput")
+            fi
+        done    
+    fi
+    readarray -t remove_bash_access_user_list < <(awk -F ':' '/bash/{print $1}' /etc/passwd)
+    for bash_user in "${bash_users[@]}"; do
+        # remove users who need bash access from the to-be-removed list
+        remove_bash_access_user_list=("${remove_bash_access_user_list[@]//$bash_user}")
+        # make sure that the user has bash access
+        sudo usermod -s /bin/bash "$bash_user"
+        logger "$bash_user granted bash access"
+    done
+    # remove bash access from users
+    for user in "${remove_bash_access_user_list[@]}"; do
+        if [ "$user" != "" ]; then
+            if [ -f /usr/sbin/nologin ]; then
+                sudo usermod -s /usr/sbin/nologin "$user"
+                logger "$user set to nologin";
+            elif [ -f /sbin/nologin ]; then
+                sudo usermod -s /sbin/nologin "$user"
+                logger "$user set to nologin"
+            else
+                logger "No usable bin for preventing bash logins aka /usr/sbin/nologin & /sbin/nologin do not exist"
             fi
         fi
-        done
-    fi
+    done
 }
 
 function setup_firewall {
@@ -866,7 +907,8 @@ case $1 in
         print_options
     ;;
     "debug")
-        echo "no debug found"
+        setup
+        display_sudo_users
     ;;
     *)
     print_options
