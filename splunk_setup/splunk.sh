@@ -575,6 +575,10 @@ function install_snoopy {
         echo "[*] Snoopy is already installed"
         return
     fi
+    # If on Fedora, install these programs
+    if command -v dnf &>/dev/null; then
+        sudo dnf install gcc gzip make procps socat tar wget
+    fi
     if ! sudo ./install-snoopy.sh stable; then
         echo "[X] ERROR: Install failed. If you would like to try installing an older version, "
         echo "    please run \`./install-snoopy.sh X.Y.Z\` with X.Y.Z being the version number."
@@ -584,7 +588,8 @@ function install_snoopy {
         echo "    - 2.4.15 (2021-10-17)"
         echo "    - 2.3.2 (2015-05-28)"
         echo ""
-    else SNOOPY_CONFIG='/etc/snoopy.ini'
+    else
+        SNOOPY_CONFIG='/etc/snoopy.ini'
         if sudo [ -f $SNOOPY_CONFIG ]; then
             sudo touch /var/log/snoopy.log
             # Unfortunately required by snoopy in order to use file other than syslog/messages
@@ -597,8 +602,8 @@ function install_snoopy {
         else
             echo "[X] ERROR: Could not find Snoopy config file. Please add \`output = file:/var/log/snoopy.log\` to the end of the config."
         fi
+        echo "[*] Snoopy installed successfully."
     fi
-    echo "[*] Snoopy installed successfully."
 }
 #####################################################
 
