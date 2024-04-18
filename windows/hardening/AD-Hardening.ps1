@@ -1,7 +1,7 @@
 Import-Module ActiveDirectory
 Import-Module GroupPolicy
 
-$ccdcRepoWindowsHardeningPath = "https://github.com/BYU-CCDC/public-ccdc-resources/tree/main/windows/hardening/"
+$ccdcRepoWindowsHardeningPath = "https://github.com/BYU-CCDC/public-ccdc-resources/blob/main/windows/hardening/"
 $portsFile = "ports.json"
 $usersFile = "users.txt"
 $advancedAuditingFile = "advancedAuditing.ps1"
