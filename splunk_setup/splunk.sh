@@ -542,14 +542,14 @@ function setup_forward_server {
 # Adds custom dashboard
 function add_dashboard {
     print_banner "Adding Homedash dashboard"
-    sudo wget -o $SPLUNKDIR/etc/users/splunk/search/local/data/ui/views/homedash.xml $GITHUB_URL/splunk_setup/homedash.xml
+    sudo wget -O $SPLUNKDIR/etc/users/splunk/search/local/data/ui/views/homedash.xml $GITHUB_URL/splunk_setup/homedash.xml
 }
 
 # Adds custom configuration files
 function add_custom_config {
     print_banner "Adding custom configuration files"
-    sudo wget -o $SPLUNKDIR/etc/apps/splunk_ingest_actions/local/props.conf $GITHUB_URL/splunk_setup/ingest_actions/props.conf
-    sudo wget -o $SPLUNKDIR/etc/apps/splunk_ingest_actions/local/transforms.conf $GITHUB_URL/splunk_setup/ingest_actions/transforms.conf
+    sudo wget -O $SPLUNKDIR/etc/apps/splunk_ingest_actions/local/props.conf $GITHUB_URL/splunk_setup/ingest_actions/props.conf
+    sudo wget -O $SPLUNKDIR/etc/apps/splunk_ingest_actions/local/transforms.conf $GITHUB_URL/splunk_setup/ingest_actions/transforms.conf
 }
 
 # Instsall auditd for file monitoring
