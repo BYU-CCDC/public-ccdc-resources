@@ -797,7 +797,7 @@
                     "earliest": "$tr_global_time.earliest$",
                     "latest": "$tr_global_time.latest$"
                 },
-                "query": "index=$input_global_index$ host=$dd_global_host$ \n| eval TIME=strftime(_time, \"%D %I:%M:%S %p\")\n| fields *",
+                "query": "index=* host IN ($ms_global_hosts$)\n| eval TIME=strftime(_time, \"%D %I:%M:%S %p\")\n| fields *",
                 "refresh": "60s",
                 "refreshType": "delay"
             },
@@ -810,7 +810,7 @@
                     "earliest": "0",
                     "latest": ""
                 },
-                "query": "| metadata type=hosts | fields host",
+                "query": "index=* \n| stats count by host \n| fields host",
                 "refresh": "60s",
                 "refreshType": "delay"
             },
@@ -849,14 +849,14 @@
             "type": "ds.chain",
             "options": {
                 "query": "| search source=\"/var/log/audit/audit.log\" type IN (ADD_USER ADD_GROUP USER_AUTH) \n| rex \".*msg.*msg='op=(?<OP>.*)exe\" \n| table TIME host type UID AUID OP exe \n| sort - TIME",
-                "extend": "ds_filter_host"
+                "extend": "ds_27hgc3Fj"
             },
             "name": "Auth auditd users"
         },
         "ds_auth_sudo": {
             "type": "ds.chain",
             "options": {
-                "extend": "ds_filter_host",
+                "extend": "ds_27hgc3Fj",
                 "query": "| search source IN (\"/var/log/auth.log\" \"/var/log/secure\") COMMAND=* \n| rex \"COMMAND=\\S*\\s(?<ARGS>.*)\" \n| table TIME host USER PWD COMMAND ARGS \n| sort - TIME"
             },
             "name": "Auth sudo"
@@ -865,14 +865,14 @@
             "type": "ds.chain",
             "options": {
                 "query": "| search source=\"/home/*/.ssh*\" \n| search host=\"$dd_global_host$\" \n| table TIME host source",
-                "extend": "ds_filter_host"
+                "extend": "ds_27hgc3Fj"
             },
             "name": "SSH keys"
         },
         "ds_auth_ssh_login": {
             "type": "ds.chain",
             "options": {
-                "extend": "ds_filter_host",
+                "extend": "ds_27hgc3Fj",
                 "query": "| search source IN (\"/var/log/auth.log\" \"/var/log/secure\") sshd password \n| rex \"sshd\\[\\d+\\]: (?<ACTION>\\w+) password for (?<USER>(invalid user )?\\w+) from (?<IP>[\\d\\.]+) port (?<PORT>\\d+)\"\n| table TIME host source ACTION USER IP PORT \n| sort - TIME"
             },
             "name": "SSH login"
@@ -880,7 +880,7 @@
         "ds_sTrvV1Om": {
             "type": "ds.chain",
             "options": {
-                "extend": "ds_filter_host",
+                "extend": "ds_27hgc3Fj",
                 "query": "| search source IN (\"/var/log/auth.log\" \"/var/log/secure\") \"password changed\" \n| rex \"pam_unix(.*): password changed for (?<USER>\\w+)\"\n| table TIME host source USER\n| sort - TIME"
             },
             "name": "Auth password"
@@ -889,14 +889,14 @@
             "type": "ds.chain",
             "options": {
                 "query": "| search source=\"/var/log/audit/audit.log\" \n| search host=\"$dd_global_host$\" | stats count by type \n| sort count",
-                "extend": "ds_filter_host"
+                "extend": "ds_27hgc3Fj"
             },
             "name": "Auth auditd types"
         },
         "ds_KaFGSkBa": {
             "type": "ds.chain",
             "options": {
-                "extend": "ds_filter_host",
+                "extend": "ds_27hgc3Fj",
                 "query": "| search source=\"/var/log/audit/audit.log\" key=CCDC* \n| table TIME host type key UID AUID tty exe success \n| sort - TIME"
             },
             "name": "Auth CCDC audit"
@@ -904,7 +904,7 @@
         "ds_SoZZLSey": {
             "type": "ds.chain",
             "options": {
-                "extend": "ds_filter_host",
+                "extend": "ds_HNl99Q7r",
                 "query": "| search source=\"WinEventLog*\" \n| search host=\"$dd_global_host$\" | eval MSG=mvindex(split(Message, \"Subject:\"), 0) \n| eval MSG=substr(MSG, 1, len(MSG)-2) \n| eval ACCOUNT=mvindex(Account_Name, 1)"
             },
             "name": "Windows events base table"
@@ -912,7 +912,7 @@
         "ds_2zn7xaGU": {
             "type": "ds.chain",
             "options": {
-                "extend": "ds_filter_host",
+                "extend": "ds_SjKqyquU",
                 "query": "| search source IN (\"/var/log/httpd/access_log\" \"/var/log/apache2/access.log\") \n| rex \"(?<SOURCE_IP>(\\d+\\.){3}\\d+) .*\\[.*\\] \\\"(?<REQUEST>.*)\\\" (?<STATUS>\\d\\d\\d) \\d+ \\\"(?<REFERRER>.*)\\\" \\\"(?<AGENT>.*)\\\"\" \n| where SOURCE_IP!=\"127.0.0.1\" \n| where NOT isnull(SOURCE_IP) "
             },
             "name": "Web apache parsed"
@@ -936,7 +936,7 @@
         "ds_CIJWDDib": {
             "type": "ds.chain",
             "options": {
-                "extend": "ds_filter_host",
+                "extend": "ds_SjKqyquU",
                 "query": "| search source=\"/var/log/mysql/mysql.log\" Query \n| search host=\"$dd_global_host$\" | rex \"Query\t(?<QUERY>.*)\" \n| table TIME host QUERY \n| sort - TIME"
             },
             "name": "Web MySQL access"
@@ -944,7 +944,7 @@
         "ds_PlUi0lFd": {
             "type": "ds.chain",
             "options": {
-                "extend": "ds_filter_host",
+                "extend": "ds_mfNWBk8w",
                 "query": "| search source IN (\"/var/log/cron\" \"/var/log/syslog\" \"/var/log/messages\") CRON CMD\n| rex \"(?<TIME>[\\d\\-\\.T]+) (?<HOSTNAME>.*) CRON\\[(?<PID>\\d+)\\]: \\((?<USER>.*)\\) CMD \\((?<RUN>.*)\\)\"\n| table TIME host source USER RUN \n| sort - TIME"
             },
             "name": "Service cron"
@@ -952,7 +952,7 @@
         "ds_IOKWGErt": {
             "type": "ds.chain",
             "options": {
-                "extend": "ds_filter_host",
+                "extend": "ds_mfNWBk8w",
                 "query": "| search source IN (\"/var/log/syslog\" \"/var/log/messages\") \n| regex \"systemd\\[.*\\]: Started\" | rex \".*systemd\\[.*\\]: (?<MSG>.*)\" \n| table TIME host MSG \n| sort - TIME"
             },
             "name": "Service system services"
@@ -961,14 +961,14 @@
             "type": "ds.chain",
             "options": {
                 "query": "| search source=\"/var/log/audit/audit.log\" type=SERVICE_START\n| stats count by unit \n| sort count",
-                "extend": "ds_filter_host"
+                "extend": "ds_mfNWBk8w"
             },
             "name": "Service auditd uncommon"
         },
         "ds_JhjdrnqT": {
             "type": "ds.chain",
             "options": {
-                "extend": "ds_filter_host",
+                "extend": "ds_ESlEi0dT",
                 "query": "| search source IN (\"/var/log/syslog\" \"/var/log/ufw.log\" \"/var/log/messages\" \"/var/log/firewalld\") \n| regex \"\\[UFW.*\\]|filter_\" \n| rex \"(\\[UFW )|(filter_.*_)(?<TYPE>\\w*)[\\]:]\" "
             },
             "name": "Network firewall host parse"
@@ -992,7 +992,7 @@
         "ds_NZyd5O7D": {
             "type": "ds.chain",
             "options": {
-                "extend": "ds_filter_host",
+                "extend": "ds_ESlEi0dT",
                 "query": "| search source=\"*fw_network.log\" \n| rex \"(?<_TIME>[\\d\\-\\.:ZT]+) (?<IP>[\\d\\.]+)  : (?<host>[\\w\\-%]+): (?<PROPS>.*)\" \n| rename _raw AS temp \n| rename PROPS as _raw  \n| extract pairdelim=\",\" kvdelim=\":\" \n| rename _raw as PROPS \n| fields - PROPS \n| rename temp as _raw"
             },
             "name": "Network firewall Cisco parse"
@@ -1041,7 +1041,7 @@
             "type": "ds.chain",
             "options": {
                 "query": "| search source IN (\"/var/log/dpkg.log\" \"/var/log/dnf.rpm.log\") \n| regex \"[\\d\\-\\.T: ]+ (SUBDEBUG )?(install|remove|Install|Erase)\" \n| rex \"[\\d\\-\\.T: ]+ (SUBDEBUG )?(?<ACTION>\\w+):? (?<NAME>.*)(-(\\d[\\.:-]?)+-|:[A-Za-z])\" \n| table TIME host source ACTION NAME \n| sort - TIME",
-                "extend": "ds_filter_host"
+                "extend": "ds_yWY9H8et"
             },
             "name": "Misc packages"
         },
@@ -1049,7 +1049,7 @@
             "type": "ds.chain",
             "options": {
                 "query": "| search source=/tmp/* \n| dedup source \n| table TIME host source \n| sort - TIME",
-                "extend": "ds_filter_host"
+                "extend": "ds_yWY9H8et"
             },
             "name": "Misc tmp files"
         },
@@ -1072,7 +1072,7 @@
         "ds_2ko3W7jP": {
             "type": "ds.chain",
             "options": {
-                "extend": "ds_filter_host",
+                "extend": "ds_HNl99Q7r",
                 "query": "| search sourcetype=\"WinEventLog:Microsoft-Windows-Sysmon/Operational\" NOT *splunk* \n| rename EventType as WinEventType\n| rex mode=sed \"s/(\\n\\w+): (.+)/\\1^\\2/g\" \n| extract pairdelim=\"\\n\", kvdelim=\"^\""
             },
             "name": "Windows sysmon parse"
@@ -1092,6 +1092,84 @@
                 "query": "| search EventID IN (12, 13, 14)\n| eval VALUES=coalesce(Details, NewName) \n| table TIME host EventID ProcessId User EventType Image TargetObject VALUES"
             },
             "name": "Windows sysmon registry"
+        },
+        "ds_27hgc3Fj": {
+            "type": "ds.search",
+            "options": {
+                "queryParameters": {
+                    "earliest": "$tr_global_time.earliest$",
+                    "latest": "$tr_global_time.latest$"
+                },
+                "query": "index=auth host IN ($ms_global_hosts$)\n| eval TIME=strftime(_time, \"%D %I:%M:%S %p\")\n| fields *",
+                "refresh": "60s",
+                "refreshType": "delay"
+            },
+            "name": "Auth filtering"
+        },
+        "ds_SjKqyquU": {
+            "type": "ds.search",
+            "options": {
+                "queryParameters": {
+                    "earliest": "$tr_global_time.earliest$",
+                    "latest": "$tr_global_time.latest$"
+                },
+                "query": "index=web host IN ($ms_global_hosts$) \n| eval TIME=strftime(_time, \"%D %I:%M:%S %p\")\n| fields *",
+                "refresh": "60s",
+                "refreshType": "delay"
+            },
+            "name": "Web filtering"
+        },
+        "ds_mfNWBk8w": {
+            "type": "ds.search",
+            "options": {
+                "queryParameters": {
+                    "earliest": "$tr_global_time.earliest$",
+                    "latest": "$tr_global_time.latest$"
+                },
+                "query": "index=service host IN ($ms_global_hosts$) \n| eval TIME=strftime(_time, \"%D %I:%M:%S %p\")\n| fields *",
+                "refresh": "60s",
+                "refreshType": "delay"
+            },
+            "name": "Service filtering"
+        },
+        "ds_ESlEi0dT": {
+            "type": "ds.search",
+            "options": {
+                "queryParameters": {
+                    "earliest": "$tr_global_time.earliest$",
+                    "latest": "$tr_global_time.latest$"
+                },
+                "query": "index=network host IN ($ms_global_hosts$) \n| eval TIME=strftime(_time, \"%D %I:%M:%S %p\")\n| fields *",
+                "refresh": "60s",
+                "refreshType": "delay"
+            },
+            "name": "Network filtering"
+        },
+        "ds_yWY9H8et": {
+            "type": "ds.search",
+            "options": {
+                "queryParameters": {
+                    "earliest": "$tr_global_time.earliest$",
+                    "latest": "$tr_global_time.latest$"
+                },
+                "query": "index=misc host IN ($ms_global_hosts$) \n| eval TIME=strftime(_time, \"%D %I:%M:%S %p\")\n| fields *",
+                "refresh": "60s",
+                "refreshType": "delay"
+            },
+            "name": "Misc filtering"
+        },
+        "ds_HNl99Q7r": {
+            "type": "ds.search",
+            "options": {
+                "queryParameters": {
+                    "earliest": "$tr_global_time.earliest$",
+                    "latest": "$tr_global_time.latest$"
+                },
+                "query": "index=windows host IN ($ms_global_hosts$) \n| eval TIME=strftime(_time, \"%D %I:%M:%S %p\")\n| fields *",
+                "refresh": "60s",
+                "refreshType": "delay"
+            },
+            "name": "Windows filtering"
         }
     },
     "defaults": {
@@ -1112,7 +1190,7 @@
             "title": "Time",
             "type": "input.timerange"
         },
-        "input_global_host": {
+        "input_global_hosts": {
             "options": {
                 "items": [
                     {
@@ -1120,53 +1198,16 @@
                         "value": "*"
                     }
                 ],
-                "token": "dd_global_host",
-                "defaultValue": "*"
+                "token": "ms_global_hosts",
+                "defaultValue": [
+                    "*"
+                ]
             },
-            "title": "Host",
-            "type": "input.dropdown",
+            "title": "Hosts",
+            "type": "input.multiselect",
             "dataSources": {
                 "primary": "ds_general_get_hosts"
-            },
-            "context": {}
-        },
-        "input_global_index": {
-            "options": {
-                "items": [
-                    {
-                        "label": "All",
-                        "value": "*"
-                    },
-                    {
-                        "label": "Auth",
-                        "value": "auth"
-                    },
-                    {
-                        "label": "Web",
-                        "value": "web"
-                    },
-                    {
-                        "label": "Service",
-                        "value": "service"
-                    },
-                    {
-                        "label": "Network",
-                        "value": "network"
-                    },
-                    {
-                        "label": "Misc",
-                        "value": "misc"
-                    },
-                    {
-                        "label": "Windows",
-                        "value": "windows"
-                    }
-                ],
-                "token": "input_global_index",
-                "defaultValue": "*"
-            },
-            "title": "Index",
-            "type": "input.dropdown"
+            }
         }
     },
     "layout": {
@@ -1538,8 +1579,7 @@
             }
         ],
         "globalInputs": [
-            "input_global_index",
-            "input_global_host",
+            "input_global_hosts",
             "input_global_time"
         ]
     },

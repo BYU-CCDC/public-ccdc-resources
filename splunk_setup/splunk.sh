@@ -31,7 +31,7 @@ fi
 #####################################################
 
 ###################### INDEXES ######################
-INDEXES=( 'auth' 'web' 'service' 'network' 'windows' 'misc' )
+INDEXES=( 'auth' 'web' 'service' 'network' 'windows' 'misc' 'snoopy' )
 #####################################################
 
 ##################### GITHUB URL ####################
@@ -524,14 +524,11 @@ function setup_monitors {
     add_ssh_key_logs
     add_web_logs
     add_mysql_logs
-    install_ccdc_app
     add_scripts
 
     if [ "$IP" == "indexer" ]; then
         add_indexer_web_logs
     fi
-
-    add_additional_logs
 }
 
 # Add forward server
@@ -542,8 +539,22 @@ function setup_forward_server {
     sudo $SPLUNKDIR/bin/splunk add forward-server "$1":9997
 }
 
+# Adds custom dashboard
+function add_dashboard {
+    print_banner "Adding Homedash dashboard"
+    sudo wget -o $SPLUNKDIR/etc/users/splunk/search/local/data/ui/views/homedash.xml $GITHUB_URL/splunk_setup/homedash.xml
+}
+
+# Adds custom configuration files
+function add_custom_config {
+    print_banner "Adding custom configuration files"
+    sudo wget -o $SPLUNKDIR/etc/apps/splunk_ingest_actions/local/props.conf $GITHUB_URL/splunk_setup/ingest_actions/props.conf
+    sudo wget -o $SPLUNKDIR/etc/apps/splunk_ingest_actions/local/transforms.conf $GITHUB_URL/splunk_setup/ingest_actions/transforms.conf
+}
+
 # Instsall auditd for file monitoring
 function install_auditd {
+    print_banner "Installing auditd (file monitor)"
     sudo wget $GITHUB_URL/splunk_setup/auditd.sh
     sudo chmod +x auditd.sh
     ./auditd.sh
@@ -552,6 +563,7 @@ function install_auditd {
 
 # Install snoopy for bash logging
 function install_snoopy {
+    print_banner "Installing Snoopy (command logger)"
     wget -O install-snoopy.sh https://github.com/a2o/snoopy/raw/install/install/install-snoopy.sh
     chmod 755 install-snoopy.sh
     if ! sudo ./install-snoopy.sh stable; then
@@ -568,9 +580,11 @@ function install_snoopy {
     if sudo [ -f $SNOOPY_CONFIG ]; then
         sudo touch /var/log/snoopy.log
         # Unfortunately required by snoopy to use file other than syslog or messages
-        sudo chmod 666 /var/log/snoopy.log
-        echo "output = file:/var/log/snoopy.log" | sudo tee -a $SNOOPY_CONFIG
-        echo "[*] Set Snoopy output to /var/log/snoopy.log."
+        SNOOPY_LOG='/var/log/snoopy.log'
+        sudo chmod 666 $SNOOPY_LOG
+        echo "output = file:$SNOOPY_LOG" | sudo tee -a $SNOOPY_CONFIG
+        echo "[*] Set Snoopy output to $SNOOPY_LOG."
+        add_monitor $SNOOPY_LOG "snoopy"
     else
         echo "[X] ERROR: Could not find Snoopy config file. Please add \`output = file:/var/log/snoopy.log\` to the end of the config."
     fi
@@ -624,11 +638,16 @@ function main {
         setup_forward_server "$2"
     fi
 
-    print_banner "Installing auditd (file logger)"
     install_auditd
-    
-    print_banner "Installing Snoopy (command logger)"
     install_snoopy
+
+    if [ "$IP" == "indexer" ]; then
+        install_ccdc_app
+        add_dashboard
+        add_custom_config
+    fi
+
+    add_additional_logs
 
     print_banner "Restarting Splunk"
     sleep 3
