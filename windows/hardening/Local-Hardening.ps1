@@ -59,8 +59,8 @@ function Disable-AllUsers {
     try {
     $currentSamAccountName = $CurrentUser.Split('\')[-1]
 
-    Get-ADUser -Filter {SamAccountName -ne $currentSamAccountName} |
-    ForEach-Object { Disable-ADAccount -Identity $_ }
+    Get-LocalUser | Where-Object SamAccountName -ne $currentSamAccountName |
+    ForEach-Object { $_ | Disable-LocalUser }
     } catch {
         Write-Host $_.Exception.Message -ForegroundColor Yellow
         Write-Host "Error Occurred..."
@@ -123,15 +123,14 @@ function Add-Competition-Users {
         foreach ($user in $UserArray) {
             $splat = @{
                 Name = $user
-                AccountPassword = (ConvertTo-SecureString -String (GeneratePassword) -AsPlainText -Force)
-                Enabled = $true
+                Password = (ConvertTo-SecureString -String (GeneratePassword) -AsPlainText -Force)
             }
-            New-ADUser @splat
+            New-LocalUser @splat
 
             if ($UserArray.indexOf($user) -eq 0) {
-                Add-LocalGroupMember -Identity "Administrators" -Members $user
-                Add-LocalGroupMember -Identity "Schema Admins" -Members $user
-                Add-LocalGroupMember -Identity "Remote Desktop Users" -Members $user
+                Add-LocalGroupMember -Group "Administrators" -Member $user
+                Add-LocalGroupMember -Group "Schema Admins" -Member $user
+                Add-LocalGroupMember -Group "Remote Desktop Users" -Member $user
 
                 while ($true) {
                     Get-Set-Password -user $user
@@ -139,7 +138,7 @@ function Add-Competition-Users {
             }
 
             if ($UserArray.indexOf($user) -eq 1) {
-                Add-LocalGroupMember -Identity "Remote Desktop Users" -Members $user
+                Add-LocalGroupMember -Group "Remote Desktop Users" -Member $user
 
                 while ($true) {
                     Get-Set-Password -user $user
@@ -232,7 +231,7 @@ function Print-Users {
             Write-Host "User: $($_.Name)"
 	    $enabledUsersOutput += "`nUser: $($_.Name)"
 
-	    $groupString = "Groups: $(Get-LocalGroup | Where-Object {  $user.SID -in ($_ | Get-LocalGroupMember | Select-Object -ExpandProperty "SID") } | Select-Object -ExpandProperty "Name"
+	    $groupString = "Groups: $(Get-LocalGroup | Where-Object {  $user.SID -in ($_ | Get-LocalGroupMember | Select-Object -ExpandProperty "SID") } | Select-Object -ExpandProperty "Name")"
 	    Write-Host $groupString
 	    $enabledUsersOutput += "`n$groupString"
             [System.GC]::Collect()
@@ -245,7 +244,7 @@ function Print-Users {
             Write-Host "User: $($_.Name)"
 	    $disabledUsersOutput += "`nUser: $($_.Name)"
 
-	    $groupString = "Groups: $(Get-LocalGroup | Where-Object {  $user.SID -in ($_ | Get-LocalGroupMember | Select-Object -ExpandProperty "SID") } | Select-Object -ExpandProperty "Name"
+	    $groupString = "Groups: $(Get-LocalGroup | Where-Object {  $user.SID -in ($_ | Get-LocalGroupMember | Select-Object -ExpandProperty "SID") } | Select-Object -ExpandProperty "Name")"
 	    Write-Host $groupString
 	    $disabledUsersOutput += "`n$groupString"
             [System.GC]::Collect()
