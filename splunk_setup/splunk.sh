@@ -554,7 +554,7 @@ function add_custom_config {
     sudo mkdir -p "$SPLUNKDIR/etc/apps/splunk_ingest_actions/local/"
     sudo wget -O "$SPLUNKDIR/etc/apps/splunk_ingest_actions/local/props.conf" "$GITHUB_URL/splunk_setup/ingest_actions/props.conf"
     sudo wget -O "$SPLUNKDIR/etc/apps/splunk_ingest_actions/local/transforms.conf" "$GITHUB_URL/splunk_setup/ingest_actions/transforms.conf"
-    echo "[*] Moved config files to $SPLUNKDIR/etc/apps/splunk_ingest_actions/local/transforms.conf"
+    echo "[*] Moved config files to $SPLUNKDIR/etc/apps/splunk_ingest_actions/local/ (props.conf and transforms.conf)"
 }
 
 # Install auditd for file monitoring
@@ -577,7 +577,7 @@ function install_snoopy {
     fi
     # If on Fedora, install these programs
     if command -v dnf &>/dev/null; then
-        sudo dnf install gcc gzip make procps socat tar wget
+        sudo dnf install -y gcc gzip make procps socat tar wget
     fi
     if ! sudo ./install-snoopy.sh stable; then
         echo "[X] ERROR: Install failed. If you would like to try installing an older version, "
