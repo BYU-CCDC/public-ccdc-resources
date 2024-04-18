@@ -545,6 +545,7 @@ function add_dashboard {
     print_banner "Adding Homedash dashboard"
     sudo mkdir -p "$SPLUNKDIR/etc/users/splunk/search/local/data/ui/views/"
     sudo wget -O "$SPLUNKDIR/etc/users/splunk/search/local/data/ui/views/homedash.xml" "$GITHUB_URL/splunk_setup/homedash.xml"
+    echo "[*] Moved dashboard file to $SPLUNKDIR/etc/users/splunk/search/local/data/ui/views/homedash.xml"
 }
 
 # Adds custom configuration files
@@ -553,6 +554,7 @@ function add_custom_config {
     sudo mkdir -p "$SPLUNKDIR/etc/apps/splunk_ingest_actions/local/"
     sudo wget -O "$SPLUNKDIR/etc/apps/splunk_ingest_actions/local/props.conf" "$GITHUB_URL/splunk_setup/ingest_actions/props.conf"
     sudo wget -O "$SPLUNKDIR/etc/apps/splunk_ingest_actions/local/transforms.conf" "$GITHUB_URL/splunk_setup/ingest_actions/transforms.conf"
+    echo "[*] Moved config files to $SPLUNKDIR/etc/apps/splunk_ingest_actions/local/transforms.conf"
 }
 
 # Install auditd for file monitoring
@@ -569,6 +571,10 @@ function install_snoopy {
     print_banner "Installing Snoopy (command logger)"
     wget -O install-snoopy.sh https://github.com/a2o/snoopy/raw/install/install/install-snoopy.sh
     chmod 755 install-snoopy.sh
+    if command -v snoopyctl &>/dev/null; then
+        echo "[*] Snoopy is already installed"
+        return
+    fi
     if ! sudo ./install-snoopy.sh stable; then
         echo "[X] ERROR: Install failed. If you would like to try installing an older version, "
         echo "    please run \`./install-snoopy.sh X.Y.Z\` with X.Y.Z being the version number."
@@ -584,9 +590,10 @@ function install_snoopy {
             # Unfortunately required by snoopy in order to use file other than syslog/messages
             SNOOPY_LOG='/var/log/snoopy.log'
             sudo chmod 666 $SNOOPY_LOG
+            echo "filter_chain = \"exclude_spawns_of:splunkd,btool\"" | sudo tee -a $SNOOPY_CONFIG
             echo "output = file:$SNOOPY_LOG" | sudo tee -a $SNOOPY_CONFIG
             echo "[*] Set Snoopy output to $SNOOPY_LOG."
-            add_monitor $SNOOPY_LOG "snoopy"
+            sudo $SPLUNKDIR/bin/splunk add monitor "$SNOOPY_LOG" -index "snoopy" -sourcetype "snoopy"
         else
             echo "[X] ERROR: Could not find Snoopy config file. Please add \`output = file:/var/log/snoopy.log\` to the end of the config."
         fi
@@ -644,15 +651,16 @@ function main {
     install_auditd
     install_snoopy
 
-    if [ "$IP" == "indexer" ]; then
-        add_dashboard
-        add_custom_config
-    fi
+    # if [ "$IP" == "indexer" ]; then
+        # TODO: Auto dashboard import doesn't work
+        # add_dashboard
+        # add_custom_config
+    # fi
 
     add_additional_logs
 
     print_banner "Restarting Splunk"
-    sleep 3
+    sleep 1
     sudo $SPLUNKDIR/bin/splunk restart
 
     print_banner "End of script"
