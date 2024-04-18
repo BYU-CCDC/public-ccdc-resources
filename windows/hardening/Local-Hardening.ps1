@@ -543,7 +543,7 @@ function Run-Windows-Updates {
         Start-Service -Name wuauserv
 
         # Check for disk space
-        $diskSpace = Get-WmiObject -Class Win32_LogicalDisk -Filter "DeviceID='C:'" | Select-Object -ExpandProperty FreeSpace
+        $diskSpace = Get-CimInstance -ClassName Win32_LogicalDisk -Filter "DeviceID='C:'" | Select-Object -ExpandProperty FreeSpace
         if ($diskSpace -lt 1073741824) { # 1 GB in bytes
             Write-Host "Insufficient disk space available on the system drive. Please free up disk space and try again."
             exit
