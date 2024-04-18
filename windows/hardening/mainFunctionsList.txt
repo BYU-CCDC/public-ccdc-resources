@@ -13,6 +13,6 @@ Install EternalBlue Patch
 Upgrade SMB
 Patch DCSync
 Patch Mimikatz
-Check Suspicious Services
+Group Mangement
 Run Windows Updates
 Set Execution Policy

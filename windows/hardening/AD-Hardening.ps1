@@ -8,6 +8,7 @@ $patchURLFile = "patchURLs.json"
 $suspiciousServicesFile = "suspiciousServices.ps1"
 $mainFunctionsFile = "mainFunctionsList.txt"
 
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 $neededFiles = @($portsFile, $advancedAuditingFile, $patchURLFile, $suspiciousServicesFile, $mainFunctionsFile)
 foreach ($file in $neededFiles) {
     try {
@@ -960,7 +961,7 @@ function Patch-Mimikatz {
 }
 
 function Run-Windows-Updates {
-    try{
+    try {
         # Restart Windows Update service
         Restart-Service -Name wuauserv
 
@@ -970,7 +971,7 @@ function Run-Windows-Updates {
         Start-Service -Name wuauserv
 
         # Check for disk space
-        $diskSpace = Get-WmiObject -Class Win32_LogicalDisk -Filter "DeviceID='C:'" | Select-Object -ExpandProperty FreeSpace
+        $diskSpace = Get-CimInstance -ClassName Win32_LogicalDisk -Filter "DeviceID='C:'" | Select-Object -ExpandProperty FreeSpace
         if ($diskSpace -lt 1073741824) { # 1 GB in bytes
             Write-Host "Insufficient disk space available on the system drive. Please free up disk space and try again."
             exit
@@ -1066,14 +1067,14 @@ function Enable-UAC {
     }
 }
 
-function Check-Suspicious-Services {
+function Group-Management {
     try {
         & $suspiciousServicesFile
-        Update-Log "Check Suspicious Services" "Executed successfully"
+        Update-Log "Group Management" "Executed successfully"
     } catch {
         Write-Host $_.Exception.Message -ForegroundColor Yellow
         Write-Host "Error Occurred..."
-        Update-Log "Check Suspicious Services" "Failed with error: $($_.Exception.Message)"
+        Update-Log "Group Management" "Failed with error: $($_.Exception.Message)"
     }
 }
 
@@ -1340,14 +1341,14 @@ if ($confirmation.toLower() -eq "y") {
 }
 
 
-# Check Suspicious Services
-$confirmation = Prompt-Yes-No -Message "Check for Suspicious Services? (y/n)"
+# Group-Management
+$confirmation = Prompt-Yes-No -Message "Do Group Management? (y/n)"
 if ($confirmation.toLower() -eq "y") {
-    Write-Host "`n***Checking for Suspicious Services...***" -ForegroundColor Magenta
-    Check-Suspicious-Services
+    Write-Host "`n***Doing Group Management...***" -ForegroundColor Magenta
+    Group-Management
 } else {
     Write-Host "Skipping..." -ForegroundColor Red
-}
+} # TODO: PUT THIS AT THE TOP
 
 
 # Run Windows Updates
