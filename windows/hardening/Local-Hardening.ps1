@@ -1,4 +1,4 @@
-Start-Transcript "$env:Temp"
+#Start-Transcript "$env:Temp"
 
 $ccdcRepoWindowsHardeningPath = "https://github.com/BYU-CCDC/public-ccdc-resources/tree/main/windows/hardening/"
 $portsFile = "ports.json"
@@ -534,12 +534,12 @@ function Patch-Mimikatz {
 
 function Run-Windows-Updates {
     try{
-        # Restart Windows Update service
-        Restart-Service -Name wuauserv
 
         # Clear Windows Update cache
+	Write-Host "Clearing Cache"
         Stop-Service -Name wuauserv
         Remove-Item -Path C:\Windows\SoftwareDistribution\* -Recurse -Force
+
         Start-Service -Name wuauserv
 
         # Check for disk space
@@ -646,6 +646,7 @@ function Run-StanfordHarden {
 	New-ItemProperty -Path $defenderSpynetPath -Name "SubmitSamplesConsent" -Value 2 -PropertyType DWORD -Force
 	New-ItemProperty -Path $defenderSpynetPath -Name "DisableBlockAtFirstSeen" -Value 1 -PropertyType DWORD -Force
 	New-ItemProperty -Path $defenderSpynetPath -Name "SpynetReporting" -Value 0 -PropertyType DWORD -Force
+	Write-Host "If the next command errors, it means tamper protection is already enabled:"
 	New-ItemProperty -Path $defenderFeaturesPath -Name "TamperProtection" -Value 5 -PropertyType DWORD -Force
 
 # Start Windows Update Service and set startup type to automatic
@@ -801,6 +802,42 @@ function Run-StanfordHarden {
 	sc.exe config trustedinstaller start= auto
 	DISM /Online /Cleanup-Image /RestoreHealth
 	sfc /scannow
+
+
+# Remove sticky keys
+	if (Test-Path "C:\Windows\System32\setch.exe") {
+		Start-Process takeown.exe -ArgumentList "/f C:\Windows\System32\sethc.exe" -NoNewWindow -Wait
+		Start-Process icacls.exe -ArgumentList "C:\Windows\System32\sethc.exe /grant administrators:F" -NoNewWindow -Wait
+		Remove-Item -Path "C:\Windows\System32\sethc.exe" -Force
+	}
+
+# Delete utility manager (backdoor)
+	if (Test-Path "C:\Windows\System32\Utilman.exe") {
+		Start-Process takeown.exe -ArgumentList "/f C:\Windows\System32\Utilman.exe" -NoNewWindow -Wait
+		Start-Process icacls.exe -ArgumentList "C:\Windows\System32\Utilman.exe /grant administrators:F" -NoNewWindow -Wait
+		Remove-Item -Path "C:\Windows\System32\Utilman.exe" -Force
+	}
+
+# Delete on-screen keyboard (backdoor)
+	if (Test-Path "C:\Windows\System32\osk.exe") {
+		Start-Process takeown.exe -ArgumentList "/f C:\Windows\System32\osk.exe" -NoNewWindow -Wait
+		Start-Process icacls.exe -ArgumentList "C:\Windows\System32\osk.exe /grant administrators:F" -NoNewWindow -Wait
+		Remove-Item -Path "C:\Windows\System32\osk.exe" -Force
+	}
+
+# Delete narrator (backdoor)
+	if (Test-Path "C:\Windows\System32\Narrator.exe") {
+		Start-Process takeown.exe -ArgumentList "/f C:\Windows\System32\Narrator.exe" -NoNewWindow -Wait
+		Start-Process icacls.exe -ArgumentList "C:\Windows\System32\Narrator.exe /grant administrators:F" -NoNewWindow -Wait
+		Remove-Item -Path "C:\Windows\System32\Narrator.exe" -Force
+	}
+
+# Delete magnify (backdoor)
+	if (Test-Path "C:\Windows\System32\Magnify.exe") {
+		Start-Process takeown.exe -ArgumentList "/f C:\Windows\System32\Magnify.exe" -NoNewWindow -Wait
+		Start-Process icacls.exe -ArgumentList "C:\Windows\System32\Magnify.exe /grant administrators:F" -NoNewWindow -Wait
+		Remove-Item -Path "C:\Windows\System32\Magnify.exe" -Force
+	}
 
 # SCHOOL: CPP
 
@@ -1050,4 +1087,4 @@ Write-Host "***Setting Execution Policy back to Restricted***" -ForegroundColor 
 Set-ExecutionPolicy Restricted
 
 $Error | Out-File $env:USERPROFILE\Desktop\hard.txt -Append -Encoding utf8
-Stop-Transcript
+#Stop-Transcript
