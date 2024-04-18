@@ -259,12 +259,12 @@ function add_system_logs {
     add_monitor "/etc/init.d/" "${INDEX}"
     add_monitor "/etc/profile.d/" "${INDEX}"
     add_monitor "/var/log/cron" "${INDEX}"
+    add_monitor "/var/log/syslog" "${INDEX}"
 
     INDEX="auth"
     add_monitor "/var/log/auth.log" "${INDEX}"
     add_monitor "/var/log/secure" "${INDEX}"
     add_monitor "/var/log/audit/audit.log" "${INDEX}"
-    add_monitor "/var/log/syslog" "${INDEX}"
     add_monitor "/var/log/messages" "${INDEX}"
 
     INDEX="misc"

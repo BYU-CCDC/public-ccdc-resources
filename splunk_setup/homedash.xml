@@ -82,8 +82,7 @@
             },
             "title": "Sudo",
             "showLastUpdated": true,
-            "description": "from auth/secure logs",
-            "hideWhenNoData": true
+            "description": "from auth/secure logs"
         },
         "viz_KVxvPhPE": {
             "type": "splunk.bar",
@@ -104,8 +103,7 @@
             "title": "Web source IPs",
             "showProgressBar": true,
             "showLastUpdated": true,
-            "description": "from Apache",
-            "hideWhenNoData": true
+            "description": "from Apache"
         },
         "viz_Y4rMvmx3": {
             "type": "splunk.table",
@@ -148,8 +146,7 @@
             "title": "Web access",
             "showProgressBar": true,
             "showLastUpdated": true,
-            "description": "from Apache",
-            "hideWhenNoData": true
+            "description": "from Apache"
         },
         "viz_JU3NPRx4": {
             "type": "splunk.table",
@@ -162,8 +159,7 @@
             },
             "title": "Password changes",
             "showLastUpdated": true,
-            "description": "from auth/secure logs",
-            "hideWhenNoData": true
+            "description": "from auth/secure logs"
         },
         "viz_4fquHTfr": {
             "type": "splunk.table",
@@ -192,8 +188,7 @@
             },
             "title": "Service started",
             "showLastUpdated": true,
-            "description": "from syslog/messages logs",
-            "hideWhenNoData": true
+            "description": "from syslog/messages logs"
         },
         "viz_sku8Ad0C": {
             "type": "splunk.table",
@@ -228,8 +223,7 @@
             },
             "title": "Cron",
             "showLastUpdated": true,
-            "description": "from syslog/messages/cron logs",
-            "hideWhenNoData": true
+            "description": "from syslog/messages/cron logs"
         },
         "viz_SH0xbiuz": {
             "type": "splunk.table",
@@ -252,8 +246,7 @@
             },
             "title": "Packages",
             "showLastUpdated": true,
-            "description": "from dpkg and dnf",
-            "hideWhenNoData": true
+            "description": "from dpkg and dnf"
         },
         "viz_P1q6lght": {
             "type": "splunk.table",
@@ -287,7 +280,6 @@
                 "primary": "ds_auth_ssh_keys"
             },
             "title": "SSH keys",
-            "hideWhenNoData": true,
             "showLastUpdated": true,
             "description": "from /home/<USER>/.ssh"
         },
@@ -301,7 +293,6 @@
                 "primary": "ds_auth_ssh_login"
             },
             "title": "SSH login attempts",
-            "hideWhenNoData": true,
             "showLastUpdated": true,
             "description": "from auth/secure logs"
         },
@@ -339,8 +330,7 @@
             },
             "title": "CCDC custom audit",
             "showLastUpdated": true,
-            "description": "from auditd",
-            "hideWhenNoData": true
+            "description": "from auditd"
         },
         "viz_E8p4Pq2K": {
             "type": "splunk.table",
@@ -381,8 +371,7 @@
             },
             "title": "Users: auth/new users/new groups",
             "showLastUpdated": true,
-            "description": "from auditd",
-            "hideWhenNoData": true
+            "description": "from auditd"
         },
         "viz_9aVaME0U": {
             "type": "splunk.table",
@@ -401,8 +390,7 @@
             "title": "Uncommon services",
             "showProgressBar": true,
             "showLastUpdated": true,
-            "description": "from auditd",
-            "hideWhenNoData": true
+            "description": "from auditd"
         },
         "viz_j6InzK8F": {
             "type": "splunk.table",
@@ -423,8 +411,7 @@
             },
             "title": "Audit log types",
             "showLastUpdated": true,
-            "description": "from auditd",
-            "hideWhenNoData": true
+            "description": "from auditd"
         },
         "viz_yIZPLgz5": {
             "type": "splunk.table",
@@ -485,8 +472,7 @@
             },
             "title": "Host firewall",
             "showLastUpdated": true,
-            "description": "from ufw and firewalld",
-            "hideWhenNoData": true
+            "description": "from ufw and firewalld"
         },
         "viz_Gma2EcCj": {
             "type": "splunk.pie",
@@ -495,8 +481,7 @@
             },
             "title": "Host firewall: blocked IPs",
             "showLastUpdated": true,
-            "description": "from ufw and firewalld",
-            "hideWhenNoData": true
+            "description": "from ufw and firewalld"
         },
         "viz_Cgf6NioU": {
             "type": "splunk.table",
@@ -513,8 +498,7 @@
                 "primary": "ds_f5dkhlHH"
             },
             "title": "Files in /tmp",
-            "showLastUpdated": true,
-            "hideWhenNoData": true
+            "showLastUpdated": true
         },
         "viz_header_general": {
             "type": "splunk.markdown",
@@ -564,7 +548,6 @@
                 "primary": "ds_YH4EKci6"
             },
             "title": "Allowed Ports: Out → In",
-            "hideWhenNoData": true,
             "description": "from Cisco"
         },
         "viz_S2m8Wozt": {
@@ -573,7 +556,6 @@
                 "primary": "ds_Venhnrnd"
             },
             "title": "Blocked SRC IPs: Out → In",
-            "hideWhenNoData": true,
             "description": "from Cisco"
         },
         "viz_IfmLrAfJ": {
@@ -610,7 +592,6 @@
                     }
                 }
             },
-            "hideWhenNoData": true,
             "description": "from Cisco"
         },
         "viz_Ole10gPx": {
@@ -619,7 +600,6 @@
                 "primary": "ds_rOBGhtCk"
             },
             "title": "Allowed Ports: In → Out",
-            "hideWhenNoData": true,
             "description": "from Cisco"
         },
         "viz_AfC2BCDF": {
@@ -628,7 +608,6 @@
                 "primary": "ds_sRmY22Kc"
             },
             "title": "Allowed DNS IPs: In → Out",
-            "hideWhenNoData": true,
             "description": "from Cisco"
         },
         "viz_lrRCADQk": {
@@ -676,8 +655,7 @@
                     }
                 }
             },
-            "description": "from WinEventLog",
-            "hideWhenNoData": true
+            "description": "from WinEventLog"
         },
         "viz_wHzLPk5d": {
             "type": "splunk.table",
@@ -717,8 +695,7 @@
                     }
                 }
             },
-            "description": "from WinEventLog",
-            "hideWhenNoData": true
+            "description": "from WinEventLog"
         },
         "viz_fYXpBeqO": {
             "type": "splunk.table",
@@ -754,8 +731,7 @@
                 "primary": "ds_MfUX80C2"
             },
             "title": "Files",
-            "description": "from Sysmon",
-            "hideWhenNoData": true
+            "description": "from Sysmon"
         },
         "viz_LF83Uk7B": {
             "type": "splunk.table",
@@ -785,8 +761,57 @@
                         "width": 182
                     }
                 }
+            }
+        },
+        "viz_bic2dTYx": {
+            "type": "splunk.table",
+            "dataSources": {
+                "primary": "ds_EAwYX8gC"
             },
-            "hideWhenNoData": true
+            "title": "New Users/Groups",
+            "description": "from auth/secure logs"
+        },
+        "viz_f4hzOM2X": {
+            "type": "splunk.table",
+            "title": "Current sessions",
+            "description": "from sessions.sh script",
+            "dataSources": {
+                "primary": "ds_eAb0E3tt"
+            },
+            "showProgressBar": false,
+            "showLastUpdated": false
+        },
+        "viz_s5txHKcE": {
+            "type": "splunk.markdown",
+            "options": {
+                "markdown": "# Snoopy",
+                "fontSize": "extraLarge"
+            }
+        },
+        "viz_3LovvxXT": {
+            "type": "splunk.table",
+            "options": {
+                "columnFormat": {
+                    "uid": {
+                        "width": 30
+                    },
+                    "cwd": {
+                        "width": 30
+                    },
+                    "tty": {
+                        "width": 30
+                    },
+                    "TIME": {
+                        "width": 38
+                    },
+                    "host": {
+                        "width": 30
+                    }
+                }
+            },
+            "dataSources": {
+                "primary": "ds_MrPNffDr"
+            }
         }
     },
     "dataSources": {
@@ -864,7 +889,7 @@
         "ds_auth_ssh_keys": {
             "type": "ds.chain",
             "options": {
-                "query": "| search source=\"/home/*/.ssh*\" \n| search host=\"$dd_global_host$\" \n| table TIME host source",
+                "query": "| search source=\"/home/*/.ssh*\" \n| table TIME host source",
                 "extend": "ds_27hgc3Fj"
             },
             "name": "SSH keys"
@@ -888,7 +913,7 @@
         "ds_ntqKv0EM": {
             "type": "ds.chain",
             "options": {
-                "query": "| search source=\"/var/log/audit/audit.log\" \n| search host=\"$dd_global_host$\" | stats count by type \n| sort count",
+                "query": "| search source=\"/var/log/audit/audit.log\" \n| stats count by type \n| sort count",
                 "extend": "ds_27hgc3Fj"
             },
             "name": "Auth auditd types"
@@ -905,7 +930,7 @@
             "type": "ds.chain",
             "options": {
                 "extend": "ds_HNl99Q7r",
-                "query": "| search source=\"WinEventLog*\" \n| search host=\"$dd_global_host$\" | eval MSG=mvindex(split(Message, \"Subject:\"), 0) \n| eval MSG=substr(MSG, 1, len(MSG)-2) \n| eval ACCOUNT=mvindex(Account_Name, 1)"
+                "query": "| search source=\"WinEventLog*\" \n| eval MSG=mvindex(split(Message, \"Subject:\"), 0) \n| eval MSG=substr(MSG, 1, len(MSG)-2) \n| eval ACCOUNT=mvindex(Account_Name, 1)"
             },
             "name": "Windows events base table"
         },
@@ -937,7 +962,7 @@
             "type": "ds.chain",
             "options": {
                 "extend": "ds_SjKqyquU",
-                "query": "| search source=\"/var/log/mysql/mysql.log\" Query \n| search host=\"$dd_global_host$\" | rex \"Query\t(?<QUERY>.*)\" \n| table TIME host QUERY \n| sort - TIME"
+                "query": "| search source=\"/var/log/mysql/mysql.log\" Query \n| rex \"Query\t(?<QUERY>.*)\" \n| table TIME host QUERY \n| sort - TIME"
             },
             "name": "Web MySQL access"
         },
@@ -945,7 +970,7 @@
             "type": "ds.chain",
             "options": {
                 "extend": "ds_mfNWBk8w",
-                "query": "| search source IN (\"/var/log/cron\" \"/var/log/syslog\" \"/var/log/messages\") CRON CMD\n| rex \"(?<TIME>[\\d\\-\\.T]+) (?<HOSTNAME>.*) CRON\\[(?<PID>\\d+)\\]: \\((?<USER>.*)\\) CMD \\((?<RUN>.*)\\)\"\n| table TIME host source USER RUN \n| sort - TIME"
+                "query": "| search source IN (\"/var/log/cron\" \"/var/log/syslog\" \"/var/log/messages\") CRON CMD\n| rex \".+ (?<HOSTNAME>.*) CRON\\[(?<PID>\\d+)\\]: \\((?<USER>.*)\\) CMD \\((?<RUN>.*)\\)\"\n| table TIME host source USER RUN \n| sort - TIME"
             },
             "name": "Service cron"
         },
@@ -961,15 +986,15 @@
             "type": "ds.chain",
             "options": {
                 "query": "| search source=\"/var/log/audit/audit.log\" type=SERVICE_START\n| stats count by unit \n| sort count",
-                "extend": "ds_mfNWBk8w"
+                "extend": "ds_27hgc3Fj"
             },
             "name": "Service auditd uncommon"
         },
         "ds_JhjdrnqT": {
             "type": "ds.chain",
             "options": {
-                "extend": "ds_ESlEi0dT",
-                "query": "| search source IN (\"/var/log/syslog\" \"/var/log/ufw.log\" \"/var/log/messages\" \"/var/log/firewalld\") \n| regex \"\\[UFW.*\\]|filter_\" \n| rex \"(\\[UFW )|(filter_.*_)(?<TYPE>\\w*)[\\]:]\" "
+                "extend": "ds_filter_host",
+                "query": "| search source IN (\"/var/log/syslog\" \"/var/log/ufw.log\" \"/var/log/messages\" \"/var/log/firewalld\") \n| regex \"\\[UFW.*\\]|filter_\" \n| rex \".*(\\[UFW |filter_[\\w_]*_)(?<TYPE>\\w+)[\\]:]\""
             },
             "name": "Network firewall host parse"
         },
@@ -1170,6 +1195,41 @@
                 "refreshType": "delay"
             },
             "name": "Windows filtering"
+        },
+        "ds_EAwYX8gC": {
+            "type": "ds.chain",
+            "options": {
+                "extend": "ds_27hgc3Fj",
+                "query": "| search source IN (\"/var/log/secure\" \"/var/log/auth.log\") \n| regex \"new (user|group)\"\n| rex \"new (?<ENTITY>\\w+): \"\n| table TIME host ENTITY name from\n| sort - TIME"
+            },
+            "name": "Auth new users groups"
+        },
+        "ds_eAb0E3tt": {
+            "type": "ds.chain",
+            "options": {
+                "extend": "ds_27hgc3Fj",
+                "query": "| search source=*users.sh \n| rex \"(?<USER>\\w+)\\s+(?<TERM>.+)\\s+(?<INIT>[\\d\\-]+\\s[\\d:]+)\" \n| rex \".+\\s+\\((?<INFO>.+)\\)$\" \n| eval INIT=strptime(INIT, \"%Y-%m-%d %H:%M\") \n| eval INIT=strftime(INIT, \"%D %I:%M:%S %p\") \n| dedup USER TERM INIT \n| table TIME host INIT USER TERM INFO \n| sort - INIT"
+            },
+            "name": "Auth current sessions"
+        },
+        "ds_gdtjiFjV": {
+            "type": "ds.search",
+            "options": {
+                "queryParameters": {
+                    "earliest": "$tr_global_time.earliest$",
+                    "latest": "$tr_global_time.latest$"
+                },
+                "query": "index=snoopy host IN ($ms_global_hosts$) \n| eval TIME=strftime(_time, \"%D %I:%M:%S %p\")\n| fields *"
+            },
+            "name": "Snoopy filtering"
+        },
+        "ds_MrPNffDr": {
+            "type": "ds.chain",
+            "options": {
+                "extend": "ds_gdtjiFjV",
+                "query": "| rex \"\\[uid:(?<uid>\\d+) sid:(?<sid>\\d+) tty:\\((?<tty>\\w+)\\) cwd:(?<cwd>.+) filename:(?<filename>.+)\\]: (?<cmd>.+)\"\n| table TIME host uid tty cwd cmd\n| sort - TIME"
+            },
+            "name": "Snoopy table"
         }
     },
     "defaults": {
@@ -1264,7 +1324,7 @@
                     "x": 0,
                     "y": 649,
                     "w": 1440,
-                    "h": 537
+                    "h": 496
                 }
             },
             {
@@ -1272,9 +1332,9 @@
                 "type": "block",
                 "position": {
                     "x": 0,
-                    "y": 1186,
+                    "y": 1145,
                     "w": 1440,
-                    "h": 627
+                    "h": 691
                 }
             },
             {
@@ -1282,9 +1342,9 @@
                 "type": "block",
                 "position": {
                     "x": 0,
-                    "y": 1813,
+                    "y": 1836,
                     "w": 654,
-                    "h": 285
+                    "h": 262
                 }
             },
             {
@@ -1304,7 +1364,27 @@
                     "x": 0,
                     "y": 2575,
                     "w": 1440,
-                    "h": 473
+                    "h": 504
+                }
+            },
+            {
+                "item": "viz_bic2dTYx",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 3079,
+                    "w": 1440,
+                    "h": 472
+                }
+            },
+            {
+                "item": "viz_f4hzOM2X",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 3551,
+                    "w": 1440,
+                    "h": 501
                 }
             },
             {
@@ -1312,9 +1392,9 @@
                 "type": "block",
                 "position": {
                     "x": 0,
-                    "y": 3048,
+                    "y": 4052,
                     "w": 1440,
-                    "h": 85
+                    "h": 91
                 }
             },
             {
@@ -1322,9 +1402,9 @@
                 "type": "block",
                 "position": {
                     "x": 0,
-                    "y": 3133,
+                    "y": 4143,
                     "w": 1440,
-                    "h": 412
+                    "h": 442
                 }
             },
             {
@@ -1332,9 +1412,9 @@
                 "type": "block",
                 "position": {
                     "x": 0,
-                    "y": 3545,
+                    "y": 4585,
                     "w": 1440,
-                    "h": 658
+                    "h": 714
                 }
             },
             {
@@ -1342,9 +1422,9 @@
                 "type": "block",
                 "position": {
                     "x": 0,
-                    "y": 4203,
+                    "y": 5299,
                     "w": 1440,
-                    "h": 289
+                    "h": 435
                 }
             },
             {
@@ -1352,9 +1432,9 @@
                 "type": "block",
                 "position": {
                     "x": 0,
-                    "y": 4492,
+                    "y": 5734,
                     "w": 1440,
-                    "h": 90
+                    "h": 91
                 }
             },
             {
@@ -1362,9 +1442,9 @@
                 "type": "block",
                 "position": {
                     "x": 0,
-                    "y": 4582,
+                    "y": 5825,
                     "w": 1440,
-                    "h": 477
+                    "h": 475
                 }
             },
             {
@@ -1372,9 +1452,9 @@
                 "type": "block",
                 "position": {
                     "x": 0,
-                    "y": 5059,
+                    "y": 6300,
                     "w": 1063,
-                    "h": 479
+                    "h": 480
                 }
             },
             {
@@ -1382,9 +1462,9 @@
                 "type": "block",
                 "position": {
                     "x": 0,
-                    "y": 5538,
+                    "y": 6780,
                     "w": 1440,
-                    "h": 94
+                    "h": 102
                 }
             },
             {
@@ -1392,9 +1472,9 @@
                 "type": "block",
                 "position": {
                     "x": 0,
-                    "y": 5632,
+                    "y": 6882,
                     "w": 1440,
-                    "h": 475
+                    "h": 480
                 }
             },
             {
@@ -1402,9 +1482,9 @@
                 "type": "block",
                 "position": {
                     "x": 0,
-                    "y": 6107,
+                    "y": 7362,
                     "w": 1440,
-                    "h": 250
+                    "h": 429
                 }
             },
             {
@@ -1412,9 +1492,9 @@
                 "type": "block",
                 "position": {
                     "x": 0,
-                    "y": 6357,
+                    "y": 7791,
                     "w": 837,
-                    "h": 326
+                    "h": 348
                 }
             },
             {
@@ -1422,9 +1502,9 @@
                 "type": "block",
                 "position": {
                     "x": 0,
-                    "y": 6683,
+                    "y": 8139,
                     "w": 837,
-                    "h": 327
+                    "h": 332
                 }
             },
             {
@@ -1432,9 +1512,9 @@
                 "type": "block",
                 "position": {
                     "x": 0,
-                    "y": 7010,
+                    "y": 8471,
                     "w": 1440,
-                    "h": 615
+                    "h": 519
                 }
             },
             {
@@ -1442,9 +1522,9 @@
                 "type": "block",
                 "position": {
                     "x": 0,
-                    "y": 7625,
+                    "y": 8990,
                     "w": 1440,
-                    "h": 96
+                    "h": 108
                 }
             },
             {
@@ -1452,7 +1532,7 @@
                 "type": "block",
                 "position": {
                     "x": 0,
-                    "y": 7721,
+                    "y": 9098,
                     "w": 1440,
                     "h": 503
                 }
@@ -1462,9 +1542,9 @@
                 "type": "block",
                 "position": {
                     "x": 0,
-                    "y": 8224,
+                    "y": 9601,
                     "w": 1440,
-                    "h": 418
+                    "h": 508
                 }
             },
             {
@@ -1472,9 +1552,9 @@
                 "type": "block",
                 "position": {
                     "x": 0,
-                    "y": 8642,
+                    "y": 10109,
                     "w": 1440,
-                    "h": 100
+                    "h": 99
                 }
             },
             {
@@ -1482,9 +1562,9 @@
                 "type": "block",
                 "position": {
                     "x": 0,
-                    "y": 8742,
+                    "y": 10208,
                     "w": 1440,
-                    "h": 516
+                    "h": 648
                 }
             },
             {
@@ -1492,9 +1572,9 @@
                 "type": "block",
                 "position": {
                     "x": 0,
-                    "y": 9258,
+                    "y": 10856,
                     "w": 1440,
-                    "h": 566
+                    "h": 637
                 }
             },
             {
@@ -1502,9 +1582,9 @@
                 "type": "block",
                 "position": {
                     "x": 0,
-                    "y": 9824,
+                    "y": 11493,
                     "w": 1440,
-                    "h": 596
+                    "h": 622
                 }
             },
             {
@@ -1512,9 +1592,29 @@
                 "type": "block",
                 "position": {
                     "x": 0,
-                    "y": 10420,
+                    "y": 12115,
                     "w": 1440,
-                    "h": 507
+                    "h": 579
+                }
+            },
+            {
+                "item": "viz_s5txHKcE",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 12694,
+                    "w": 1440,
+                    "h": 106
+                }
+            },
+            {
+                "item": "viz_3LovvxXT",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 12800,
+                    "w": 1440,
+                    "h": 473
                 }
             },
             {
@@ -1522,9 +1622,9 @@
                 "type": "block",
                 "position": {
                     "x": 654,
-                    "y": 1813,
+                    "y": 1836,
                     "w": 786,
-                    "h": 285
+                    "h": 262
                 }
             },
             {
@@ -1532,9 +1632,9 @@
                 "type": "block",
                 "position": {
                     "x": 837,
-                    "y": 6357,
+                    "y": 7791,
                     "w": 603,
-                    "h": 326
+                    "h": 348
                 }
             },
             {
@@ -1542,9 +1642,9 @@
                 "type": "block",
                 "position": {
                     "x": 837,
-                    "y": 6683,
+                    "y": 8139,
                     "w": 603,
-                    "h": 327
+                    "h": 332
                 }
             },
             {
@@ -1562,9 +1662,9 @@
                 "type": "block",
                 "position": {
                     "x": 1063,
-                    "y": 5059,
+                    "y": 6300,
                     "w": 377,
-                    "h": 479
+                    "h": 480
                 }
             },
             {
