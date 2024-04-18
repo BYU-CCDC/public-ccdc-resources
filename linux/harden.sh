@@ -10,6 +10,8 @@ lpm=""
 admin_group=""
 scored_users=()
 scored_users_exist="true"
+all_users=$(awk -F':' '/.*sh/{print $1}' /etc/passwd)
+user_count=$(echo "$all_users" | wc -l)
 
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++#
 
@@ -27,6 +29,34 @@ function format {
     fi
 }
 
+# Function to display users and pause if there are more than 20 users
+function display_bash_users {
+    local users="$1"
+    local count="$2"
+    local batch_size=15
+    local start_index=$3
+
+    echo "Current Users with Bash Access:"
+    echo "$users" | sed -n "${start_index},$((start_index + batch_size - 1))p" | sed 's/^/\t/'
+
+    if [ "$((start_index + batch_size))" -le "$count" ]; then
+        echo "Press Enter to display the next $batch_size users..."
+        read
+        display_bash_users "$users" "$count" "$((start_index + batch_size))"
+    fi
+}
+
+#TODO: Print each user on new line
+function display_sudo_users {
+    admin_members=$(getent group "$admin_group" | cut -d: -f4)
+    IFS=',' read -r -a admin_group_members <<< "$admin_members"
+    echo "Current $admin_group members:"
+    for mem in "${admin_group_members[@]}"; do
+        echo "  -- $mem"
+    done
+}
+
+
 function logger {
     # Log $1 (string) into scripts audit log
 
@@ -43,15 +73,7 @@ function logger {
 
     echo "$1"
     echo "$1" >> "$log_file"
-}
-
-function cleanup_files {
-    #use to move used scripts to folder to help declutter home directory
-    cleanup=('harden.sh' 'splunkf.sh' 'splunkf.deb')
-    for file in "${cleanup[@]}"; do
-        if [[ -f "$file" ]]; then sudo mv "$file" "$backup_dir/scripts/"; else logger "Couldnt cleanup $file"; fi
-    done
-}
+} 
 
 function print_options {
     echo "
@@ -97,7 +119,7 @@ function var_check {
     # A function that checks that certain vars have been set. This is important for functionality of some functions
     # that require the OS, lpm or admin groups should they be run standalone
 
-    if [ "$log_dir" == "" ] || [ "$log_file" == "" ] || [ "$backup_dir" == "" ] ||  [ "$os" == "" ] || [ "$lpm" == "" ] || [ "$admin_group" == "" ] || [ "${#scored_users[@]}" -eq "0"  ];
+    if [ "$log_dir" == "" ] || [ "$log_file" == "" ] || [ "$backup_dir" == "" ] ||  [ "$os" == "" ] || [ "$lpm" == "" ] || [ "$admin_group" == "" ];
         then setup
     fi
 }
@@ -168,7 +190,7 @@ function test_functions {
     echo "Testing to_lower"
     test1=$(format "THISTEST")
     p=$(verify_test "$test1" "thistest")
-    if [ "$p" == "pass" ]; then echo "------Test #1 Passed----"; pass_count+=1; else echo "-----Test #1 Failed----"; fi
+    if [ "$p" == "pass" ]; then echo "------Test #1 Passed----"; (( pass_count+=1 )); else echo "-----Test #1 Failed----"; fi
 
 }
 
@@ -219,6 +241,7 @@ function get_os {
     # package manager, sudo groups, firewalls configs, etc.
     while true; do
         read -r -p "What is the OS based on? (Debian, RedHat, SuSE, CentOs): " os
+        os=$(format "$os")
         case $os in
             "debian"|"redhat"|"suse"|"centos")
                 break ;;
@@ -346,7 +369,7 @@ function  full_backup {
     if [ "$option" == "y" ]; then
         l="true"
         while [ "$l" == "true" ]; do
-            read -r -e -p "Enter directory's full path (one entry per line; enter  to continue script): " userInput
+            read -r -e -p "Enter directory's full path (one entry per line; hit enter to continue script): " userInput
 
             if [[ "$userInput" == "" ]]; then
                 l="false"
@@ -382,7 +405,6 @@ function  full_backup {
     # revert ownership to user who ran script
     sudo chown -R "$(whoami):$(whoami)" "$backup_dir"
     sudo chmod -R 744 "$backup_dir"
-    echo $backup_dir
     tar -czvf $backup_dir/backups.tar.gz -C "$backup_dir" backups &>/dev/null
     l="true"
     while [ $l == "true" ]; do
@@ -438,8 +460,8 @@ function change_passwords {
     done
     l="true"
     while [ "$l" == "true" ]; do
-        read -r -p "Would you like a passphrase or password for the new passwords? (1-passphrase; 2-password; 3-custom password): " opt1
-        if [ "$opt1" = "1" ]; then
+        read -r -p "Would you like a passphrase or password for the new passwords? (1-passphrase; 2-password; 3-custom password; 4-list users): " opt1
+        if [ "$opt1" == "1" ]; then
             wget -O "list.txt" "https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main/linux/list.txt" &> /dev/null # grab a wordlist
             if [ $? -eq 0 ]; then 
                 logger "Successfully grabbed wordlist. Setting option to: Passphrase"
@@ -449,7 +471,7 @@ function change_passwords {
                 opt1=3
             fi
             l="false"
-        elif [ "$opt1" = "2" ]; then
+        elif [ "$opt1" == "2" ]; then
             sudo openssl rand -base64 12 &>/dev/null
             if [ $? -eq 0 ]; then
                 logger "Command test succeeded. Setting option to: Random Password "
@@ -459,38 +481,54 @@ function change_passwords {
                 opt1=3
             fi
             l="false"
-        elif [ "$opt1" = "3" ]; then
+        elif [ "$opt1" == "3" ]; then
             logger "User Opted for custom password"
             opt1=3
             l="false"
+        elif [ "$opt1" == "4" ]; then
+            display_bash_users "$all_users" "$user_count" 1
         else
             echo "Option: $opt1 is not a valid option. Try Again."
         fi
     done
 
-    echo -e "Would you like to append more users to exclude from a password change?
+    echo -e "Would you like to append more users to exclude from a password change? (enter '2' to display users)
     -- Default excluded users are:"
     for item in "${users_to_exclude[@]}"; do
         echo "      - $item"
     done
     read -r -p "(y/n): " option
     option=$(echo "$option" | tr -d ' ') #truncates any spaces accidentally put in
+    while [ "$option" != "y" ] && [ "$option" != "n" ]; do
+        display_bash_users "$all_users" "$user_count" 1
+        echo " "
+        echo -e "Would you like to append more users to exclude from a password change? (enter '2' to display users)
+    -- Default excluded users are:"
+        for item in "${users_to_exclude[@]}"; do
+            echo "      - $item"
+        done
+        read -r -p "(y/n): " option
+
+    done
     if [ "$option" == "y" ]; then
         l="true"
         while [ "$l" == "true" ]; do
-            read -r -e -p "Enter additional user (one entry per line; enter  to continue script): " userInput
-
+            read -r -e -p "Enter additional user (one entry per line; enter '2' to display users; hit enter to continue script): " userInput
             if [[ "$userInput" == "" ]]; then
                 l="false"
+            elif [ "$userInput" == "2" ]; then
+                display_bash_users "$all_users" "$user_count" 1
             else
                 users_to_exclude+=("$userInput")
             fi
         done
     fi
-    readarray -t non_system_users < <(awk -F: '$3 >= 1000 && $1 != "nobody" && $1 != "nfsnobody" {print $1}' /etc/passwd)    # remove user from users if user is in excluded users
+    readarray -t non_system_users < <(awk -F':' '/.*sh/{print $1}' /etc/passwd)    # remove user from users if user is in excluded users
     for excluded_user in "${users_to_exclude[@]}"; do
         non_system_users=("${non_system_users[@]//$excluded_user}")
     done
+    # add root manually due to it having an SID < 1000
+    non_system_users+=("root")
     # if all users are excluded no need to run through this. niche case for an almost blank machine
     if [ "${#non_system_users[@]}" != "0" ]; then
         if [ "$opt1" == "3" ]; then
@@ -513,12 +551,13 @@ function change_passwords {
                 if [ "$user" != "" ]; then
                     echo "$user:$pass" | sudo chpasswd
                     echo "$user:$pass" >> "$HOME/passwd_changed.txt"
+                    echo " "
                     logger "Changed password for $user"
                 fi
             done
         else
             for user in "${non_system_users[@]}"; do
-                if [ "$user" != "" ]; then # line 498 replaces entries with an empty string. this line checks if the current user is one of those blank strings
+                if [ "$user" != "" ]; then
                     if [ "$opt1" == "1" ]; then
                         generate_passphrase
                     elif [ "$opt1" == "2" ]; then
@@ -571,23 +610,37 @@ function remove_sudoers {
     for scored_user in "${scored_users[@]}"; do 
         users_to_exclude+=("$scored_user")
     done
-    echo -e "Would you like to append more users to exclude from being removed from the $admin_group group?
+    echo -e "Would you like to append more users to exclude from being removed from the $admin_group group? (enter '2' to display users) 
 -- Current excluded users are:"
     for item in "${users_to_exclude[@]}"; do
         echo "      - $item"
     done
     read -r -p "(y/n): " option
-    option=$(echo "$option" | tr -d ' ') #truncates any spaces accidentally put in #truncates any spaces accidentally put in
+    while [ "$option" != "y" ] && [ "$option" != "n" ]; do
+        display_sudo_users
+        echo " "
+        echo -e "Would you like to append more users to exclude from being removed from the $admin_group group? (enter '2' to display users)
+-- Current excluded users are:"
+        for item in "${users_to_exclude[@]}"; do
+            echo "      - $item"
+        done
+        read -r -p "(y/n): " option
+    done
+    option=$(echo "$option" | tr -d ' ') #truncates any spaces accidentally put in 
     if [ "$option" == "y" ]; then
         l="true"
         while [ "$l" == "true" ]; do
-            read -r -e -p "Enter additional user (one entry per line; enter  to continue script): " userInput
+            read -r -e -p "Enter additional user (one entry per line; enter '2' to display users; hit enter to continue script): " userInput
             if [[ "$userInput" == "" ]]; then
                 l="false"
+            elif [ "$userInput" == "2" ]; then
+                display_sudo_users
             else
                 users_to_exclude+=("$userInput")
             fi
         done
+    else
+        display_sudo_users
     fi
     backup "/etc/passwd" # in case it gets screwed up
     # Iterate through all users in the target group
@@ -619,50 +672,59 @@ function disable_users {
     for scored_user in "${scored_users[@]}"; do 
         bash_users+=("$scored_user")
     done
-    read -r -p "Would you like to remove bash access for users? (y/n): " opt
-    if [ "$opt" == "y" ]; then
-        echo -e "Would you like to append more users who need bash access? 
+    echo -e "Would you like to append more users who need bash access? (enter '2' to display users)
+    -- Current excluded users are:"
+    for item in "${bash_users[@]}"; do
+        echo "      - $item"
+    done
+    read -r -p "(y/n): " opt
+    opt=$(echo "$opt" | tr -d ' ')
+    while [ "$opt" != "y" ] && [ "$opt" != "n" ]; do
+        display_bash_users "$all_users" "$user_count" 1
+        echo " "
+        echo -e "Would you like to append more users who need bash access? (enter '2' to display users)
     -- Current excluded users are:"
         for item in "${bash_users[@]}"; do
             echo "      - $item"
         done
-        read -r -p "(y/n): " option
-        option=$(echo "$option" | tr -d ' ') #truncates any spaces accidentally put in
-        if [ "$option" == "y" ]; then
-            l="true"
-            while [ "$l" == "true" ]; do
-                read -r -e -p "Enter additional users (one entry per line; hit enter to continue script): " userInput
-
-                if [[ "$userInput" == "" ]]; then
-                    l="false"
-                else
-                    bash_users+=("$userInput")
-                fi
-            done    
-        fi
-        readarray -t remove_bash_access_user_list < <(awk -F ':' '/bash/{print $1}' /etc/passwd)
-        for bash_user in "${bash_users[@]}"; do
-            # remove users who need bash access from the to-be-removed list
-            remove_bash_access_user_list=("${remove_bash_access_user_list[@]//$bash_user}")
-            # make sure that the user has bash access
-            sudo usermod -s /bin/bash "$bash_user"
-            logger "$bash_user granted bash access"
-        done
-        # remove bash access from users
-        for user in "${remove_bash_access_user_list[@]}"; do
-            if [ "$user" != "" ]; then
-                if [ -f /usr/sbin/nologin ]; then
-                    sudo usermod -s /usr/sbin/nologin "$user"
-                    logger "$user set to nologin";
-                elif [ -f /sbin/nologin ]; then
-                    sudo usermod -s /sbin/nologin "$user"
-                    logger "$user set to nologin"
-                else
-                    logger "No usable bin for preventing bash logins aka /usr/sbin/nologin & /sbin/nologin do not exist"
+        read -r -p "(y/n): " opt
+        opt=$(echo "$opt" | tr -d ' ')
+    done
+    if [ "$opt" == "y" ]; then
+        l="true"
+        while [ "$l" == "true" ]; do
+            read -r -e -p "Enter additional users (one entry per line; enter '2' to display users; hit enter to continue script): " userInput
+            if [[ "$userInput" == "" ]]; then
+                l="false"
+            elif [ "$userInput" == "2" ]; then
+                display_bash_users "$all_users" "$user_count" 1
+            else
+                bash_users+=("$userInput")
+            fi
+        done    
+    fi
+    readarray -t remove_bash_access_user_list < <(awk -F ':' '/bash/{print $1}' /etc/passwd)
+    for bash_user in "${bash_users[@]}"; do
+        # remove users who need bash access from the to-be-removed list
+        remove_bash_access_user_list=("${remove_bash_access_user_list[@]//$bash_user}")
+        # make sure that the user has bash access
+        sudo usermod -s /bin/bash "$bash_user"
+        logger "$bash_user granted bash access"
+    done
+    # remove bash access from users
+    for user in "${remove_bash_access_user_list[@]}"; do
+        if [ "$user" != "" ]; then
+            if [ -f /usr/sbin/nologin ]; then
+                sudo usermod -s /usr/sbin/nologin "$user"
+                logger "$user set to nologin";
+            elif [ -f /sbin/nologin ]; then
+                sudo usermod -s /sbin/nologin "$user"
+                logger "$user set to nologin"
+            else
+                logger "No usable bin for preventing bash logins aka /usr/sbin/nologin & /sbin/nologin do not exist"
             fi
         fi
-        done
-    fi
+    done
 }
 
 function setup_firewall {
@@ -743,12 +805,23 @@ function setup_firewall {
 function setup_splunk {
 
     var_check
-    wget https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main/splunk_setup/splunk.sh
-    sudo chmod +x splunk.sh
-    if [ $os == "redhat" ] || [ $os == "centos" ] || [ $os == "suse" ]; then type="rpm"; else type="debian"; fi
-    read -r -p "what is the forward server ip? " ip
-    ./splunk.sh $type "$ip"
-    cleanup_files ./splunk.sh
+    wget https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main/splunk_setup/splunk.sh --no-check-certificate
+    if [ $? -eq 0 ]; then
+        sudo chmod +x splunk.sh
+        if [ $os == "redhat" ] || [ $os == "centos" ] || [ $os == "suse" ]; then type="rpm"; else type="debian"; fi
+        l="true"
+        while [ $l == "true" ]; do
+            read -r -p "what is the forward server ip? " ip
+            if [[ ! $ip =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                echo "[*] ERROR: Invalid IP address format: $ip"
+            else
+                l="false"
+            fi
+        done
+        ./splunk.sh $type "$ip"
+    else
+        logger "ERROR: Splunk forwarder was unable to start"
+    fi
 }
 
 function start_function {
@@ -780,7 +853,7 @@ function start_function {
 
 function start_script {
     # The main brain for all the script. This function takes in all the main functions listed below and runs them in the order specified
-    fx=("locate_services" "disable_users" "change_passwords" "remove_sudoers" "setup_firewall" "full_backup" "setup_splunk" y)
+    fx=("change_passwords" "disable_users" "remove_sudoers" "setup_firewall" "locate_services" "full_backup" "setup_splunk")
     setup
     for funct in "${fx[@]}"; do
         start_function "$funct"
@@ -834,7 +907,8 @@ case $1 in
         print_options
     ;;
     "debug")
-        echo "no debug found"
+        setup
+        display_sudo_users
     ;;
     *)
     print_options
