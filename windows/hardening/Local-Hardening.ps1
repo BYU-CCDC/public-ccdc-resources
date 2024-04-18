@@ -129,7 +129,6 @@ function Add-Competition-Users {
 
             if ($UserArray.indexOf($user) -eq 0) {
                 Add-LocalGroupMember -Group "Administrators" -Member $user
-                Add-LocalGroupMember -Group "Schema Admins" -Member $user
                 Add-LocalGroupMember -Group "Remote Desktop Users" -Member $user
 
                 while ($true) {
@@ -227,9 +226,10 @@ function Print-Users {
 
         Write-Host "`n==== Enabled Users ====" -ForegroundColor Green
         $enabledUsersOutput = "==== Enabled Users ===="
-        $enabledUsers = Get-LocalUser | Where-Object Enabled -eq $true | ForEach-Object {
+        $enabledUsers = Get-LocalUser | Where-Object { $_.Enabled -eq $true } | ForEach-Object {
             Write-Host "User: $($_.Name)"
 	    $enabledUsersOutput += "`nUser: $($_.Name)"
+	    $user = $_
 
 	    $groupString = "Groups: $(Get-LocalGroup | Where-Object {  $user.SID -in ($_ | Get-LocalGroupMember | Select-Object -ExpandProperty "SID") } | Select-Object -ExpandProperty "Name")"
 	    Write-Host $groupString
@@ -239,11 +239,13 @@ function Print-Users {
         }
         $output += $enabledUsersOutput
 
+	Write-Host "`n==== Disabled Users ====" -ForegroundColor Red
         $disabledUsersOutput = "==== Disabled Users ===="
         $disabledUsers = Get-LocalUser | Where-Object Enabled -eq $false | ForEach-Object {
             Write-Host "User: $($_.Name)"
 	    $disabledUsersOutput += "`nUser: $($_.Name)"
 
+	    $user = $_
 	    $groupString = "Groups: $(Get-LocalGroup | Where-Object {  $user.SID -in ($_ | Get-LocalGroupMember | Select-Object -ExpandProperty "SID") } | Select-Object -ExpandProperty "Name")"
 	    Write-Host $groupString
 	    $disabledUsersOutput += "`n$groupString"
@@ -655,20 +657,20 @@ function Run-StanfordHarden {
 	$windowsUpdateAUPath = "$windowsUpdatePath\AU"
 	$windowsUpdateAutoUpdatePath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update"
 
-	New-ItemProperty -Path $windowsUpdateAUPath -Name "AutoInstallMinorUpdates" -Value 1 -PropertyType DWORD -Force
-	New-ItemProperty -Path $windowsUpdateAUPath -Name "NoAutoUpdate" -Value 0 -PropertyType DWORD -Force
-	New-ItemProperty -Path $windowsUpdateAUPath -Name "AUOptions" -Value 4 -PropertyType DWORD -Force
-	New-ItemProperty -Path $windowsUpdateAutoUpdatePath -Name "AUOptions" -Value 4 -PropertyType DWORD -Force
-	New-ItemProperty -Path $windowsUpdatePath -Name "ElevateNonAdmins" -Value 0 -PropertyType DWORD -Force
-	New-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer" -Name "NoWindowsUpdate" -Value 0 -PropertyType DWORD -Force
-	New-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer" -Name "NoWindowsUpdate" -Value 0 -PropertyType DWORD -Force
-	New-ItemProperty -Path "HKLM:\SYSTEM\Internet Communication Management\Internet Communication" -Name "DisableWindowsUpdateAccess" -Value 0 -PropertyType DWORD -Force
-	New-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\WindowsUpdate" -Name "DisableWindowsUpdateAccess" -Value 0 -PropertyType DWORD -Force
-	New-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\WindowsUpdate" -Name "DisableWindowsUpdateAccess" -Value 0 -PropertyType DWORD -Force
-	New-ItemProperty -Path $windowsUpdateAutoUpdatePath -Name "IncludeRecommendedUpdates" -Value 1 -PropertyType DWORD -Force
-	New-ItemProperty -Path $windowsUpdateAutoUpdatePath -Name "ScheduledInstallTime" -Value 22 -PropertyType DWORD -Force
-	New-ItemProperty -Path $windowsUpdatePath -Name "DeferFeatureUpdates" -Value 0 -PropertyType DWORD -Force
-	New-ItemProperty -Path $windowsUpdatePath -Name "DeferQualityUpdates" -Value 0 -PropertyType DWORD -Force
+	#New-ItemProperty -Path $windowsUpdateAUPath -Name "AutoInstallMinorUpdates" -Value 1 -PropertyType DWORD -Force
+	#New-ItemProperty -Path $windowsUpdateAUPath -Name "NoAutoUpdate" -Value 0 -PropertyType DWORD -Force
+	#New-ItemProperty -Path $windowsUpdateAUPath -Name "AUOptions" -Value 4 -PropertyType DWORD -Force
+	#New-ItemProperty -Path $windowsUpdateAutoUpdatePath -Name "AUOptions" -Value 4 -PropertyType DWORD -Force
+	#New-ItemProperty -Path $windowsUpdatePath -Name "ElevateNonAdmins" -Value 0 -PropertyType DWORD -Force
+	#New-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer" -Name "NoWindowsUpdate" -Value 0 -PropertyType DWORD -Force
+	#New-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer" -Name "NoWindowsUpdate" -Value 0 -PropertyType DWORD -Force
+	#New-ItemProperty -Path "HKLM:\SYSTEM\Internet Communication Management\Internet Communication" -Name "DisableWindowsUpdateAccess" -Value 0 -PropertyType DWORD -Force
+	#New-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\WindowsUpdate" -Name "DisableWindowsUpdateAccess" -Value 0 -PropertyType DWORD -Force
+	#New-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\WindowsUpdate" -Name "DisableWindowsUpdateAccess" -Value 0 -PropertyType DWORD -Force
+	#New-ItemProperty -Path $windowsUpdateAutoUpdatePath -Name "IncludeRecommendedUpdates" -Value 1 -PropertyType DWORD -Force
+	#New-ItemProperty -Path $windowsUpdateAutoUpdatePath -Name "ScheduledInstallTime" -Value 22 -PropertyType DWORD -Force
+	#New-ItemProperty -Path $windowsUpdatePath -Name "DeferFeatureUpdates" -Value 0 -PropertyType DWORD -Force
+	#New-ItemProperty -Path $windowsUpdatePath -Name "DeferQualityUpdates" -Value 0 -PropertyType DWORD -Force
 
 # Delete netlogon fullsecurechannelprotection then add a new key with it enabled
 	Remove-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Services\Netlogon\Parameters' -Name 'FullSecureChannelProtection' -Force
@@ -910,6 +912,8 @@ function Run-StanfordHarden {
 	    Remove-MpPreference -ExclusionProcess $ExcludedProc | Out-Null
 	}
 	Write-Output "$Env:ComputerName [INFO] Defender exclusions removed" 
+
+	Write-Host "If the next command errors, it means tamper protection is already enabled:"
 	reg add "HKLM\SOFTWARE\Microsoft\Windows Defender\Features" /v TamperProtection /t REG_DWORD /d 5 /f | Out-Null
 
 ######### Service Lockdown #########
@@ -940,7 +944,7 @@ function Run-StanfordHarden {
 # Network security: LDAP client signing requirements
 	reg add "HKLM\SYSTEM\CurrentControlSet\Services\LDAP" /v LDAPClientIntegrity /t REG_DWORD /d 2 /f | Out-Null
 # Domain Controller: LDAP Server signing requirements
-	reg add "HKLM\SYSTEM\CurrentControlSet\Services\NTDS\Parameters\" /v LDAPServerIntegrity /t REG_DWORD /d 2 /f | Out-Null
+	#reg add "HKLM\SYSTEM\CurrentControlSet\Services\NTDS\Parameters\" /v LDAPServerIntegrity /t REG_DWORD /d 2 /f | Out-Null
 # Disable BITS transfers
 	reg add "HKLM\Software\Policies\Microsoft\Windows\BITS" /v EnableBITSMaxBandwidth /t REG_DWORD /d 0 /f | Out-Null
 	reg add "HKLM\Software\Policies\Microsoft\Windows\BITS" /v MaxDownloadTime /t REG_DWORD /d 1 /f | Out-Null
@@ -955,6 +959,9 @@ function Run-StanfordHarden {
 
 }
 
+
+
+#Start of script
 Disable-Users
 
 
