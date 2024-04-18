@@ -239,11 +239,13 @@ function add_monitor {
 #   $1: Path of log source
 #   $2: Index name
 #   $3: Interval
+#   $4: Sourcetype (arbitrary)
 function add_script {
     source=$1
     index=$2
     interval=$3
-    sudo $SPLUNKDIR/bin/splunk add exec "$source" -index "$index" -interval "$interval"
+    sourcetype=$4
+    sudo $SPLUNKDIR/bin/splunk add exec "$source" -index "$index" -interval "$interval" -sourcetype "$sourcetype"
 }
 
 # Adds monitors for system logs
@@ -469,8 +471,8 @@ function install_ccdc_app {
 # Adds scripted inputs
 function add_scripts {
     print_banner "Adding scripted inputs"
-    echo "[*] Adding logged-in users script"
-    add_script "$SPLUNKDIR/etc/apps/ccdc-app/bin/users.sh" "auth" "180"
+    echo "[*] Adding user sessions script"
+    add_script "$SPLUNKDIR/etc/apps/ccdc-app/bin/sessions.sh" "auth" "180" "ccdc-sessions"
 }
 
 # Adds monitors for the Splunk indexer service itself
