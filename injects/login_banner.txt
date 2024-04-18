@@ -1,0 +1,96 @@
+﻿INTEROFFICE MEMORANDUM
+________________
+
+
+To: Management
+From: Team 
+Subject: Login Banner Improvements
+Date: 
+________________
+
+
+
+
+Management,
+
+
+Thank you for expressing your concern regarding our computer systems’ login banners. 
+
+
+We have taken steps to correct this shortcoming by modifying login banners on our devices so that when someone logs in to access a device they are informed of our company’s acceptable use and security monitoring actions. Due to the Computer Fraud and Abuse Act, when someone unauthorized accesses one of our devices, they can now be prosecuted for the unauthorized access because they are warned about accessing devices without authorization. 
+
+
+Previously login banners on our systems looked like this:
+
+
+
+
+Figure 1. Ubuntu initial login banner
+
+
+
+
+Figure 2. Splunk with no initial login banner
+                
+
+
+Our previous login banners provided information about our systems including the operating system in use. Our new login banners reference the company Acceptable Use Policy and emphasize the ability to prosecute misuse or unauthorized access. 
+
+
+        
+New Login Banner:         
+******** WARNING ********
+This system is the property of a private organization and is for authorized use only. By accessing this system, users agree to comply with the company’s Acceptable Use Policy.
+
+
+All activities on this system may be monitored, recorded, and disclosed to authorized personnel for security purposes. There is no expectation of privacy while using this system. 
+
+
+Unauthorized or improper use may result in disciplinary action or legal penalties. By continuing to use this system you indicate your awareness of and consent to these terms and conditions of use.
+
+
+**************************
+	Figure 3. New Login Banner        
+
+
+
+
+The new login banner has successfully been installed on our machines and is evident in the images below:
+
+
+
+
+Figure 4. Debian Login Banner 
+
+
+Figure 5. CentOS Login Banner
+
+
+Figure 6. Splunk Login Banner Updated 
+
+
+Figure 7. Ubuntu Server Login Banner
+
+
+________________
+
+
+Windows Devices Login Banner
+For Windows devices’ login banners, the message title was set to “Warning” and the message text to “This computer should be used for authorized purposes only. Unauthorized use of this computer will lead to disciplinary action or prosecution.” Whenever a user logs on to a Windows system, this interactive message is displayed. This was applied to all devices on the Windows Domain through a Group Policy. The user can then log in by clicking on the OK button.
+
+
+
+
+Figure 9. Windows Login Banner set for Domain
+
+
+
+
+Figure 10. Windows Login Message
+
+
+Please let us know if there are any additional actions the security team can perform to improve the login banners. 
+
+
+Thank you,
+Team

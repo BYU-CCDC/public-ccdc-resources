@@ -1,0 +1,18 @@
+﻿MEMORANDUM
+
+To: Management
+From: Team 
+Subject: Benefits of Implementing IPv6
+Date: 
+
+
+The IT Team has been evaluating the benefits of moving our network setup to IPv6. IPv6 is the newest version of internet protocol meant to address the problem of IP address depletion. It offers simplified address configuration due to every machine being able to have its own unique address, faster speeds and reliability due to multicasting, and improved security due to built-in security features, as well as a number of other advantages over IPv4. IPv6 is in the process of being rolled out worldwide, however this process is slow.
+
+Our current network topology includes several machines plus a firewall, over multiple different networks. We are nowhere near the limit of the IP address space allocated in IPv4, and the IT Team does not project running out of internal addresses anytime within the next decade, assuming our future network setup is configured in a similar state. We are also not running up against any limitations of our firewall for routing or prioritization. It is also unknown whether or not our Internet Service Provider (ISP) provides us support for IPv6, which is something that needs to be explored further.
+
+For these reasons, we recommend that a transition to IPv6 is tabled for the future, given the cost and effort that would be required for the change and the marginal benefits it would bring to our current infrastructure. We recommend reinvestigating the proposal at a future point, perhaps in Q4, and evaluating the benefits of future-proofing our networks, but currently there is not enough impetus to do so.
+
+Please let us know if there are any additional actions we should perform at this time. 
+
+Thank you,
+Team 
