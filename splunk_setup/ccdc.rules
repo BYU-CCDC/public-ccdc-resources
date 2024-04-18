@@ -37,7 +37,7 @@
 -w /usr/sbin/adduser -p x -k CCDC_exec_adduser
 
 # new shell
--w /bin/bash -p x -k CCDC_new_shell
+#-w /bin/bash -p x -k CCDC_new_shell
 
 # modification or addition of binaries
 -w /usr/sbin/ -p w -k CCDC_modify_binaries
