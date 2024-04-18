@@ -1,0 +1,1688 @@
+{
+    "visualizations": {
+        "viz_dLjbX2gA": {
+            "type": "splunk.singlevalue",
+            "options": {
+                "unit": "events"
+            },
+            "dataSources": {
+                "primary": "ds_KaAyhVpf"
+            },
+            "title": "Total logs",
+            "showProgressBar": true,
+            "showLastUpdated": true
+        },
+        "viz_ZI2XixNd": {
+            "type": "splunk.pie",
+            "dataSources": {
+                "primary": "ds_host_logs"
+            },
+            "title": "By host",
+            "showProgressBar": true,
+            "showLastUpdated": true
+        },
+        "viz_EQfLTBnN": {
+            "type": "splunk.table",
+            "options": {
+                "drilldown": "none",
+                "tableFormat": {
+                    "rowBackgroundColors": "> table | seriesByIndex(0) | pick(tableAltRowBackgroundColorsByTheme)"
+                },
+                "showInternalFields": false,
+                "columnFormat": {
+                    "host": {
+                        "width": 126
+                    }
+                }
+            },
+            "context": {
+                "hostColumnColorConfig": [
+                    "#7b56db"
+                ]
+            },
+            "dataSources": {
+                "primary": "ds_s6xpHCU4"
+            },
+            "title": "Last seen",
+            "showLastUpdated": true
+        },
+        "viz_bYb3KRMF": {
+            "type": "splunk.table",
+            "options": {
+                "drilldown": "none",
+                "showInternalFields": false,
+                "columnFormat": {
+                    "host": {
+                        "width": 30
+                    },
+                    "USER": {
+                        "width": 30
+                    },
+                    "PWD": {
+                        "width": 30
+                    },
+                    "COMMAND": {
+                        "width": 86
+                    },
+                    "_time": {
+                        "width": 47
+                    },
+                    "TIME": {
+                        "width": 36
+                    }
+                }
+            },
+            "context": {
+                "hostColumnColorConfig": [
+                    "#7b56db"
+                ]
+            },
+            "dataSources": {
+                "primary": "ds_auth_sudo"
+            },
+            "title": "Sudo",
+            "showLastUpdated": true,
+            "description": "from auth/secure logs"
+        },
+        "viz_KVxvPhPE": {
+            "type": "splunk.bar",
+            "options": {
+                "yAxisAbbreviation": "off",
+                "y2AxisAbbreviation": "off",
+                "showRoundedY2AxisLabels": false,
+                "legendTruncation": "ellipsisMiddle",
+                "showY2MajorGridLines": true,
+                "xAxisTitleVisibility": "hide",
+                "yAxisLabelVisibility": "show",
+                "yAxisMajorTickInterval": 0,
+                "yAxisTitleVisibility": "hide"
+            },
+            "dataSources": {
+                "primary": "ds_q4gq4QSU"
+            },
+            "title": "Web source IPs",
+            "showProgressBar": true,
+            "showLastUpdated": true,
+            "description": "from Apache"
+        },
+        "viz_Y4rMvmx3": {
+            "type": "splunk.table",
+            "options": {
+                "drilldown": "none",
+                "showInternalFields": false,
+                "columnFormat": {
+                    "host": {
+                        "width": 30
+                    },
+                    "USER": {
+                        "width": 30
+                    },
+                    "PWD": {
+                        "width": 80
+                    },
+                    "STATUS": {
+                        "width": 30
+                    },
+                    "REFERRER": {
+                        "width": 81
+                    },
+                    "SOURCE_IP": {
+                        "width": 30
+                    },
+                    "REQUEST": {
+                        "width": 138
+                    },
+                    "_time": {
+                        "width": 65
+                    },
+                    "TIME": {
+                        "width": 51
+                    }
+                }
+            },
+            "dataSources": {
+                "primary": "ds_SiGWezwp"
+            },
+            "title": "Web access",
+            "showProgressBar": true,
+            "showLastUpdated": true,
+            "description": "from Apache"
+        },
+        "viz_JU3NPRx4": {
+            "type": "splunk.table",
+            "options": {
+                "drilldown": "none",
+                "showInternalFields": false
+            },
+            "dataSources": {
+                "primary": "ds_sTrvV1Om"
+            },
+            "title": "Password changes",
+            "showLastUpdated": true,
+            "description": "from auth/secure logs"
+        },
+        "viz_4fquHTfr": {
+            "type": "splunk.table",
+            "options": {
+                "drilldown": "none",
+                "showInternalFields": false,
+                "columnFormat": {
+                    "_time": {
+                        "width": 45
+                    },
+                    "host": {
+                        "width": 30
+                    },
+                    "TIME": {
+                        "width": 30
+                    }
+                }
+            },
+            "context": {
+                "hostColumnColorConfig": [
+                    "#7b56db"
+                ]
+            },
+            "dataSources": {
+                "primary": "ds_IOKWGErt"
+            },
+            "title": "Service started",
+            "showLastUpdated": true,
+            "description": "from syslog/messages logs"
+        },
+        "viz_sku8Ad0C": {
+            "type": "splunk.table",
+            "options": {
+                "drilldown": "none",
+                "showInternalFields": false,
+                "columnFormat": {
+                    "USER": {
+                        "width": 30
+                    },
+                    "source": {
+                        "width": 30
+                    },
+                    "_time": {
+                        "width": 71
+                    },
+                    "host": {
+                        "width": 30
+                    },
+                    "TIME": {
+                        "width": 30
+                    }
+                }
+            },
+            "context": {
+                "hostColumnColorConfig": [
+                    "#7b56db"
+                ]
+            },
+            "dataSources": {
+                "primary": "ds_PlUi0lFd"
+            },
+            "title": "Cron",
+            "showLastUpdated": true,
+            "description": "from syslog/messages/cron logs"
+        },
+        "viz_SH0xbiuz": {
+            "type": "splunk.table",
+            "options": {
+                "drilldown": "none",
+                "showInternalFields": false,
+                "columnFormat": {
+                    "TIME": {
+                        "width": 58
+                    }
+                }
+            },
+            "context": {
+                "hostColumnColorConfig": [
+                    "#7b56db"
+                ]
+            },
+            "dataSources": {
+                "primary": "ds_49mCGoBV"
+            },
+            "title": "Packages",
+            "showLastUpdated": true,
+            "description": "from dpkg and dnf"
+        },
+        "viz_P1q6lght": {
+            "type": "splunk.table",
+            "options": {
+                "drilldown": "none",
+                "showInternalFields": false
+            },
+            "dataSources": {
+                "primary": "ds_CIJWDDib"
+            },
+            "title": "SQL queries",
+            "hideWhenNoData": true,
+            "showLastUpdated": true,
+            "description": "from MySQL"
+        },
+        "viz_XIrSSjcx": {
+            "type": "splunk.table",
+            "options": {
+                "drilldown": "none",
+                "showInternalFields": false,
+                "columnFormat": {
+                    "TIME": {
+                        "width": 73
+                    },
+                    "host": {
+                        "width": 62
+                    }
+                }
+            },
+            "dataSources": {
+                "primary": "ds_auth_ssh_keys"
+            },
+            "title": "SSH keys",
+            "showLastUpdated": true,
+            "description": "from /home/<USER>/.ssh"
+        },
+        "viz_ROuTLO56": {
+            "type": "splunk.table",
+            "options": {
+                "drilldown": "none",
+                "showInternalFields": false
+            },
+            "dataSources": {
+                "primary": "ds_auth_ssh_login"
+            },
+            "title": "SSH login attempts",
+            "showLastUpdated": true,
+            "description": "from auth/secure logs"
+        },
+        "viz_tumhhQKw": {
+            "type": "splunk.table",
+            "options": {
+                "drilldown": "none",
+                "showInternalFields": false,
+                "columnFormat": {
+                    "key": {
+                        "width": 161
+                    },
+                    "type": {
+                        "width": 116
+                    },
+                    "host": {
+                        "width": 134
+                    },
+                    "TIME": {
+                        "width": 126
+                    },
+                    "UID": {
+                        "width": 63
+                    },
+                    "AUID": {
+                        "width": 60
+                    },
+                    "exe": {
+                        "width": 262
+                    }
+                }
+            },
+            "dataSources": {
+                "primary": "ds_KaFGSkBa"
+            },
+            "title": "CCDC custom audit",
+            "showLastUpdated": true,
+            "description": "from auditd"
+        },
+        "viz_E8p4Pq2K": {
+            "type": "splunk.table",
+            "options": {
+                "drilldown": "none",
+                "showInternalFields": false,
+                "columnFormat": {
+                    "_time": {
+                        "width": 102
+                    },
+                    "AUID": {
+                        "width": 30
+                    },
+                    "type": {
+                        "width": 39
+                    },
+                    "UID": {
+                        "width": 30
+                    },
+                    "host": {
+                        "width": 47
+                    },
+                    "TIME": {
+                        "width": 56
+                    },
+                    "OP": {
+                        "width": 181
+                    }
+                }
+            },
+            "context": {
+                "hostColumnColorConfig": [
+                    "#7b56db"
+                ]
+            },
+            "dataSources": {
+                "primary": "ds_auditd_users"
+            },
+            "title": "Users: auth/new users/new groups",
+            "showLastUpdated": true,
+            "description": "from auditd"
+        },
+        "viz_9aVaME0U": {
+            "type": "splunk.table",
+            "options": {
+                "drilldown": "none",
+                "showInternalFields": false,
+                "columnFormat": {
+                    "unit": {
+                        "width": 181
+                    }
+                }
+            },
+            "dataSources": {
+                "primary": "ds_3jgLUw4J"
+            },
+            "title": "Uncommon services",
+            "showProgressBar": true,
+            "showLastUpdated": true,
+            "description": "from auditd"
+        },
+        "viz_j6InzK8F": {
+            "type": "splunk.table",
+            "options": {
+                "drilldown": "none",
+                "showInternalFields": false,
+                "columnFormat": {
+                    "unit": {
+                        "width": 161
+                    },
+                    "type": {
+                        "width": 186
+                    }
+                }
+            },
+            "dataSources": {
+                "primary": "ds_ntqKv0EM"
+            },
+            "title": "Audit log types",
+            "showLastUpdated": true,
+            "description": "from auditd"
+        },
+        "viz_yIZPLgz5": {
+            "type": "splunk.table",
+            "options": {
+                "dataOverlayMode": "none",
+                "drilldown": "none",
+                "showRowNumbers": false,
+                "showInternalFields": false,
+                "columnFormat": {
+                    "SPT": {
+                        "width": 88
+                    },
+                    "DST": {
+                        "width": 180
+                    },
+                    "DPT": {
+                        "width": 76
+                    },
+                    "source": {
+                        "width": 171
+                    },
+                    "_time": {
+                        "width": 260
+                    },
+                    "TIME": {
+                        "width": 128
+                    },
+                    "host": {
+                        "width": 139
+                    }
+                }
+            },
+            "context": {
+                "TYPEColumnColorConfig": [
+                    {
+                        "match": "REJECT",
+                        "value": "#D41F1F"
+                    },
+                    {
+                        "match": "BLOCK",
+                        "value": "#D41F1F"
+                    },
+                    {
+                        "match": "ALLOW",
+                        "value": "#118832"
+                    },
+                    {
+                        "match": "ACCEPT",
+                        "value": "#118832"
+                    }
+                ],
+                "hostColumnColorConfig": [
+                    "#7b56db"
+                ]
+            },
+            "dataSources": {
+                "primary": "ds_EI8bDaJ0"
+            },
+            "title": "Host firewall",
+            "showLastUpdated": true,
+            "description": "from ufw and firewalld"
+        },
+        "viz_Gma2EcCj": {
+            "type": "splunk.pie",
+            "dataSources": {
+                "primary": "ds_9Ff3Q6WA"
+            },
+            "title": "Host firewall: blocked IPs",
+            "showLastUpdated": true,
+            "description": "from ufw and firewalld"
+        },
+        "viz_Cgf6NioU": {
+            "type": "splunk.table",
+            "options": {
+                "drilldown": "none",
+                "showInternalFields": false
+            },
+            "context": {
+                "hostColumnColorConfig": [
+                    "#7b56db"
+                ]
+            },
+            "dataSources": {
+                "primary": "ds_f5dkhlHH"
+            },
+            "title": "Files in /tmp",
+            "showLastUpdated": true
+        },
+        "viz_header_general": {
+            "type": "splunk.markdown",
+            "options": {
+                "markdown": "# General",
+                "fontSize": "extraLarge"
+            }
+        },
+        "viz_header_auth": {
+            "type": "splunk.markdown",
+            "options": {
+                "markdown": "# Auth",
+                "fontSize": "extraLarge"
+            }
+        },
+        "viz_header_web": {
+            "type": "splunk.markdown",
+            "options": {
+                "markdown": "# Web",
+                "fontSize": "extraLarge"
+            }
+        },
+        "viz_header_service": {
+            "type": "splunk.markdown",
+            "options": {
+                "markdown": "# Service",
+                "fontSize": "extraLarge"
+            }
+        },
+        "viz_header_misc": {
+            "type": "splunk.markdown",
+            "options": {
+                "markdown": "# Misc",
+                "fontSize": "extraLarge"
+            }
+        },
+        "viz_header_network": {
+            "type": "splunk.markdown",
+            "options": {
+                "markdown": "# Network",
+                "fontSize": "extraLarge"
+            }
+        },
+        "viz_Bk4MTmR8": {
+            "type": "splunk.pie",
+            "dataSources": {
+                "primary": "ds_YH4EKci6"
+            },
+            "title": "Allowed Ports: Out → In",
+            "description": "from Cisco"
+        },
+        "viz_S2m8Wozt": {
+            "type": "splunk.column",
+            "dataSources": {
+                "primary": "ds_Venhnrnd"
+            },
+            "title": "Blocked SRC IPs: Out → In",
+            "description": "from Cisco"
+        },
+        "viz_IfmLrAfJ": {
+            "type": "splunk.table",
+            "dataSources": {
+                "primary": "ds_Aqx1voFp"
+            },
+            "title": "Network Traffic",
+            "options": {
+                "columnFormat": {
+                    "TIME": {
+                        "width": 104
+                    },
+                    "DstIP": {
+                        "width": 89
+                    },
+                    "DstPort": {
+                        "width": 59
+                    },
+                    "SrcPort": {
+                        "width": 56
+                    },
+                    "SrcIP": {
+                        "width": 73
+                    },
+                    "Protocol": {
+                        "width": 59
+                    },
+                    "AccessControlRuleAction": {
+                        "width": 120
+                    },
+                    "AccessControlRuleName": {
+                        "width": 122
+                    }
+                }
+            },
+            "description": "from Cisco"
+        },
+        "viz_Ole10gPx": {
+            "type": "splunk.pie",
+            "dataSources": {
+                "primary": "ds_rOBGhtCk"
+            },
+            "title": "Allowed Ports: In → Out",
+            "description": "from Cisco"
+        },
+        "viz_AfC2BCDF": {
+            "type": "splunk.column",
+            "dataSources": {
+                "primary": "ds_sRmY22Kc"
+            },
+            "title": "Allowed DNS IPs: In → Out",
+            "description": "from Cisco"
+        },
+        "viz_lrRCADQk": {
+            "type": "splunk.markdown",
+            "options": {
+                "markdown": "# Windows",
+                "fontSize": "extraLarge"
+            }
+        },
+        "viz_zVvUuV7r": {
+            "type": "splunk.table",
+            "dataSources": {
+                "primary": "ds_UXAe9i7j"
+            },
+            "title": "Important events",
+            "showLastUpdated": true,
+            "options": {
+                "columnFormat": {
+                    "TIME": {
+                        "width": 58
+                    },
+                    "host": {
+                        "width": 42
+                    },
+                    "source": {
+                        "width": 33
+                    },
+                    "EventCode": {
+                        "width": 30
+                    },
+                    "Account_Name": {
+                        "width": 42
+                    },
+                    "ACCOUNT": {
+                        "width": 38
+                    },
+                    "MSG": {
+                        "width": 134
+                    },
+                    "Source_Port": {
+                        "width": 30
+                    },
+                    "Source_Network_Address": {
+                        "width": 52
+                    }
+                }
+            },
+            "description": "from WinEventLog"
+        },
+        "viz_wHzLPk5d": {
+            "type": "splunk.table",
+            "dataSources": {
+                "primary": "ds_a1qk4nIW"
+            },
+            "title": "All events",
+            "showLastUpdated": true,
+            "options": {
+                "columnFormat": {
+                    "TIME": {
+                        "width": 58
+                    },
+                    "host": {
+                        "width": 42
+                    },
+                    "source": {
+                        "width": 33
+                    },
+                    "EventCode": {
+                        "width": 30
+                    },
+                    "Account_Name": {
+                        "width": 42
+                    },
+                    "ACCOUNT": {
+                        "width": 38
+                    },
+                    "MSG": {
+                        "width": 134
+                    },
+                    "Source_Port": {
+                        "width": 30
+                    },
+                    "Source_Network_Address": {
+                        "width": 52
+                    }
+                }
+            },
+            "description": "from WinEventLog"
+        },
+        "viz_fYXpBeqO": {
+            "type": "splunk.table",
+            "options": {
+                "columnFormat": {
+                    "EventID": {
+                        "width": 30
+                    },
+                    "ProcessId": {
+                        "width": 32
+                    },
+                    "TargetFilename": {
+                        "width": 203
+                    },
+                    "host": {
+                        "width": 90
+                    },
+                    "TIME": {
+                        "width": 97
+                    },
+                    "User": {
+                        "width": 91
+                    },
+                    "IsExecutable": {
+                        "width": 44
+                    },
+                    "Image": {
+                        "width": 223
+                    }
+                }
+            },
+            "dataSources": {
+                "primary": "ds_MfUX80C2"
+            },
+            "title": "Files",
+            "description": "from Sysmon"
+        },
+        "viz_LF83Uk7B": {
+            "type": "splunk.table",
+            "dataSources": {
+                "primary": "ds_naKdOutr"
+            },
+            "title": "Registry",
+            "description": "from Sysmon",
+            "options": {
+                "columnFormat": {
+                    "EventID": {
+                        "width": 30
+                    },
+                    "EventType": {
+                        "width": 59
+                    },
+                    "TIME": {
+                        "width": 90
+                    },
+                    "ProcessId": {
+                        "width": 39
+                    },
+                    "Image": {
+                        "width": 91
+                    },
+                    "TargetObject": {
+                        "width": 182
+                    }
+                }
+            }
+        },
+        "viz_bic2dTYx": {
+            "type": "splunk.table",
+            "dataSources": {
+                "primary": "ds_EAwYX8gC"
+            },
+            "title": "New Users/Groups",
+            "description": "from auth/secure logs"
+        },
+        "viz_f4hzOM2X": {
+            "type": "splunk.table",
+            "title": "Current sessions",
+            "description": "from sessions.sh script",
+            "dataSources": {
+                "primary": "ds_eAb0E3tt"
+            },
+            "showProgressBar": false,
+            "showLastUpdated": false
+        },
+        "viz_s5txHKcE": {
+            "type": "splunk.markdown",
+            "options": {
+                "markdown": "# Snoopy",
+                "fontSize": "extraLarge"
+            }
+        },
+        "viz_3LovvxXT": {
+            "type": "splunk.table",
+            "options": {
+                "columnFormat": {
+                    "uid": {
+                        "width": 30
+                    },
+                    "cwd": {
+                        "width": 30
+                    },
+                    "tty": {
+                        "width": 30
+                    },
+                    "TIME": {
+                        "width": 38
+                    },
+                    "host": {
+                        "width": 30
+                    }
+                }
+            },
+            "dataSources": {
+                "primary": "ds_MrPNffDr"
+            }
+        }
+    },
+    "dataSources": {
+        "ds_filter_host": {
+            "type": "ds.search",
+            "options": {
+                "queryParameters": {
+                    "earliest": "$tr_global_time.earliest$",
+                    "latest": "$tr_global_time.latest$"
+                },
+                "query": "index=* host IN ($ms_global_hosts$)\n| eval TIME=strftime(_time, \"%D %I:%M:%S %p\")\n| fields *",
+                "refresh": "60s",
+                "refreshType": "delay"
+            },
+            "name": "Global filtering"
+        },
+        "ds_general_get_hosts": {
+            "type": "ds.search",
+            "options": {
+                "queryParameters": {
+                    "earliest": "0",
+                    "latest": ""
+                },
+                "query": "index=* \n| stats count by host \n| fields host",
+                "refresh": "60s",
+                "refreshType": "delay"
+            },
+            "name": "General get hosts"
+        },
+        "ds_KaAyhVpf": {
+            "type": "ds.chain",
+            "options": {
+                "query": "stats count",
+                "extend": "ds_filter_host"
+            },
+            "name": "General total logs"
+        },
+        "ds_host_logs": {
+            "type": "ds.chain",
+            "options": {
+                "query": "stats count by host",
+                "extend": "ds_filter_host"
+            },
+            "name": "General host logs"
+        },
+        "ds_s6xpHCU4": {
+            "type": "ds.search",
+            "options": {
+                "queryParameters": {
+                    "earliest": "$tr_global_time.earliest$",
+                    "latest": "$tr_global_time.latest$"
+                },
+                "query": "index=*\n| stats latest(_time) AS last_seen BY host\n| eval last_seen=strftime(last_seen, \"%D %I:%M:%S %p\")\n| table host last_seen",
+                "refresh": "60s",
+                "refreshType": "delay"
+            },
+            "name": "General last log"
+        },
+        "ds_auditd_users": {
+            "type": "ds.chain",
+            "options": {
+                "query": "| search source=\"/var/log/audit/audit.log\" type IN (ADD_USER ADD_GROUP USER_AUTH) \n| rex \".*msg.*msg='op=(?<OP>.*)exe\" \n| table TIME host type UID AUID OP exe \n| sort - TIME",
+                "extend": "ds_27hgc3Fj"
+            },
+            "name": "Auth auditd users"
+        },
+        "ds_auth_sudo": {
+            "type": "ds.chain",
+            "options": {
+                "extend": "ds_27hgc3Fj",
+                "query": "| search source IN (\"/var/log/auth.log\" \"/var/log/secure\") COMMAND=* \n| rex \"COMMAND=\\S*\\s(?<ARGS>.*)\" \n| table TIME host USER PWD COMMAND ARGS \n| sort - TIME"
+            },
+            "name": "Auth sudo"
+        },
+        "ds_auth_ssh_keys": {
+            "type": "ds.chain",
+            "options": {
+                "query": "| search source=\"/home/*/.ssh*\" \n| table TIME host source",
+                "extend": "ds_27hgc3Fj"
+            },
+            "name": "SSH keys"
+        },
+        "ds_auth_ssh_login": {
+            "type": "ds.chain",
+            "options": {
+                "extend": "ds_27hgc3Fj",
+                "query": "| search source IN (\"/var/log/auth.log\" \"/var/log/secure\") sshd password \n| rex \"sshd\\[\\d+\\]: (?<ACTION>\\w+) password for (?<USER>(invalid user )?\\w+) from (?<IP>[\\d\\.]+) port (?<PORT>\\d+)\"\n| table TIME host source ACTION USER IP PORT \n| sort - TIME"
+            },
+            "name": "SSH login"
+        },
+        "ds_sTrvV1Om": {
+            "type": "ds.chain",
+            "options": {
+                "extend": "ds_27hgc3Fj",
+                "query": "| search source IN (\"/var/log/auth.log\" \"/var/log/secure\") \"password changed\" \n| rex \"pam_unix(.*): password changed for (?<USER>\\w+)\"\n| table TIME host source USER\n| sort - TIME"
+            },
+            "name": "Auth password"
+        },
+        "ds_ntqKv0EM": {
+            "type": "ds.chain",
+            "options": {
+                "query": "| search source=\"/var/log/audit/audit.log\" \n| stats count by type \n| sort count",
+                "extend": "ds_27hgc3Fj"
+            },
+            "name": "Auth auditd types"
+        },
+        "ds_KaFGSkBa": {
+            "type": "ds.chain",
+            "options": {
+                "extend": "ds_27hgc3Fj",
+                "query": "| search source=\"/var/log/audit/audit.log\" key=CCDC* \n| table TIME host type key UID AUID tty exe success \n| sort - TIME"
+            },
+            "name": "Auth CCDC audit"
+        },
+        "ds_SoZZLSey": {
+            "type": "ds.chain",
+            "options": {
+                "extend": "ds_HNl99Q7r",
+                "query": "| search source=\"WinEventLog*\" \n| eval MSG=mvindex(split(Message, \"Subject:\"), 0) \n| eval MSG=substr(MSG, 1, len(MSG)-2) \n| eval ACCOUNT=mvindex(Account_Name, 1)"
+            },
+            "name": "Windows events base table"
+        },
+        "ds_2zn7xaGU": {
+            "type": "ds.chain",
+            "options": {
+                "extend": "ds_SjKqyquU",
+                "query": "| search source IN (\"/var/log/httpd/access_log\" \"/var/log/apache2/access.log\") \n| rex \"(?<SOURCE_IP>(\\d+\\.){3}\\d+) .*\\[.*\\] \\\"(?<REQUEST>.*)\\\" (?<STATUS>\\d\\d\\d) \\d+ \\\"(?<REFERRER>.*)\\\" \\\"(?<AGENT>.*)\\\"\" \n| where SOURCE_IP!=\"127.0.0.1\" \n| where NOT isnull(SOURCE_IP) "
+            },
+            "name": "Web apache parsed"
+        },
+        "ds_q4gq4QSU": {
+            "type": "ds.chain",
+            "options": {
+                "extend": "ds_2zn7xaGU",
+                "query": "| stats count by SOURCE_IP"
+            },
+            "name": "Web apache IPs"
+        },
+        "ds_SiGWezwp": {
+            "type": "ds.chain",
+            "options": {
+                "extend": "ds_2zn7xaGU",
+                "query": "| table TIME SOURCE_IP STATUS REQUEST REFERRER AGENT\n| sort - TIME"
+            },
+            "name": "Web Apache access"
+        },
+        "ds_CIJWDDib": {
+            "type": "ds.chain",
+            "options": {
+                "extend": "ds_SjKqyquU",
+                "query": "| search source=\"/var/log/mysql/mysql.log\" Query \n| rex \"Query\t(?<QUERY>.*)\" \n| table TIME host QUERY \n| sort - TIME"
+            },
+            "name": "Web MySQL access"
+        },
+        "ds_PlUi0lFd": {
+            "type": "ds.chain",
+            "options": {
+                "extend": "ds_mfNWBk8w",
+                "query": "| search source IN (\"/var/log/cron\" \"/var/log/syslog\" \"/var/log/messages\") CRON CMD\n| rex \".+ (?<HOSTNAME>.*) CRON\\[(?<PID>\\d+)\\]: \\((?<USER>.*)\\) CMD \\((?<RUN>.*)\\)\"\n| table TIME host source USER RUN \n| sort - TIME"
+            },
+            "name": "Service cron"
+        },
+        "ds_IOKWGErt": {
+            "type": "ds.chain",
+            "options": {
+                "extend": "ds_mfNWBk8w",
+                "query": "| search source IN (\"/var/log/syslog\" \"/var/log/messages\") \n| regex \"systemd\\[.*\\]: Started\" | rex \".*systemd\\[.*\\]: (?<MSG>.*)\" \n| table TIME host MSG \n| sort - TIME"
+            },
+            "name": "Service system services"
+        },
+        "ds_3jgLUw4J": {
+            "type": "ds.chain",
+            "options": {
+                "query": "| search source=\"/var/log/audit/audit.log\" type=SERVICE_START\n| stats count by unit \n| sort count",
+                "extend": "ds_27hgc3Fj"
+            },
+            "name": "Service auditd uncommon"
+        },
+        "ds_JhjdrnqT": {
+            "type": "ds.chain",
+            "options": {
+                "extend": "ds_filter_host",
+                "query": "| search source IN (\"/var/log/syslog\" \"/var/log/ufw.log\" \"/var/log/messages\" \"/var/log/firewalld\") \n| regex \"\\[UFW.*\\]|filter_\" \n| rex \".*(\\[UFW |filter_[\\w_]*_)(?<TYPE>\\w+)[\\]:]\""
+            },
+            "name": "Network firewall host parse"
+        },
+        "ds_EI8bDaJ0": {
+            "type": "ds.chain",
+            "options": {
+                "extend": "ds_JhjdrnqT",
+                "query": "| table TIME host source TYPE SRC SPT DST DPT PROTO \n| sort - _time"
+            },
+            "name": "Network firewall host table"
+        },
+        "ds_9Ff3Q6WA": {
+            "type": "ds.chain",
+            "options": {
+                "extend": "ds_JhjdrnqT",
+                "query": "| stats count by SRC"
+            },
+            "name": "Network firewall host IPs"
+        },
+        "ds_NZyd5O7D": {
+            "type": "ds.chain",
+            "options": {
+                "extend": "ds_ESlEi0dT",
+                "query": "| search source=\"*fw_network.log\" \n| rex \"(?<_TIME>[\\d\\-\\.:ZT]+) (?<IP>[\\d\\.]+)  : (?<host>[\\w\\-%]+): (?<PROPS>.*)\" \n| rename _raw AS temp \n| rename PROPS as _raw  \n| extract pairdelim=\",\" kvdelim=\":\" \n| rename _raw as PROPS \n| fields - PROPS \n| rename temp as _raw"
+            },
+            "name": "Network firewall Cisco parse"
+        },
+        "ds_Venhnrnd": {
+            "type": "ds.chain",
+            "options": {
+                "extend": "ds_NZyd5O7D",
+                "query": "| where AccessControlRuleAction=\"Block\" AND IngressInterface=\"outside\" AND EgressInterface=\"inside\" \n| stats count by SrcIP"
+            },
+            "name": "Network firewall Cisco block"
+        },
+        "ds_YH4EKci6": {
+            "type": "ds.chain",
+            "options": {
+                "extend": "ds_NZyd5O7D",
+                "query": "| where (AccessControlRuleAction=\"Allow\" OR AccessControlRuleAction=\"Trust\") AND IngressInterface=\"outside\" AND EgressInterface=\"inside\" \n| stats count by DstPort"
+            },
+            "name": "Network firewall Cisco allow inbound ports"
+        },
+        "ds_sRmY22Kc": {
+            "type": "ds.chain",
+            "options": {
+                "extend": "ds_NZyd5O7D",
+                "query": "| where (AccessControlRuleAction=\"Allow\" OR AccessControlRuleAction=\"Trust\") AND IngressInterface=\"inside\" AND EgressInterface=\"outside\" AND DstPort=53 \n| stats count by DstIP"
+            },
+            "name": "Network firewall Cisco allow DNS"
+        },
+        "ds_rOBGhtCk": {
+            "type": "ds.chain",
+            "options": {
+                "extend": "ds_NZyd5O7D",
+                "query": "| where (AccessControlRuleAction=\"Allow\" OR AccessControlRuleAction=\"Trust\") AND IngressInterface=\"inside\" AND EgressInterface=\"outside\" \n| stats count by DstPort"
+            },
+            "name": "Network firewall Cisco allow outbound ports"
+        },
+        "ds_Aqx1voFp": {
+            "type": "ds.chain",
+            "options": {
+                "extend": "ds_NZyd5O7D",
+                "query": "| table TIME AccessControlRuleName AccessControlRuleAction Protocol SrcIP SrcPort IngressInterface DstIP DstPort EgressInterface \n| sort - _time"
+            },
+            "name": "Network firewall Cisco table"
+        },
+        "ds_49mCGoBV": {
+            "type": "ds.chain",
+            "options": {
+                "query": "| search source IN (\"/var/log/dpkg.log\" \"/var/log/dnf.rpm.log\") \n| regex \"[\\d\\-\\.T: ]+ (SUBDEBUG )?(install|remove|Install|Erase)\" \n| rex \"[\\d\\-\\.T: ]+ (SUBDEBUG )?(?<ACTION>\\w+):? (?<NAME>.*)(-(\\d[\\.:-]?)+-|:[A-Za-z])\" \n| table TIME host source ACTION NAME \n| sort - TIME",
+                "extend": "ds_yWY9H8et"
+            },
+            "name": "Misc packages"
+        },
+        "ds_f5dkhlHH": {
+            "type": "ds.chain",
+            "options": {
+                "query": "| search source=/tmp/* \n| dedup source \n| table TIME host source \n| sort - TIME",
+                "extend": "ds_yWY9H8et"
+            },
+            "name": "Misc tmp files"
+        },
+        "ds_a1qk4nIW": {
+            "type": "ds.chain",
+            "options": {
+                "extend": "ds_SoZZLSey",
+                "query": "| table TIME host Account_Name EventCode MSG Source_Network_Address Source_Port\n| sort - TIME"
+            },
+            "name": "Windows events all table"
+        },
+        "ds_UXAe9i7j": {
+            "type": "ds.chain",
+            "options": {
+                "extend": "ds_SoZZLSey",
+                "query": "| search EventCode IN (4624, 4720, 4722, 4723, 4724, 4725, 4726, 4738, 4740)\n| table TIME host ACCOUNT EventCode Source_Network_Address Source_Port MSG\n| sort - TIME"
+            },
+            "name": "Windows events important table"
+        },
+        "ds_2ko3W7jP": {
+            "type": "ds.chain",
+            "options": {
+                "extend": "ds_HNl99Q7r",
+                "query": "| search sourcetype=\"WinEventLog:Microsoft-Windows-Sysmon/Operational\" NOT *splunk* \n| rename EventType as WinEventType\n| rex mode=sed \"s/(\\n\\w+): (.+)/\\1^\\2/g\" \n| extract pairdelim=\"\\n\", kvdelim=\"^\""
+            },
+            "name": "Windows sysmon parse"
+        },
+        "ds_MfUX80C2": {
+            "type": "ds.chain",
+            "options": {
+                "extend": "ds_2ko3W7jP",
+                "query": "| search EventID IN (11, 23, 26, 27, 29) AND NOT Image IN (\"*wsmprovhost.exe*\" \"*MsMpEng.exe*\" \"*svchost.exe*\")\n| table TIME host EventID ProcessId User IsExecutable Image TargetFilename\n| sort - _time"
+            },
+            "name": "Windows sysmon file monitoring"
+        },
+        "ds_naKdOutr": {
+            "type": "ds.chain",
+            "options": {
+                "extend": "ds_2ko3W7jP",
+                "query": "| search EventID IN (12, 13, 14)\n| eval VALUES=coalesce(Details, NewName) \n| table TIME host EventID ProcessId User EventType Image TargetObject VALUES"
+            },
+            "name": "Windows sysmon registry"
+        },
+        "ds_27hgc3Fj": {
+            "type": "ds.search",
+            "options": {
+                "queryParameters": {
+                    "earliest": "$tr_global_time.earliest$",
+                    "latest": "$tr_global_time.latest$"
+                },
+                "query": "index=auth host IN ($ms_global_hosts$)\n| eval TIME=strftime(_time, \"%D %I:%M:%S %p\")\n| fields *",
+                "refresh": "60s",
+                "refreshType": "delay"
+            },
+            "name": "Auth filtering"
+        },
+        "ds_SjKqyquU": {
+            "type": "ds.search",
+            "options": {
+                "queryParameters": {
+                    "earliest": "$tr_global_time.earliest$",
+                    "latest": "$tr_global_time.latest$"
+                },
+                "query": "index=web host IN ($ms_global_hosts$) \n| eval TIME=strftime(_time, \"%D %I:%M:%S %p\")\n| fields *",
+                "refresh": "60s",
+                "refreshType": "delay"
+            },
+            "name": "Web filtering"
+        },
+        "ds_mfNWBk8w": {
+            "type": "ds.search",
+            "options": {
+                "queryParameters": {
+                    "earliest": "$tr_global_time.earliest$",
+                    "latest": "$tr_global_time.latest$"
+                },
+                "query": "index=service host IN ($ms_global_hosts$) \n| eval TIME=strftime(_time, \"%D %I:%M:%S %p\")\n| fields *",
+                "refresh": "60s",
+                "refreshType": "delay"
+            },
+            "name": "Service filtering"
+        },
+        "ds_ESlEi0dT": {
+            "type": "ds.search",
+            "options": {
+                "queryParameters": {
+                    "earliest": "$tr_global_time.earliest$",
+                    "latest": "$tr_global_time.latest$"
+                },
+                "query": "index=network host IN ($ms_global_hosts$) \n| eval TIME=strftime(_time, \"%D %I:%M:%S %p\")\n| fields *",
+                "refresh": "60s",
+                "refreshType": "delay"
+            },
+            "name": "Network filtering"
+        },
+        "ds_yWY9H8et": {
+            "type": "ds.search",
+            "options": {
+                "queryParameters": {
+                    "earliest": "$tr_global_time.earliest$",
+                    "latest": "$tr_global_time.latest$"
+                },
+                "query": "index=misc host IN ($ms_global_hosts$) \n| eval TIME=strftime(_time, \"%D %I:%M:%S %p\")\n| fields *",
+                "refresh": "60s",
+                "refreshType": "delay"
+            },
+            "name": "Misc filtering"
+        },
+        "ds_HNl99Q7r": {
+            "type": "ds.search",
+            "options": {
+                "queryParameters": {
+                    "earliest": "$tr_global_time.earliest$",
+                    "latest": "$tr_global_time.latest$"
+                },
+                "query": "index=windows host IN ($ms_global_hosts$) \n| eval TIME=strftime(_time, \"%D %I:%M:%S %p\")\n| fields *",
+                "refresh": "60s",
+                "refreshType": "delay"
+            },
+            "name": "Windows filtering"
+        },
+        "ds_EAwYX8gC": {
+            "type": "ds.chain",
+            "options": {
+                "extend": "ds_27hgc3Fj",
+                "query": "| search source IN (\"/var/log/secure\" \"/var/log/auth.log\") \n| regex \"new (user|group)\"\n| rex \"new (?<ENTITY>\\w+): \"\n| table TIME host ENTITY name from\n| sort - TIME"
+            },
+            "name": "Auth new users groups"
+        },
+        "ds_eAb0E3tt": {
+            "type": "ds.chain",
+            "options": {
+                "extend": "ds_27hgc3Fj",
+                "query": "| search source=*users.sh \n| rex \"(?<USER>\\w+)\\s+(?<TERM>.+)\\s+(?<INIT>[\\d\\-]+\\s[\\d:]+)\" \n| rex \".+\\s+\\((?<INFO>.+)\\)$\" \n| eval INIT=strptime(INIT, \"%Y-%m-%d %H:%M\") \n| eval INIT=strftime(INIT, \"%D %I:%M:%S %p\") \n| dedup USER TERM INIT \n| table TIME host INIT USER TERM INFO \n| sort - INIT"
+            },
+            "name": "Auth current sessions"
+        },
+        "ds_gdtjiFjV": {
+            "type": "ds.search",
+            "options": {
+                "queryParameters": {
+                    "earliest": "$tr_global_time.earliest$",
+                    "latest": "$tr_global_time.latest$"
+                },
+                "query": "index=snoopy host IN ($ms_global_hosts$) \n| eval TIME=strftime(_time, \"%D %I:%M:%S %p\")\n| fields *"
+            },
+            "name": "Snoopy filtering"
+        },
+        "ds_MrPNffDr": {
+            "type": "ds.chain",
+            "options": {
+                "extend": "ds_gdtjiFjV",
+                "query": "| rex \"\\[uid:(?<uid>\\d+) sid:(?<sid>\\d+) tty:\\((?<tty>\\w+)\\) cwd:(?<cwd>.+) filename:(?<filename>.+)\\]: (?<cmd>.+)\"\n| table TIME host uid tty cwd cmd\n| sort - TIME"
+            },
+            "name": "Snoopy table"
+        }
+    },
+    "defaults": {
+        "dataSources": {
+            "ds.search": {
+                "options": {
+                    "queryParameters": {}
+                }
+            }
+        }
+    },
+    "inputs": {
+        "input_global_time": {
+            "options": {
+                "defaultValue": "-2h@h,now",
+                "token": "tr_global_time"
+            },
+            "title": "Time",
+            "type": "input.timerange"
+        },
+        "input_global_hosts": {
+            "options": {
+                "items": [
+                    {
+                        "label": "All",
+                        "value": "*"
+                    }
+                ],
+                "token": "ms_global_hosts",
+                "defaultValue": [
+                    "*"
+                ]
+            },
+            "title": "Hosts",
+            "type": "input.multiselect",
+            "dataSources": {
+                "primary": "ds_general_get_hosts"
+            }
+        }
+    },
+    "layout": {
+        "type": "grid",
+        "options": {
+            "height": 3750,
+            "width": 1440
+        },
+        "structure": [
+            {
+                "item": "viz_header_general",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 0,
+                    "w": 1440,
+                    "h": 94
+                }
+            },
+            {
+                "item": "viz_dLjbX2gA",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 94,
+                    "w": 954,
+                    "h": 176
+                }
+            },
+            {
+                "item": "viz_ZI2XixNd",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 270,
+                    "w": 954,
+                    "h": 292
+                }
+            },
+            {
+                "item": "viz_header_auth",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 562,
+                    "w": 1440,
+                    "h": 87
+                }
+            },
+            {
+                "item": "viz_bYb3KRMF",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 649,
+                    "w": 1440,
+                    "h": 496
+                }
+            },
+            {
+                "item": "viz_E8p4Pq2K",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 1145,
+                    "w": 1440,
+                    "h": 691
+                }
+            },
+            {
+                "item": "viz_XIrSSjcx",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 1836,
+                    "w": 654,
+                    "h": 262
+                }
+            },
+            {
+                "item": "viz_JU3NPRx4",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 2098,
+                    "w": 1080,
+                    "h": 477
+                }
+            },
+            {
+                "item": "viz_tumhhQKw",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 2575,
+                    "w": 1440,
+                    "h": 504
+                }
+            },
+            {
+                "item": "viz_bic2dTYx",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 3079,
+                    "w": 1440,
+                    "h": 472
+                }
+            },
+            {
+                "item": "viz_f4hzOM2X",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 3551,
+                    "w": 1440,
+                    "h": 501
+                }
+            },
+            {
+                "item": "viz_header_web",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 4052,
+                    "w": 1440,
+                    "h": 91
+                }
+            },
+            {
+                "item": "viz_KVxvPhPE",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 4143,
+                    "w": 1440,
+                    "h": 442
+                }
+            },
+            {
+                "item": "viz_Y4rMvmx3",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 4585,
+                    "w": 1440,
+                    "h": 714
+                }
+            },
+            {
+                "item": "viz_P1q6lght",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 5299,
+                    "w": 1440,
+                    "h": 435
+                }
+            },
+            {
+                "item": "viz_header_service",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 5734,
+                    "w": 1440,
+                    "h": 91
+                }
+            },
+            {
+                "item": "viz_sku8Ad0C",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 5825,
+                    "w": 1440,
+                    "h": 475
+                }
+            },
+            {
+                "item": "viz_4fquHTfr",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 6300,
+                    "w": 1063,
+                    "h": 480
+                }
+            },
+            {
+                "item": "viz_header_network",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 6780,
+                    "w": 1440,
+                    "h": 102
+                }
+            },
+            {
+                "item": "viz_yIZPLgz5",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 6882,
+                    "w": 1440,
+                    "h": 480
+                }
+            },
+            {
+                "item": "viz_Gma2EcCj",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 7362,
+                    "w": 1440,
+                    "h": 429
+                }
+            },
+            {
+                "item": "viz_S2m8Wozt",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 7791,
+                    "w": 837,
+                    "h": 348
+                }
+            },
+            {
+                "item": "viz_AfC2BCDF",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 8139,
+                    "w": 837,
+                    "h": 332
+                }
+            },
+            {
+                "item": "viz_IfmLrAfJ",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 8471,
+                    "w": 1440,
+                    "h": 519
+                }
+            },
+            {
+                "item": "viz_header_misc",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 8990,
+                    "w": 1440,
+                    "h": 108
+                }
+            },
+            {
+                "item": "viz_SH0xbiuz",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 9098,
+                    "w": 1440,
+                    "h": 503
+                }
+            },
+            {
+                "item": "viz_Cgf6NioU",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 9601,
+                    "w": 1440,
+                    "h": 508
+                }
+            },
+            {
+                "item": "viz_lrRCADQk",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 10109,
+                    "w": 1440,
+                    "h": 99
+                }
+            },
+            {
+                "item": "viz_zVvUuV7r",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 10208,
+                    "w": 1440,
+                    "h": 648
+                }
+            },
+            {
+                "item": "viz_wHzLPk5d",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 10856,
+                    "w": 1440,
+                    "h": 637
+                }
+            },
+            {
+                "item": "viz_fYXpBeqO",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 11493,
+                    "w": 1440,
+                    "h": 622
+                }
+            },
+            {
+                "item": "viz_LF83Uk7B",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 12115,
+                    "w": 1440,
+                    "h": 579
+                }
+            },
+            {
+                "item": "viz_s5txHKcE",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 12694,
+                    "w": 1440,
+                    "h": 106
+                }
+            },
+            {
+                "item": "viz_3LovvxXT",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 12800,
+                    "w": 1440,
+                    "h": 473
+                }
+            },
+            {
+                "item": "viz_ROuTLO56",
+                "type": "block",
+                "position": {
+                    "x": 654,
+                    "y": 1836,
+                    "w": 786,
+                    "h": 262
+                }
+            },
+            {
+                "item": "viz_Bk4MTmR8",
+                "type": "block",
+                "position": {
+                    "x": 837,
+                    "y": 7791,
+                    "w": 603,
+                    "h": 348
+                }
+            },
+            {
+                "item": "viz_Ole10gPx",
+                "type": "block",
+                "position": {
+                    "x": 837,
+                    "y": 8139,
+                    "w": 603,
+                    "h": 332
+                }
+            },
+            {
+                "item": "viz_EQfLTBnN",
+                "type": "block",
+                "position": {
+                    "x": 954,
+                    "y": 94,
+                    "w": 486,
+                    "h": 468
+                }
+            },
+            {
+                "item": "viz_9aVaME0U",
+                "type": "block",
+                "position": {
+                    "x": 1063,
+                    "y": 6300,
+                    "w": 377,
+                    "h": 480
+                }
+            },
+            {
+                "item": "viz_j6InzK8F",
+                "type": "block",
+                "position": {
+                    "x": 1080,
+                    "y": 2098,
+                    "w": 360,
+                    "h": 477
+                }
+            }
+        ],
+        "globalInputs": [
+            "input_global_hosts",
+            "input_global_time"
+        ]
+    },
+    "description": "Slash the bash",
+    "title": "Homedash"
+}
