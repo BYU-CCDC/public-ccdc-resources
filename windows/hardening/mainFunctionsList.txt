@@ -1,0 +1,18 @@
+Disable Users
+Add Competition Users
+Harden RDP
+Configure Firewall
+Disable Unnecessary Services
+Create Good GPO
+Enable Auditing
+Configure Splunk
+Configure Sysmon and Connect to Splunk
+Harden IIS
+Enable UAC
+Install EternalBlue Patch
+Upgrade SMB
+Patch DCSync
+Patch Mimikatz
+Group Management
+Run Windows Updates
+Set Execution Policy

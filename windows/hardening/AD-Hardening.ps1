@@ -1,13 +1,15 @@
 Import-Module ActiveDirectory
 Import-Module GroupPolicy
 
-$ccdcRepoWindowsHardeningPath = "https://github.com/BYU-CCDC/public-ccdc-resources/tree/main/windows/hardening/"
+$ccdcRepoWindowsHardeningPath = "https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main/windows/hardening"
 $portsFile = "ports.json"
-$usersFile = "users.txt"
 $advancedAuditingFile = "advancedAuditing.ps1"
 $patchURLFile = "patchURLs.json"
+$groupManagementFile = "groupManagement.ps1"
+$mainFunctionsFile = "mainFunctionsList.txt"
 
-$neededFiles = @($portsFile, $usersFile, $advancedAuditingFile, $patchURLFile)
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+$neededFiles = @($portsFile, $advancedAuditingFile, $patchURLFile, $groupManagementFile, $mainFunctionsFile)
 foreach ($file in $neededFiles) {
     try {
         if (-not (Test-Path "$pwd\$file")) {
@@ -22,13 +24,40 @@ foreach ($file in $neededFiles) {
     }
 }
 
+Write-Host "All necessary files have been downloaded." -ForegroundColor Green
+Write-Host "Getting Competition Users" -ForegroundColor Magenta
+
+function GetCompetitionUsers {
+    try {
+        # Prompt the user for the first username
+        $user1 = Read-Host "Please enter the first username"
+
+        # Prompt the user for the second username
+        $user2 = Read-Host "Please enter the second username"
+
+        # Combine the usernames with a newline between them
+        $content = "$user1`n$user2"
+
+        # Write the usernames to users.txt in the current directory
+        Set-Content -Path ".\users.txt" -Value $content
+
+        # Notify the user that the file has been created
+        Write-Host "The file users.txt has been created with the provided usernames." -ForegroundColor Green
+    } catch {
+        Write-Host $_.Exception.Message -ForegroundColor Yellow
+        Write-Host "Error Occurred..."
+    }
+}
+GetCompetitionUsers
+$usersFile = "users.txt"
+
 # Get OS version and current user
 $OSVersion = (Get-WmiObject -class Win32_OperatingSystem).Caption
 $CurrentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
 
 # Load userfile and portdata
-[string[]]$UserArray = Get-Content -Path ".\users.txt"
-$PortsObject = Get-Content -Path ".\ports.json" -Raw | ConvertFrom-Json
+[string[]]$UserArray = Get-Content -Path ".\$usersFile"
+$PortsObject = Get-Content -Path ".\$portsFile" -Raw | ConvertFrom-Json
 
 # Get all computer names in the domain
 $ADcomputers = Get-ADComputer -Filter * | Select-Object -ExpandProperty Name
@@ -61,31 +90,51 @@ function GeneratePassword {
     }
 }
 
-# Disable all AD users except the current one
-function MassDisable {
-    try {
-    $currentSamAccountName = $CurrentUser.Split('\')[-1]
+# Check if the function list file exists
+if (Test-Path $mainFunctionsFile) {
+    # Read the function names from the file
+    $functionNames = Get-Content -Path $mainFunctionsFile
+} else {
+    Write-Host "Function list file does not exist: $mainFunctionsFile" -ForegroundColor Red
+    exit
+}
 
-    Get-ADUser -Filter {SamAccountName -ne $currentSamAccountName} |
-    ForEach-Object { Disable-ADAccount -Identity $_ }
-    } catch {
-        Write-Host $_.Exception.Message -ForegroundColor Yellow
-        Write-Host "Error Occurred..."
+# Initialize log hash table
+$log = @{}
+
+# Function to update log
+function Update-Log {
+    param([string]$key, [string]$value)
+    $log[$key] = $value
+}
+
+# Initialize function log based on the loaded list
+function Initialize-Log {
+    foreach ($func in $functionNames) {
+        Update-Log $func "Not executed"
     }
 }
 
-function Disable-Users {
+# Function to print log
+function Print-Log {
+    Write-Host "`n### Script Execution Summary ###`n" -ForegroundColor Green
+    foreach ($entry in $log.GetEnumerator()) {
+        Write-Host "$($entry.Key): $($entry.Value)"
+    }
+}
+
+# Disable all AD users except the current one
+function Mass-Disable {
+    Write-Host "Disabling all users except $CurrentUser..."
     try {
-        $confirmation = Prompt-Yes-No -Message "Mass disable users (y/n)?"
-            if ($confirmation.toLower() -eq "y") {
-                MassDisable
-                Write-Host "All users disabled but your own" -ForegroundColor Red
-            } else {
-                Write-Host "Skipping..." -ForegroundColor Red
-            }
+        $currentSamAccountName = $CurrentUser.Split('\')[-1]
+        Get-ADUser -Filter {SamAccountName -ne $currentSamAccountName} |
+        ForEach-Object { Disable-ADAccount -Identity $_ }
+        Update-Log "Disable Users" "Executed successfully"
     } catch {
-        Write-Host $_.Exception.Message
-        Write-Host "Error disabling users. Revisit later." -ForegroundColor Yellow
+        Write-Host $_.Exception.Message -ForegroundColor Yellow
+        Write-Host "Error Occurred..."
+        Update-Log "Disable Users" "Failed with error: $($_.Exception.Message)"
     }
 }
 
@@ -184,12 +233,14 @@ function Add-Competition-Users {
 		$userOutput = Print-Users
 		if ($userOutput -ne $null) {
 			$outputText = $userOutput -join "`n`n"
-			$outputText | Out-File -FilePath "UserPerms.txt" -Encoding UTF8
+			$outputText | Out-File -FilePath ".\UserPerms.txt" -Encoding UTF8
 			Write-Host "`nUser permissions have been exported to .\UserPerms.txt" -ForegroundColor Green
 		}
+        Update-Log "Add Competition Users" "Executed successfully"
     } catch {
         Write-Host $_.Exception.Message -ForegroundColor Yellow
         Write-Host "Error Occurred..."
+        Update-Log "Add Competition Users" "Failed with error: $($_.Exception.Message)"
     }
 }
 
@@ -201,9 +252,11 @@ function Remove-RDP-Users {
         ForEach-Object {
             Remove-ADGroupMember -identity "Remote Desktop Users" -members $_ -Confirm:$false
         }
+        Update-Log "Harden RDP" "Executed successfully"
     } catch {
         Write-Host $_.Exception.Message -ForegroundColor Yellow
         Write-Host "Error Occurred..."
+        Update-Log "Harden RDP" "Failed with error: $($_.Exception.Message)"
     }
 }
 
@@ -376,9 +429,11 @@ function Configure-Firewall {
             # Re-enable the firewall profiles
             netsh advfirewall set allprofiles state on
         }
+        Update-Log "Configure Firewall" "Executed successfully"
     } catch {
         Write-Host $_.Exception.Message -ForegroundColor Yellow
         Write-Host "Error Occurred..."
+        Update-Log "Configure Firewall" "Failed with error: $($_.Exception.Message)"
     }
 }
 
@@ -402,9 +457,11 @@ function Disable-Unnecessary-Services {
             # Disable NetBIOS over TCP/IP (NetbiosOptions = 2)
             $adapter.SetTcpipNetbios(2)
         }
+        Update-Log "Disable Unnecessary Services" "Executed successfully"
     } catch {
         Write-Host $_.Exception.Message -ForegroundColor Yellow
         Write-Host "Error Occurred..."
+        Update-Log "Disable Unnecessary Services" "Failed with error: $($_.Exception.Message)"
     }
 }
 
@@ -513,9 +570,11 @@ function Create-Good-GPO {
 		Read-Host " "
 		Set-GPLink -Name $GPOName -Target $domainDN -Enforced Yes
 		Write-Host "GPO fully and successfully configured and enforced!" -ForegroundColor Green
+        Update-Log "Create Good GPO" "Executed successfully"
     } catch {
         Write-Host $_.Exception.Message -ForegroundColor Yellow
         Write-Host "Error Occurred..."
+        Update-Log "Create Good GPO" "Failed with error: $($_.Exception.Message)"
     }
 }
 
@@ -764,24 +823,26 @@ function Download-Install-Setup-Splunk {
 
         # Clean up the downloaded MSI file
         Remove-Item $path
+        Update-Log "Configure Splunk" "Executed successfully"
     } catch {
         Write-Host $_.Exception.Message -ForegroundColor Yellow
         Write-Host "Error Occurred..."
+        Update-Log "Configure Splunk" "Failed with error: $($_.Exception.Message)"
     }
 }
 
 function Install-EternalBluePatch {
     try {
-        $patchURLs = Get-Content -Raw -Path "patchURLs.json" | ConvertFrom-Json
+        $patchURLsFromJSON = Get-Content -Raw -Path $patchURLFile | ConvertFrom-Json
         # Determine patch URL based on OS version keywords
         $patchURL = switch -Regex ($osVersion) {
-            '(?i)Vista'  { $patchURLs.Vista; break }
-            'Windows 7'  { $patchURLs.'Windows 7'; break }
-            'Windows 8'  { $patchURLs.'Windows 8'; break }
-            '2008 R2'    { $patchURLs.'2008 R2'; break }
-            '2008'       { $patchURLs.'2008'; break }
-            '2012 R2'    { $patchURLs.'2012 R2'; break }
-            '2012'       { $patchURLs.'2012'; break }
+            '(?i)Vista'  { $patchURLsFromJSON.Vista; break }
+            'Windows 7'  { $patchURLsFromJSON.'Windows 7'; break }
+            'Windows 8'  { $patchURLsFromJSON.'Windows 8'; break }
+            '2008 R2'    { $patchURLsFromJSON.'2008 R2'; break }
+            '2008'       { $patchURLsFromJSON.'2008'; break }
+            '2012 R2'    { $patchURLsFromJSON.'2012 R2'; break }
+            '2012'       { $patchURLsFromJSON.'2012'; break }
             default { throw "Unsupported OS version: $osVersion" }
         }
 		Write-Host $patchURL
@@ -800,9 +861,11 @@ function Install-EternalBluePatch {
         Remove-Item -Path $path -Force
 
         Write-Host "Patch for $OSVersion installed successfully!" -ForegroundColor Green
+        Update-Log "Install EternalBlue Patch" "Executed successfully"
     } catch {
         Write-Host $_.Exception.Message -ForegroundColor Yellow
         Write-Host "Error Occurred..."
+        Update-Log "Install EternalBlue Patch" "Failed with error: $($_.Exception.Message)"
     }
 }
 
@@ -836,9 +899,11 @@ function Upgrade-SMB {
         if ($restart -eq $true) {
             Write-Host "Please consider restarting the machine for changes to take effect." -ForegroundColor Red
         }
+        Update-Log "Upgrade SMB" "Executed successfully"
     } catch {
         Write-Host $_.Exception.Message -ForegroundColor Yellow
         Write-Host "Error Occurred..."
+        Update-Log "Upgrade SMB" "Failed with error: $($_.Exception.Message)"
     }
 }
 
@@ -859,9 +924,11 @@ function Patch-DCSync-Vuln {
                 Write-Host "Permission to Sync AD granted to:" $ACL.IdentityReference
             }
         }
+        Update-Log "Patch DCSync" "Executed successfully"
     } catch {
         Write-Host $_.Exception.Message -ForegroundColor Yellow
         Write-Host "Error Occurred..."
+        Update-Log "Patch DCSync" "Failed with error: $($_.Exception.Message)"
     }
 }
 
@@ -885,14 +952,16 @@ function Patch-Mimikatz {
         } else {
             Write-Host "Registry key path not found: $registryPath"
         }
+        Update-Log "Patch Mimikatz" "Executed successfully"
     } catch {
         Write-Host $_.Exception.Message -ForegroundColor Yellow
         Write-Host "Error Occurred..."
+        Update-Log "Patch Mimikatz" "Failed with error: $($_.Exception.Message)"
     }
 }
 
 function Run-Windows-Updates {
-    try{
+    try {
         # Restart Windows Update service
         Restart-Service -Name wuauserv
 
@@ -902,7 +971,7 @@ function Run-Windows-Updates {
         Start-Service -Name wuauserv
 
         # Check for disk space
-        $diskSpace = Get-WmiObject -Class Win32_LogicalDisk -Filter "DeviceID='C:'" | Select-Object -ExpandProperty FreeSpace
+        $diskSpace = Get-CimInstance -ClassName Win32_LogicalDisk -Filter "DeviceID='C:'" | Select-Object -ExpandProperty FreeSpace
         if ($diskSpace -lt 1073741824) { # 1 GB in bytes
             Write-Host "Insufficient disk space available on the system drive. Please free up disk space and try again."
             exit
@@ -946,16 +1015,194 @@ function Run-Windows-Updates {
         } else {
             Write-Host "No updates available."
         }
+        Update-Log "Run Windows Updates" "Executed successfully"
     } catch {
         Write-Host $_.Exception.Message -ForegroundColor Yellow
         Write-Host "Error Occurred..."
+        Update-Log "Run Windows Updates" "Failed with error: $($_.Exception.Message)"
     }
 }
 
+function Harden-IIS {
+    try {
+        C:\windows\system32\inetsrv\appcmd.exe set config /section:directoryBrowse /enabled:false
+        C:\windows\system32\inetsrv\appcmd.exe set config -section:anonymousAuthentication /username:"" --password
+        C:\windows\system32\inetsrv\appcmd.exe set config /commit:WEBROOT /section:sessionState /cookieless:UseCookies /cookieName:ASP.NET_SessionID /timeout:20 
+        C:\windows\system32\inetsrv\appcmd.exe set config /commit:WEBROOT /section:machineKey /validation:SHA1
+        C:\windows\system32\inetsrv\appcmd.exe set config /section:requestfiltering /requestLimits.maxAllowedContentLength:300000
+        C:\windows\system32\inetsrv\appcmd.exe set config /section:requestfiltering /requestLimits.maxURL:4096
+        C:\windows\system32\inetsrv\appcmd.exe set config /section:requestfiltering /requestLimits.maxQueryString:2048
+        C:\windows\system32\inetsrv\appcmd.exe set config /section:requestfiltering /allowHighBitCharacters:false
+        C:\windows\system32\inetsrv\appcmd.exe set config /section:requestfiltering /allowDoubleEscaping:false
+        C:\windows\system32\inetsrv\appcmd.exe set config /section:requestfiltering /+verbs.[verb='TRACE',allowed='false']
+        C:\windows\system32\inetsrv\appcmd.exe set config /section:requestfiltering /fileExtensions.allowunlisted:false
+        C:\windows\system32\inetsrv\appcmd.exe set config /section:handlers /accessPolicy:Read
+        C:\windows\system32\inetsrv\appcmd.exe set config -section:system.webServer/security/isapiCgiRestriction /notListedIsapisAllowed:false
+        C:\windows\system32\inetsrv\appcmd.exe set config -section:system.webServer/security/isapiCgiRestriction /notListedCgisAllowed:false
+        Update-Log "Harden IIS" "Executed successfully"
+    } catch {
+        Write-Host $_.Exception.Message -ForegroundColor Yellow
+        Write-Host "Error Occurred..."
+        Update-Log "Harden IIS" "Failed with error: $($_.Exception.Message)"
+    }
+}
 
-Disable-Users
+function Enable-UAC {
+    try {
+        $registryPath = "REGISTRY::HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Policies\System"
+        $propertyName = "ConsentPromptBehaviorAdmin"
+        $newValue = 1 # This means that every time administrator actions are wanted, a password is required
+
+        if (Test-Path $registryPath) {
+            Set-ItemProperty -Path $registryPath -Name $propertyName -Value $newValue
+            Write-Host "Registry key updated successfully."
+        } else {
+            Write-Host "Registry key does not exist."
+        }
+        Update-Log "Enable UAC" "Executed successfully"
+    } catch {
+        Write-Host $_.Exception.Message -ForegroundColor Yellow
+        Write-Host "Error Occurred..."
+        Update-Log "Enable UAC" "Failed with error: $($_.Exception.Message)"
+    }
+}
+
+function Group-Management {
+    try {
+        & ".\$groupManagementFile"
+        Update-Log "Group Management" "Executed successfully"
+    } catch {
+        Write-Host $_.Exception.Message -ForegroundColor Yellow
+        Write-Host "Error Occurred..."
+        Update-Log "Group Management" "Failed with error: $($_.Exception.Message)"
+    }
+}
+
+function Enable-Auditing {
+    try {
+        Write-Host "`n***Enabling advanced auditing...***" -ForegroundColor Magenta
+        & ".\$advancedAuditingFile"
+        Write-Host "Enabling Firewall logging successful and blocked connections..." -ForegroundColor Green
+        Set-NetFirewallProfile -Profile Domain,Public,Private -LogAllowed True -LogBlocked True
+        Update-Log "Enable Auditing" "Executed successfully"
+    } catch {
+        Write-Host $_.Exception.Message -ForegroundColor Yellow
+        Write-Host "Error Occurred..."
+        Update-Log "Enable Auditing" "Failed with error: $($_.Exception.Message)"
+    }
+}
+
+function Configure-Sysmon-Connect-Splunk {
+    try {
+        # Define base URL and local directory for the Sysmon files
+        $sysmonPath = "$ccdcRepoWindowsHardeningPath/sysmon"
+        $localSysmonDir = ".\sysmon"
+
+        # Ensure the Sysmon directory exists
+        if (-not (Test-Path $localSysmonDir)) {
+            New-Item -Path $localSysmonDir -ItemType Directory
+        }
+
+        # File names to be downloaded
+        $sysmonZip = "Sysmon.zip"
+        $configXml = "sysmonconfig-export.xml"
+
+        # Full paths for the files to be saved
+        $sysmonZipPath = Join-Path $localSysmonDir $sysmonZip
+        $configXmlPath = Join-Path $localSysmonDir $configXml
+
+        # Download Sysmon and the configuration file using Invoke-WebRequest
+        Write-Host "Downloading Sysmon..."
+        Invoke-WebRequest -Uri "$sysmonPath/$sysmonZip" -OutFile $sysmonZipPath
+
+        Write-Host "Downloading Sysmon configuration..."
+        Invoke-WebRequest -Uri "$sysmonPath/$configXml" -OutFile $configXmlPath
+
+        # Unzip Sysmon
+        Write-Host "Extracting Sysmon..."
+        $sysmonExtractPath = Join-Path $localSysmonDir "extracted"
+        Expand-Archive -Path $sysmonZipPath -DestinationPath $sysmonExtractPath -Force
+
+        # Install Sysmon with the configuration file
+        Write-Host "Installing Sysmon with configuration..."
+        Start-Process -FilePath "$sysmonExtractPath\Sysmon.exe" -ArgumentList "-accepteula -i $configXmlPath" -Wait -NoNewWindow
+
+        # Define the Splunk Universal Forwarder inputs.conf path
+        $splunkInputsConfPath = "C:\Program Files\SplunkUniversalForwarder\etc\system\local\inputs.conf"
+
+        # Ensure the directory for inputs.conf exists
+        if (-not (Test-Path (Split-Path -Path $splunkInputsConfPath -Parent))) {
+            New-Item -Path (Split-Path -Path $splunkInputsConfPath -Parent) -ItemType Directory -Force
+        }
+
+        # Define the new Splunk input configuration for Sysmon
+        $sysmonInputsConf = @"
+[WinEventLog://Microsoft-Windows-Sysmon/Operational]
+disabled = false
+index = windows
+sourcetype = XmlWinEventLog:Microsoft-Windows-Sysmon
+renderXml=false
+"@
+
+        # Check if the specific Sysmon configuration already exists in inputs.conf
+        if (Test-Path $splunkInputsConfPath) {
+            $inputsContent = Get-Content -Path $splunkInputsConfPath -Raw
+            if ($inputsContent -notmatch 'WinEventLog://Microsoft-Windows-Sysmon/Operational') {
+                Write-Host "Appending new Sysmon configuration to inputs.conf..."
+                if ($inputsContent -ne "") {
+                    # Ensure two new lines precede the new configuration if the file isn't empty
+                    $sysmonInputsConf = "`n`n" + $sysmonInputsConf
+                }
+                Add-Content -Path $splunkInputsConfPath -Value $sysmonInputsConf
+            } else {
+                Write-Host "Sysmon configuration already exists in inputs.conf."
+            }
+        } else {
+            Write-Host "Creating new inputs.conf and adding Sysmon configuration..."
+            Add-Content -Path $splunkInputsConfPath -Value $sysmonInputsConf
+        }
+
+        # Restart Splunk Universal Forwarder to apply changes
+        Write-Host "Restarting Splunk Universal Forwarder to apply changes..."
+        Stop-Service -Name SplunkForwarder
+        Start-Service -Name SplunkForwarder
+
+        Write-Host "Sysmon installation and Splunk configuration complete." -ForegroundColor Green
+        Update-Log "Configure Sysmon and Connect to Splunk" "Executed successfully"
+    } catch {
+        Write-Host $_.Exception.Message -ForegroundColor Yellow
+        Write-Host "Error Occurred..."
+        Update-Log "Configure Sysmon and Connect to Splunk" "Failed with error: $($_.Exception.Message)"
+    }
+}
+
+###################################### MAIN ######################################
 
 
+Initialize-Log
+
+
+# Group-Management
+$confirmation = Prompt-Yes-No -Message "Do Group Management? (y/n)"
+if ($confirmation.toLower() -eq "y") {
+    Write-Host "`n***Doing Group Management...***" -ForegroundColor Magenta
+    Group-Management
+} else {
+    Write-Host "Skipping..." -ForegroundColor Red
+}
+
+
+# Mass Disable Users
+$confirmation = Prompt-Yes-No -Message "Disable every user but your own? (y/n)"
+if ($confirmation.toLower() -eq "y") {
+    Mass-Disable
+    Write-Host "All users disabled but your own" -ForegroundColor Red
+} else {
+    Write-Host "Skipping..." -ForegroundColor Red
+}
+
+
+# Add Competition Users
 $confirmation = Prompt-Yes-No -Message "Enter the 'Add Competition Users' function? (y/n)"
 if ($confirmation.toLower() -eq "y") {
     Write-Host "`n***Adding Competition Users...***" -ForegroundColor Magenta
@@ -965,6 +1212,7 @@ if ($confirmation.toLower() -eq "y") {
 }
 
 
+# Harden RDP
 $confirmation = Prompt-Yes-No -Message "Enter the 'Remove users from RDP group except $($UserArray[0]) and $($UserArray[1])' function? (y/n)"
 if ($confirmation.toLower() -eq "y") {
     Write-Host "`n***Removing every user from RDP group except $($UserArray[0]) and $($UserArray[1])...***" -ForegroundColor Magenta
@@ -974,29 +1222,30 @@ if ($confirmation.toLower() -eq "y") {
 }
 
 
+# Configure Firewall
 $confirmation = Prompt-Yes-No -Message "Enter the 'Configure Firewall' function? (y/n)"
 if ($confirmation.toLower() -eq "y") {
-    Write-Host "`n***Configuring firewall***" -ForegroundColor Magenta
+    Write-Host "`n***Configuring firewall...***" -ForegroundColor Magenta
     Configure-Firewall
 } else {
     Write-Host "Skipping..." -ForegroundColor Red
 }
 
 
+# Disable Unnecessary Services
 $confirmation = Prompt-Yes-No -Message "Enter the 'Disable unnecessary services (NetBIOS over TCP/IP, IPv6, closed port services)' function? (y/n)"
 if ($confirmation.toLower() -eq "y") {
-    Write-Host "`n***Disabling unnecessary services***" -ForegroundColor Magenta
+    Write-Host "`n***Disabling unnecessary services...***" -ForegroundColor Magenta
     Disable-Unnecessary-Services
 } else {
     Write-Host "Skipping..." -ForegroundColor Red
 }
 
 
-
-
+# Create Blank GPO
 $confirmation = Prompt-Yes-No -Message "Enter the 'Create Blank GPO with Correct Permissions' function? (y/n)"
 if ($confirmation.toLower() -eq "y") {
-    Write-Host "`n***Creating Blank GPO and applying to Root of domain***" -ForegroundColor Magenta
+    Write-Host "`n***Creating Blank GPO and applying to Root of domain...***" -ForegroundColor Magenta
 	Create-Good-GPO
 } else {
     Write-Host "Skipping..." -ForegroundColor Red
@@ -1012,46 +1261,123 @@ if ($confirmation.toLower() -eq "y") {
 # }
 
 
-Write-Host "`n***Enabling advanced auditing***" -ForegroundColor Magenta
-.\advancedAuditing.ps1
-Write-Host "Enabling Firewall logging successful and blocked connections" -ForegroundColor Green
-Set-NetFirewallProfile -Profile Domain,Public,Private -LogAllowed True -LogBlocked True
+# Configure Auditing
+$confirmation = Prompt-Yes-No -Message "Enable Advanced Auditing and Firewall Logging? (y/n)"
+if ($confirmation.toLower() -eq "y") {
+    Enable-Auditing
+} else {
+    Write-Host "Skipping..." -ForegroundColor Red
+}
 
 
+# Configure Splunk
 $confirmation = Prompt-Yes-No -Message "Enter the 'Configure Splunk' function? (y/n)"
 if ($confirmation.toLower() -eq "y") {
-    Write-Host "`n***Configuring Splunk***" -ForegroundColor Magenta
+    Write-Host "`n***Configuring Splunk...***" -ForegroundColor Magenta
     $SplunkIP = Read-Host "`nInput IP address of Splunk Server"
     Download-Install-Setup-Splunk -IP $SplunkIP
 } else {
     Write-Host "Skipping..." -ForegroundColor Red
 }
 
-
-Write-Host "`n***Installing EternalBlue Patch***" -ForegroundColor Magenta
-Install-EternalBluePatch
-
-
-Write-Host "`n***Upgrading SMB***" -ForegroundColor Magenta
-Upgrade-SMB
-
-
-Write-Host "`n***Patching DCSync Vulns***" -ForegroundColor Magenta
-Patch-DCSync-Vuln
-
-
-Write-Host "`n***Patching Mimikatz***" -ForegroundColor Magenta
-Patch-Mimikatz
-
-
-$confirmation = Prompt-Yes-No -Message "Enter the 'Run Windows Updates' function? (y/n) This might take a while"
+# Configure Sysmon and Connect to Splunk
+$confirmation = Prompt-Yes-No -Message "Enter the 'Configure Sysmon and Connect to Splunk' function? (y/n)"
 if ($confirmation.toLower() -eq "y") {
-    Write-Host "`n***Running Windows Updater***" -ForegroundColor Magenta
+    Write-Host "`n***Configuring Sysmon and Connecting to Splunk...***" -ForegroundColor Magenta
+    Configure-Sysmon-Connect-Splunk
+} else {
+    Write-Host "Skipping..." -ForegroundColor Red
+}
+
+
+# Harden IIS
+$confirmation = Prompt-Yes-No -Message "Enter the 'Harden IIS' function? THIS ONLY WORKS WITH IIS 7.0 AND OLDER (y/n)"
+if ($confirmation.toLower() -eq "y") {
+    Write-Host "`n***Hardening IIS...***" -ForegroundColor Magenta
+    Harden-IIS
+} else {
+    Write-Host "Skipping..." -ForegroundColor Red
+}
+
+
+# Enable UAC With Password
+$confirmation = Prompt-Yes-No -Message "Enable UAC with Password? (y/n)"
+if ($confirmation.toLower() -eq "y") {
+    Write-Host "`n***Enabling UAC with the key set to 1, always prompting password...***" -ForegroundColor Magenta
+    Enable-UAC
+} else {
+    Write-Host "Skipping..." -ForegroundColor Red
+}
+
+
+# Install EternalBlue Patch
+$confirmation = Prompt-Yes-No -Message "Install EternalBlue Patch? (y/n)"
+if ($confirmation.toLower() -eq "y") {
+    Write-Host "`n***Installing EternalBlue Patch...***" -ForegroundColor Magenta
+    Install-EternalBluePatch
+} else {
+    Write-Host "Skipping..." -ForegroundColor Red
+}
+
+
+# Upgrade SMB
+$confirmation = Prompt-Yes-No -Message "Upgrade SMB? (y/n)"
+if ($confirmation.toLower() -eq "y") {
+    Write-Host "`n***Upgrading SMB...***" -ForegroundColor Magenta
+    Upgrade-SMB
+} else {
+    Write-Host "Skipping..." -ForegroundColor Red
+}
+
+
+# Patch DCSync Vulnerability
+$confirmation = Prompt-Yes-No -Message "Patch DCSync? (y/n)"
+if ($confirmation.toLower() -eq "y") {
+    Write-Host "`n***Patching DCSync...***" -ForegroundColor Magenta
+    Patch-DCSync-Vuln
+} else {
+    Write-Host "Skipping..." -ForegroundColor Red
+}
+
+
+# Patch Mimikatz
+$confirmation = Prompt-Yes-No -Message "Patch Mimikatz? (y/n)"
+if ($confirmation.toLower() -eq "y") {
+    Write-Host "`n***Patching Mimikatz...***" -ForegroundColor Magenta
+    Patch-Mimikatz
+} else {
+    Write-Host "Skipping..." -ForegroundColor Red
+}
+
+# Run Windows Updates
+$confirmation = Prompt-Yes-No -Message "Enter the 'Run Windows Updates' function? THIS WILL TAKE A WHILE... (y/n)"
+if ($confirmation.toLower() -eq "y") {
+    Write-Host "`n***Running Windows Updater...***" -ForegroundColor Magenta
     Run-Windows-Updates
 } else {
     Write-Host "Skipping..." -ForegroundColor Red
 }
 
 
-Write-Host "***Setting Execution Policy back to Restricted***" -ForegroundColor Red
-Set-ExecutionPolicy Restricted
+#Set Execution Policy back to Restricted
+$confirmation = Prompt-Yes-No -Message "Set Execution Policy back to Restricted? (y/n)"
+if ($confirmation.toLower() -eq "y") {
+    try {
+        Write-Host "`n***Setting Execution Policy back to Restricted...***" -ForegroundColor Magenta
+        Set-ExecutionPolicy Restricted
+        Update-Log "Set Execution Policy" "Executed successfully"
+    } catch {
+        Write-Host $_.Exception.Message -ForegroundColor Yellow
+        Write-Host "Error Occurred..."
+        Update-Log "Set Execution Policy" "Failed with error: $($_.Exception.Message)"
+    }
+} else {
+    Write-Host "Skipping..." -ForegroundColor Red
+}
+
+
+Write-Host "`n***Script Completed!!!***" -ForegroundColor Green
+Print-Log
+
+
+###################################### MAIN ######################################
