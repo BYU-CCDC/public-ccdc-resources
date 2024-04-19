@@ -1181,6 +1181,17 @@ renderXml=false
 
 Initialize-Log
 
+
+# Group-Management
+$confirmation = Prompt-Yes-No -Message "Do Group Management? (y/n)"
+if ($confirmation.toLower() -eq "y") {
+    Write-Host "`n***Doing Group Management...***" -ForegroundColor Magenta
+    Group-Management
+} else {
+    Write-Host "Skipping..." -ForegroundColor Red
+}
+
+
 # Mass Disable Users
 $confirmation = Prompt-Yes-No -Message "Disable every user but your own? (y/n)"
 if ($confirmation.toLower() -eq "y") {
@@ -1337,17 +1348,6 @@ if ($confirmation.toLower() -eq "y") {
 } else {
     Write-Host "Skipping..." -ForegroundColor Red
 }
-
-
-# Group-Management
-$confirmation = Prompt-Yes-No -Message "Do Group Management? (y/n)"
-if ($confirmation.toLower() -eq "y") {
-    Write-Host "`n***Doing Group Management...***" -ForegroundColor Magenta
-    Group-Management
-} else {
-    Write-Host "Skipping..." -ForegroundColor Red
-} # TODO: PUT THIS AT THE TOP
-
 
 # Run Windows Updates
 $confirmation = Prompt-Yes-No -Message "Enter the 'Run Windows Updates' function? THIS WILL TAKE A WHILE... (y/n)"
