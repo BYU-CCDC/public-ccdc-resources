@@ -13,6 +13,6 @@ Install EternalBlue Patch
 Upgrade SMB
 Patch DCSync
 Patch Mimikatz
-Group Mangement
+Group Management
 Run Windows Updates
 Set Execution Policy
