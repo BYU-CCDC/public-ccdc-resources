@@ -62,7 +62,7 @@
                         "width": 30
                     },
                     "COMMAND": {
-                        "width": 86
+                        "width": 64
                     },
                     "_time": {
                         "width": 47
@@ -303,10 +303,10 @@
                 "showInternalFields": false,
                 "columnFormat": {
                     "key": {
-                        "width": 161
+                        "width": 147
                     },
                     "type": {
-                        "width": 116
+                        "width": 82
                     },
                     "host": {
                         "width": 134
@@ -318,7 +318,7 @@
                         "width": 63
                     },
                     "AUID": {
-                        "width": 60
+                        "width": 92
                     },
                     "exe": {
                         "width": 262
@@ -922,7 +922,7 @@
             "type": "ds.chain",
             "options": {
                 "extend": "ds_27hgc3Fj",
-                "query": "| search source=\"/var/log/audit/audit.log\" key=CCDC* \n| table TIME host type key UID AUID tty exe success \n| sort - TIME"
+                "query": "| search source=\"/var/log/audit/audit.log\" key=CCDC* \n| search NOT ((key=CCDC_modify_binaries OR key=CCDC_modify_initd) AND (exe=*dpkg OR exe=*update-alternatives))\n| table TIME host type key UID AUID tty exe success \n| sort - TIME"
             },
             "name": "Auth CCDC audit"
         },

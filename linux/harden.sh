@@ -231,7 +231,14 @@ function setup {
         sudo $lpm install -y zip &> /dev/null
         logger "zip package installed"
     fi
-
+    # Needed for splunk script
+    if command -v unzip &> /dev/null; then
+        echo "unzip is installed. Proceeding"
+    else
+        echo "unzip is not installed. Installing..."
+        sudo $lpm install -y unzip &> /dev/null
+        logger "unzip package installed"
+    fi
     check_for_scored_users
 
 }
