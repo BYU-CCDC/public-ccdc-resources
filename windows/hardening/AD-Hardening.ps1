@@ -5,11 +5,11 @@ $ccdcRepoWindowsHardeningPath = "https://raw.githubusercontent.com/BYU-CCDC/publ
 $portsFile = "ports.json"
 $advancedAuditingFile = "advancedAuditing.ps1"
 $patchURLFile = "patchURLs.json"
-$suspiciousServicesFile = "suspiciousServices.ps1"
+$groupManagementFile = "groupManagement.ps1"
 $mainFunctionsFile = "mainFunctionsList.txt"
 
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-$neededFiles = @($portsFile, $advancedAuditingFile, $patchURLFile, $suspiciousServicesFile, $mainFunctionsFile)
+$neededFiles = @($portsFile, $advancedAuditingFile, $patchURLFile, $groupManagementFile, $mainFunctionsFile)
 foreach ($file in $neededFiles) {
     try {
         if (-not (Test-Path "$pwd\$file")) {
@@ -1069,7 +1069,7 @@ function Enable-UAC {
 
 function Group-Management {
     try {
-        & $suspiciousServicesFile
+        & ".\$groupManagementFile"
         Update-Log "Group Management" "Executed successfully"
     } catch {
         Write-Host $_.Exception.Message -ForegroundColor Yellow
@@ -1081,7 +1081,7 @@ function Group-Management {
 function Enable-Auditing {
     try {
         Write-Host "`n***Enabling advanced auditing...***" -ForegroundColor Magenta
-        & $advancedAuditingFile
+        & ".\$advancedAuditingFile"
         Write-Host "Enabling Firewall logging successful and blocked connections..." -ForegroundColor Green
         Set-NetFirewallProfile -Profile Domain,Public,Private -LogAllowed True -LogBlocked True
         Update-Log "Enable Auditing" "Executed successfully"
@@ -1111,14 +1111,12 @@ function Configure-Sysmon-Connect-Splunk {
         $sysmonZipPath = Join-Path $localSysmonDir $sysmonZip
         $configXmlPath = Join-Path $localSysmonDir $configXml
 
-        # Download Sysmon and the configuration file using WebClient
-        $wc = New-Object System.Net.WebClient
-
+        # Download Sysmon and the configuration file using Invoke-WebRequest
         Write-Host "Downloading Sysmon..."
-        $wc.DownloadFile("$sysmonPath/$sysmonZip", $sysmonZipPath)
+        Invoke-WebRequest -Uri "$sysmonPath/$sysmonZip" -OutFile $sysmonZipPath
 
         Write-Host "Downloading Sysmon configuration..."
-        $wc.DownloadFile("$sysmonPath/$configXml", $configXmlPath)
+        Invoke-WebRequest -Uri "$sysmonPath/$configXml" -OutFile $configXmlPath
 
         # Unzip Sysmon
         Write-Host "Extracting Sysmon..."
