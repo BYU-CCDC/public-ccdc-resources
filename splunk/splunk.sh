@@ -2,44 +2,27 @@
 # Usage: ./splunk.sh <option> <forward-server-ip>
 # Use `indexer` as the forward-server-ip to install the indexer
 
-################### DOWNLOAD URLS ###################
+###################### GLOBALS ######################
+DEBUG_LOG='/var/log/ccdc/setup/splunk.log'
+GITHUB_URL='https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main'
+INDEXES=( 'system' 'web' 'network' 'windows' 'misc' 'snoopy' )
+# Download URLs
 IP="$2"
 if [ "$IP" == "indexer" ] || [ "$IP" == "i" ]; then
     IP="indexer"
-    deb="https://download.splunk.com/products/splunk/releases/9.2.1/linux/splunk-9.2.1-78803f08aabb-linux-2.6-amd64.deb"
-    rpm="https://download.splunk.com/products/splunk/releases/9.2.1/linux/splunk-9.2.1-78803f08aabb.x86_64.rpm"
-    tgz="https://download.splunk.com/products/splunk/releases/9.2.1/linux/splunk-9.2.1-78803f08aabb-Linux-x86_64.tgz"
+    deb="https://download.splunk.com/products/splunk/releases/9.2.2/linux/splunk-9.2.2-d76edf6f0a15-linux-2.6-amd64.deb"
+    rpm="https://download.splunk.com/products/splunk/releases/9.2.2/linux/splunk-9.2.2-d76edf6f0a15.x86_64.rpm"
+    tgz="https://download.splunk.com/products/splunk/releases/9.2.2/linux/splunk-9.2.2-d76edf6f0a15-Linux-x86_64.tgz"
     SPLUNKDIR="/opt/splunk"
 else
-    deb="https://download.splunk.com/products/universalforwarder/releases/9.2.1/linux/splunkforwarder-9.2.1-78803f08aabb-linux-2.6-amd64.deb"
-    rpm="https://download.splunk.com/products/universalforwarder/releases/9.2.1/linux/splunkforwarder-9.2.1-78803f08aabb.x86_64.rpm"
-    tgz="https://download.splunk.com/products/universalforwarder/releases/9.2.1/linux/splunkforwarder-9.2.1-78803f08aabb-Linux-x86_64.tgz"
-    arm_deb="https://download.splunk.com/products/universalforwarder/releases/9.2.1/linux/splunkforwarder-9.2.1-78803f08aabb-Linux-armv8.deb"
-    arm_rpm="https://download.splunk.com/products/universalforwarder/releases/9.2.1/linux/splunkforwarder-9.2.1-78803f08aabb.aarch64.rpm"
-    arm_tgz="https://download.splunk.com/products/universalforwarder/releases/9.2.1/linux/splunkforwarder-9.2.1-78803f08aabb-Linux-armv8.tgz"
-    ppcle="https://download.splunk.com/products/universalforwarder/releases/9.2.1/linux/splunkforwarder-9.2.1-78803f08aabb-Linux-ppc64le.tgz"
-    s90="https://download.splunk.com/products/universalforwarder/releases/9.2.1/linux/splunkforwarder-9.2.1-78803f08aabb-Linux-s390x.tgz"
-    mac="https://download.splunk.com/products/universalforwarder/releases/9.2.1/osx/splunkforwarder-9.2.1-78803f08aabb-darwin-universal2.dmg"
-    freebsd="https://download.splunk.com/products/universalforwarder/releases/9.2.1/freebsd/splunkforwarder-9.2.1-78803f08aabb-FreeBSD-amd64.tgz"
-    solaris_sparc_z="https://download.splunk.com/products/universalforwarder/releases/9.2.1/solaris/splunkforwarder-9.2.1-78803f08aabb-SunOS-sparc.tar.Z"
-    solaris_sparc_p5p="https://download.splunk.com/products/universalforwarder/releases/9.2.1/solaris/splunkforwarder-9.2.1-78803f08aabb-solaris-sparc.p5p"
-    solaris_64_z="https://download.splunk.com/products/universalforwarder/releases/9.2.1/solaris/splunkforwarder-9.2.1-78803f08aabb-SunOS-x86_64.tar.Z"
-    solaris_64_p5p="https://download.splunk.com/products/universalforwarder/releases/9.2.1/solaris/splunkforwarder-9.2.1-78803f08aabb-solaris-intel.p5p"
-    aix="https://download.splunk.com/products/universalforwarder/releases/9.2.1/aix/splunkforwarder-9.2.1-78803f08aabb-AIX-powerpc.tgz"
+    deb="https://download.splunk.com/products/universalforwarder/releases/9.2.2/linux/splunkforwarder-9.2.2-d76edf6f0a15-linux-2.6-amd64.deb"
+    rpm="https://download.splunk.com/products/universalforwarder/releases/9.2.2/linux/splunkforwarder-9.2.2-d76edf6f0a15.x86_64.rpm"
+    tgz="https://download.splunk.com/products/universalforwarder/releases/9.2.2/linux/splunkforwarder-9.2.2-d76edf6f0a15-Linux-x86_64.tgz"
+    arm_deb="https://download.splunk.com/products/universalforwarder/releases/9.2.2/linux/splunkforwarder-9.2.2-d76edf6f0a15-Linux-armv8.deb"
+    arm_rpm="https://download.splunk.com/products/universalforwarder/releases/9.2.2/linux/splunkforwarder-9.2.2-d76edf6f0a15.aarch64.rpm"
+    arm_tgz="https://download.splunk.com/products/universalforwarder/releases/9.2.2/linux/splunkforwarder-9.2.2-d76edf6f0a15-Linux-armv8.tgz"
     SPLUNKDIR="/opt/splunkforwarder"
 fi
-#####################################################
-
-###################### INDEXES ######################
-INDEXES=( 'auth' 'web' 'service' 'network' 'windows' 'misc' 'snoopy' )
-#####################################################
-
-##################### GITHUB URL ####################
-GITHUB_URL='https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main'
-#####################################################
-
-##################### DEBUG LOG #####################
-DEBUG_LOG='/tmp/splunk_log.txt'
 #####################################################
 
 ###################### FUNCTIONS ######################
@@ -115,7 +98,6 @@ function print_banner {
     echo "#"
     echo "#######################################"
     echo
-    sleep 2
 }
 
 # Downloads and installs correct version for distribution
@@ -141,7 +123,6 @@ function install_splunk {
                 echo
                 sudo wget -O splunk.tgz "$tgz"
                 echo "******* Extracting to $SPLUNKDIR *******"
-                sleep 2
                 sudo tar -xvf splunk.tgz -C /opt/ &> /dev/null
             ;;
             arm_deb )
@@ -161,7 +142,6 @@ function install_splunk {
                 echo
                 sudo wget -O splunk.tgz "$arm_tgz"
                 echo "******* Extracting to $SPLUNKDIR *******"
-                sleep 2
                 sudo tar -xvf splunk.tgz -C /opt/ &> /dev/null
             ;;
             # catch all statement that either downloads the pkg or provides the user with a list of potential command line options
@@ -206,7 +186,6 @@ function setup_indexer {
 
 # Installs splunk
 function setup_splunk {
-    sleep 2
     if [[ $2 == "" ]]; then 
         echo "[X] ERROR: Please provide the IP of the central splunk instance"
         echo "Usage: ./splunk.sh <option> <forward-server-ip>"
@@ -226,11 +205,11 @@ function setup_splunk {
 function add_monitor {
     source=$1
     index=$2
-    if sudo [ -e "${source}" ]; then
+    if sudo [ -e "$source" ]; then
         sudo $SPLUNKDIR/bin/splunk add monitor "$source" -index "$index"
-        # echo "[*] Added monitor for ${source}"
+        # echo "[*] Added monitor for $source"
     else
-        echo "[X] ERROR: No file or dir found at ${source}"
+        echo "[X] ERROR: No file or dir found at $source"
     fi
 }
 
@@ -253,22 +232,20 @@ function add_system_logs {
     print_banner "Adding various system logs"
     echo "[*] Some of these will fail due to distribution differences"
 
-    INDEX="service"
-    add_monitor "/etc/services" "${INDEX}"
-    add_monitor "/etc/systemd/" "${INDEX}"
-    add_monitor "/etc/init.d/" "${INDEX}"
-    add_monitor "/etc/profile.d/" "${INDEX}"
-    add_monitor "/var/log/cron" "${INDEX}"
-    add_monitor "/var/log/syslog" "${INDEX}"
-
-    INDEX="auth"
-    add_monitor "/var/log/auth.log" "${INDEX}"
-    add_monitor "/var/log/secure" "${INDEX}"
-    add_monitor "/var/log/audit/audit.log" "${INDEX}"
-    add_monitor "/var/log/messages" "${INDEX}"
+    INDEX="system"
+    # add_monitor "/etc/services" "$INDEX"
+    # add_monitor "/etc/systemd/" "$INDEX"
+    # add_monitor "/etc/init.d/" "$INDEX"
+    # add_monitor "/etc/profile.d/" "$INDEX"
+    # add_monitor "/var/log/cron" "$INDEX" # this probably won't exist by default
+    add_monitor "/var/log/syslog" "$INDEX"
+    add_monitor "/var/log/auth.log" "$INDEX"
+    add_monitor "/var/log/secure" "$INDEX"
+    add_monitor "/var/log/audit/audit.log" "$INDEX"
+    add_monitor "/var/log/messages" "$INDEX"
 
     INDEX="misc"
-    add_monitor "/tmp/" "${INDEX}"
+    # add_monitor "/tmp/" "$INDEX"
 }
 
 # Adds monitors for firewall logs
@@ -276,7 +253,7 @@ function add_firewall_logs {
     print_banner "Adding firewall logs"
     INDEX="network"
     
-    if command -v firewalld &>/dev/null; then
+    if sudo command -v firewalld &>/dev/null; then
         echo "[*] firewalld detected"
         FIREWALL_LOG="/var/log/firewalld"
 
@@ -284,9 +261,9 @@ function add_firewall_logs {
         sudo firewall-cmd --set-log-denied=all
 
         echo "[*] Adding firewalld error logs"
-        add_monitor "${FIREWALL_LOG}" "${INDEX}"
+        add_monitor "$FIREWALL_LOG" "$INDEX"
         echo "[*] firewalld access logs contained in /var/log/messages (already added)"
-    elif command -v ufw &>/dev/null; then
+    elif sudo command -v ufw &>/dev/null; then
         echo "[*] ufw detected"
         FIREWALL_LOG="/var/log/ufw.log"
 
@@ -296,10 +273,10 @@ function add_firewall_logs {
         sudo ufw status | awk '/^[0-9]/ { print $1 }' | while read -r INPUT; do sudo ufw allow log "$INPUT"; done
 
         echo "[*] Adding monitors for ufw logs"
-        # sudo touch "${FIREWALL_LOG}"
-        add_monitor "${FIREWALL_LOG}" "${INDEX}"
+        # sudo touch "$FIREWALL_LOG"
+        add_monitor "$FIREWALL_LOG" "$INDEX"
         echo "[*] ufw logs also contained in /var/log/syslog"
-    elif command -v iptables &>/dev/null; then
+    elif sudo command -v iptables &>/dev/null; then
         echo "[*] iptables detected"
         FIREWALL_LOG="/var/log/iptables.log"
 
@@ -311,8 +288,8 @@ function add_firewall_logs {
         # sudo iptables -A FORWARD -j LOG --log-prefix "iptables: " --log-level $LOGGING_LEVEL
         
         echo "[*] Adding monitors for iptables"
-        # sudo touch "${FIREWALL_LOG}"
-        add_monitor "${FIREWALL_LOG}" "${INDEX}"
+        # sudo touch "$FIREWALL_LOG"
+        add_monitor "$FIREWALL_LOG" "$INDEX"
     else
         echo "[X] ERROR: No firewall found. Please forward logs manually."
     fi
@@ -326,43 +303,43 @@ function add_package_logs {
     if command -v dpkg &>/dev/null; then
         echo "[*] Adding monitors for dpkg logs"
         PACKAGE_LOGS="/var/log/dpkg.log"
-        add_monitor "${PACKAGE_LOGS}" "${INDEX}"
+        add_monitor "$PACKAGE_LOGS" "$INDEX"
     fi
 
     if command -v apt &>/dev/null; then
         echo "[*] Adding monitors for apt logs"
         PACKAGE_LOGS="/var/log/apt/history.log"
-        add_monitor "${PACKAGE_LOGS}" "${INDEX}"
+        add_monitor "$PACKAGE_LOGS" "$INDEX"
     fi
 
     if command -v dnf &>/dev/null; then
         echo "[*] Adding monitors for dnf logs"
         PACKAGE_LOGS="/var/log/dnf.rpm.log"
-        add_monitor "${PACKAGE_LOGS}" "${INDEX}"
+        add_monitor "$PACKAGE_LOGS" "$INDEX"
     fi
 
     if command -v yum &>/dev/null; then
         echo "[*] Adding monitors for yum logs"
         PACKAGE_LOGS="/var/log/yum.log"
-        add_monitor "${PACKAGE_LOGS}" "${INDEX}"
+        add_monitor "$PACKAGE_LOGS" "$INDEX"
     fi
 
     if command -v zypper &>/dev/null; then
         echo "[*] Adding monitors for zypper logs"
         PACKAGE_LOGS="/var/log/zypp/history"
-        add_monitor "${PACKAGE_LOGS}" "${INDEX}"
+        add_monitor "$PACKAGE_LOGS" "$INDEX"
     fi
 }
 
 # Adds monitors for ssh keys
 function add_ssh_key_logs {
     print_banner "Adding user ssh key logs"
-    INDEX="auth"
+    INDEX="system"
     for dir in /home/*; do
         if [ -d "$dir" ]; then
             if [ -d "$dir/.ssh" ]; then
-                echo "[*] Adding ${dir}/.ssh/"
-                add_monitor "${dir}/.ssh" "${INDEX}"
+                echo "[*] Adding $dir/.ssh/"
+                add_monitor "$dir/.ssh" "$INDEX"
             fi
         fi
     done
@@ -377,20 +354,20 @@ function add_web_logs {
         echo "Adding monitors for Apache logs"
         APACHE_ACCESS="/var/log/apache2/access.log"
         APACHE_ERROR="/var/log/apache2/error.log"
-        add_monitor "${APACHE_ACCESS}" "${INDEX}"
-        add_monitor "${APACHE_ERROR}" "${INDEX}"
+        add_monitor "$APACHE_ACCESS" "$INDEX"
+        add_monitor "$APACHE_ERROR" "$INDEX"
     elif [ -d "/var/log/httpd/" ]; then
         echo "[*] Adding monitors for Apache logs"
         APACHE_ACCESS="/var/log/httpd/access_log"
         APACHE_ERROR="/var/log/httpd/error_log"
-        add_monitor "${APACHE_ACCESS}" "${INDEX}"
-        add_monitor "${APACHE_ERROR}" "${INDEX}"
+        add_monitor "$APACHE_ACCESS" "$INDEX"
+        add_monitor "$APACHE_ERROR" "$INDEX"
     elif [ -d "/var/log/lighttpd/" ]; then
         echo "[*] Adding monitor for lighttpd error logs"
         # LIGHTTPD_ACCESS="/var/log/lighhtpd/access.log"
         LIGHTTPD_ERROR="/var/log/lighttpd/error.log"
-        # add_monitor "${LIGHTTPD_ACCESS}" "${INDEX}"
-        add_monitor "${LIGHTTPD_ERROR}" "${INDEX}"
+        # add_monitor "$LIGHTTPD_ACCESS" "$INDEX"
+        add_monitor "$LIGHTTPD_ERROR" "$INDEX"
         print_banner "Please manually modify lighttpd config file in /etc/lighttpd/lighttpd.conf."
         echo "[*] Add \"mod_accesslog\" in server.modules, and at the bottom of the file add \`accesslog.filename = \"/var/log/lighttpd/access.log\"\`"
         echo "[*] Then, add a Splunk monitor for /var/log/lighttpd/access.log"
@@ -398,8 +375,8 @@ function add_web_logs {
         echo "[*] Adding monitors for Nginx logs"
         NGINX_ACCESS="/var/log/nginx/access.log"
         NGINX_ERROR="/var/log/nginx/error.log"
-        add_monitor "${NGINX_ACCESS}" "${INDEX}"
-        add_monitor "${NGINX_ERROR}" "${INDEX}"
+        add_monitor "$NGINX_ACCESS" "$INDEX"
+        add_monitor "$NGINX_ERROR" "$INDEX"
     else
         echo "[*] Did not find webserver (Apache, Nginx, or lighttpd) on this system."
     fi
@@ -412,7 +389,7 @@ function add_mysql_logs {
     INDEX="web"
     MYSQL_CONFIG="/etc/mysql/my.cnf" # Adjust the path based on your system
 
-    if [ -f "${MYSQL_CONFIG}" ]; then
+    if [ -f "$MYSQL_CONFIG" ]; then
         # Make sure there's actually a MySQL or MariaDB service
         if command -v systemctl &> /dev/null; then
             if ! sudo systemctl status mysql &> /dev/null && ! sudo systemctl status mariadb &> /dev/null; then
@@ -451,10 +428,10 @@ function add_mysql_logs {
             echo "[X] ERROR: Unable to restart MySQL. Please restart the MySQL service manually."
         fi
 
-        # sudo touch "${GENERAL_LOG}"
-        # sudo touch "${ERROR_LOG}"
-        add_monitor "${GENERAL_LOG}" "${INDEX}"
-        add_monitor "${ERROR_LOG}" "${INDEX}"
+        # sudo touch "$GENERAL_LOG"
+        # sudo touch "$ERROR_LOG"
+        add_monitor "$GENERAL_LOG" "$INDEX"
+        add_monitor "$ERROR_LOG" "$INDEX"
     else
         echo "[*] Did not find MySQL on this system."
     fi
@@ -466,13 +443,14 @@ function install_ccdc_app {
     sudo wget $GITHUB_URL/splunk_setup/ccdc-app.zip
     sudo unzip ccdc-app.zip
     sudo mv ccdc-app $SPLUNKDIR/etc/apps/ccdc-app
+    sudo chown -R splunk:splunk $SPLUNKDIR/etc/apps/ccdc-app
 }
 
 # Adds scripted inputs
 function add_scripts {
     print_banner "Adding scripted inputs"
     echo "[*] Adding user sessions script"
-    add_script "$SPLUNKDIR/etc/apps/ccdc-app/bin/sessions.sh" "auth" "180" "ccdc-sessions"
+    add_script "$SPLUNKDIR/etc/apps/ccdc-app/bin/sessions.sh" "system" "180" "ccdc-sessions"
 }
 
 # Adds monitors for the Splunk indexer service itself
@@ -483,7 +461,7 @@ function add_indexer_web_logs {
     SPLUNK_WEB_ACCESS="/opt/splunk/var/log/splunk/web_access.log"
 
     echo "[*] Adding monitors for Splunk web logs"
-    add_monitor "${SPLUNK_WEB_ACCESS}" "${INDEX}"
+    add_monitor "$SPLUNK_WEB_ACCESS" "$INDEX"
 }
 
 # Asks the user to specify additional logs to add
@@ -492,7 +470,7 @@ function add_additional_logs {
 
     echo "[*] Indexes:" "${INDEXES[@]}"
     for index in "${INDEXES[@]}"; do
-        echo "[*] Would you like to add additional log sources for index '${index}'?"
+        echo "[*] Would you like to add additional log sources for index '$index'?"
         read -r -p "(y/n): " option
         option=$(echo "$option" | tr -d ' ') # truncates any spaces accidentally put in
 
@@ -508,7 +486,7 @@ function add_additional_logs {
                 fi
             done
             for source in "${sources[@]}"; do
-                add_monitor "${source}" "${index}"
+                add_monitor "$source" "$index"
             done
         fi
     done
@@ -563,7 +541,7 @@ function install_auditd {
     sudo wget $GITHUB_URL/splunk_setup/auditd.sh
     sudo chmod +x auditd.sh
     ./auditd.sh
-    add_monitor "/var/log/audit/audit.log" "auth"
+    add_monitor "/var/log/audit/audit.log" "system"
 }
 
 # Install snoopy for bash logging
@@ -610,10 +588,10 @@ function install_snoopy {
 ######################## MAIN #######################
 function main {
     echo "CURRENT TIME: $(date +"%Y-%m-%d_%H:%M:%S")"
-    echo "[*] Starting script"
+    echo "[*] Start of script"
 
     if [ "$1" == "print" ]; then
-        # prints urls of the Splunk forwarders
+        # prints download urls for Splunk
         echo "Linux deb (deb): $deb"
         echo
         echo "Linux rpm (rpm): $rpm"
@@ -627,22 +605,8 @@ function main {
             echo 
             echo "Linux ARM tgz (arm_tgz): $arm_tgz"
             echo 
-            echo "Linux s390 (s90): $s90"
-            echo
-            echo "Linux PPCLE (ppcle): $ppcle"
-            echo
-            echo "OSX M1/Intel (mac): $mac"
-            echo
-            echo "FreeBSD (freebsd): $freebsd"
-            echo
-            echo "Solaris:
-            - Sparc .tar.Z (solaris_sparc_z): $solaris_sparc_z
-            - Sparc .p5p (solaris_sparc_p5p): $solaris_sparc_p5p
-            - 64-bit .tar.Z (solaris_64_z): $solaris_64_z
-            - 64-bit .p5p (solaris_64_p5p): $solaris_64_p5p"
-            echo
-            echo "AIX (aix): $aix"
         fi
+        echo "A full list of URLs can be found in the markdown page on Github"
         exit
     fi
 
@@ -663,18 +627,27 @@ function main {
     # fi
 
     add_additional_logs
+    sudo $SPLUNKDIR/bin/splunk stop
 
-    print_banner "Restarting Splunk"
-    sleep 1
-    sudo $SPLUNKDIR/bin/splunk restart
+    # Enable starting on boot
+    sudo $SPLUNKDIR/bin/splunk enable boot-start -systemd-managed 1
+
+    print_banner "Starting Splunk"
+    sudo $SPLUNKDIR/bin/splunk start
 
     print_banner "End of script"
     echo "[*] You can add future additional monitors with 'sudo $SPLUNKDIR/bin/splunk add monitor <PATH> -index <INDEX>'"
     echo "[*] You can add future additional scripted inputs with 'sudo $SPLUNKDIR/bin/splunk add exec <PATH> -interval <SECONDS> -index <INDEX>'"
     echo "  - place any scripts in the $SPLUNKDIR/etc/apps/ccdc-app/bin/ directory"
-    echo "[*] A debug log is located in /tmp/splunk_log.txt"
+    echo "[*] A debug log is located at $DEBUG_LOG"
     echo
 }
 
-main "$@" 2>&1 | tee -a $DEBUG_LOG 
+DEBUG_LOG_PATH=$(dirname "$DEBUG_LOG")
+if [ ! -d "$DEBUG_LOG_PATH" ]; then
+    sudo mkdir -p "$DEBUG_LOG_PATH"
+    sudo chown root:root "$DEBUG_LOG_PATH"
+    sudo chmod 755 "$DEBUG_LOG_PATH"
+fi
+main "$@" 2>&1 | sudo tee -a $DEBUG_LOG
 #####################################################
