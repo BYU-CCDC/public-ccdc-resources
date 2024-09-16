@@ -73,12 +73,12 @@ def format_template(template, item, indexer=False):
     elif name.endswith('ppc64le.rpm'):
         # PPCLE RPM
         return template.replace('$PPCLE_RPM', url)
-    elif name.endswith('intel.dmg'):
+    elif name.endswith('darwin-intel.dmg'):
         # Mac Intel DMG
         if indexer:
             return template.replace('$INDEXER_MAC_INTEL_DMG', url)
         return template.replace('$MAC_INTEL_DMG', url)
-    elif name.endswith('darwin-64.tgz'):
+    elif name.endswith('darwin-intel.tgz'):
         # Mac Intel TGZ
         if indexer:
             return template.replace('$INDEXER_MAC_INTEL_TGZ', url)
@@ -89,12 +89,18 @@ def format_template(template, item, indexer=False):
     elif name.endswith('darwin-universal2.tgz'):
         # Mac Universal TGZ
         return template.replace('$MAC_UNIV_TGZ', url)
-    elif name.endswith('FreeBSD-amd64.tgz'):
-        # FreeBSD TGZ
-        return template.replace('$FREEBSD_TGZ', url)
-    elif name.endswith('freebsd-amd64.txz'):
-        # FreeBSD TXZ
-        return template.replace('$FREEBSD_TXZ', url)
+    elif name.endswith('freebsd12-amd64.tgz'):
+        # FreeBSD 12 TGZ
+        return template.replace('$FREEBSD12_TGZ', url)
+    elif name.endswith('freebsd12-amd64.txz'):
+        # FreeBSD 12 TXZ
+        return template.replace('$FREEBSD12_TXZ', url)
+    elif name.endswith('freebsd13-amd64.tgz'):
+        # FreeBSD 13 TGZ
+        return template.replace('$FREEBSD13_TGZ', url)
+    elif name.endswith('freebsd13-amd64.txz'):
+        # FreeBSD 13 TXZ
+        return template.replace('$FREEBSD13_TXZ', url)
     elif name.endswith('solaris-sparc.p5p'):
         # Solaris Sparc P5P
         return template.replace('$SOLARIS_SPARC_P5P', url)
@@ -117,7 +123,7 @@ def format_template(template, item, indexer=False):
 markdown_template = '''\
 # Splunk Download URLs
 ## Indexer
-Windows x64 (64 bit): [$INDEXER_WINDOWS_X64]($INDEXER_WINDOWS_X64)<br>
+Windows x64 (64 bit) msi: [$INDEXER_WINDOWS_X64]($INDEXER_WINDOWS_X64)<br>
 Linux .tgz: [$INDEXER_TGZ]($INDEXER_TGZ)<br>
 Linux .deb: [$INDEXER_DEB]($INDEXER_DEB)<br>
 Linux .rpm: [$INDEXER_RPM]($INDEXER_RPM)<br>
@@ -125,8 +131,8 @@ Mac Intel .dmg: [$INDEXER_MAC_INTEL_DMG]($INDEXER_MAC_INTEL_DMG)<br>
 Mac Intel .tgz: [$INDEXER_MAC_INTEL_TGZ]($INDEXER_MAC_INTEL_TGZ)<br>
 
 ## Forwarder
-Windows x64 (64 bit): [$WINDOWS_X64]($WINDOWS_X64)<br>
-Windows x86 (32 bit): [$WINDOWS_X86]($WINDOWS_X86)<br>
+Windows x64 (64 bit) msi: [$WINDOWS_X64]($WINDOWS_X64)<br>
+Windows x86 (32 bit) msi: [$WINDOWS_X86]($WINDOWS_X86)<br>
 Linux .tgz: [$TGZ]($TGZ)<br>
 Linux .deb: [$DEB]($DEB)<br>
 Linux .rpm: [$RPM]($RPM)<br>
@@ -141,8 +147,10 @@ Mac Intel .dmg: [$MAC_INTEL_DMG]($MAC_INTEL_DMG)<br>
 Mac Intel .tgz: [$MAC_INTEL_TGZ]($MAC_INTEL_TGZ)<br>
 Mac Universal .dmg: [$MAC_UNIV_DMG]($MAC_UNIV_DMG)<br>
 Mac Universal .tgz: [$MAC_UNIV_TGZ]($MAC_UNIV_TGZ)<br>
-FreeBSD .tgz: [$FREEBSD_TGZ]($FREEBSD_TGZ)<br>
-FreeBSD .txz: [$FREEBSD_TXZ]($FREEBSD_TXZ)<br>
+FreeBSD12 .tgz: [$FREEBSD12_TGZ]($FREEBSD12_TGZ)<br>
+FreeBSD12 .txz: [$FREEBSD12_TXZ]($FREEBSD12_TXZ)<br>
+FreeBSD13 .tgz: [$FREEBSD13_TGZ]($FREEBSD13_TGZ)<br>
+FreeBSD13 .txz: [$FREEBSD13_TXZ]($FREEBSD13_TXZ)<br>
 Solaris Sparc .p5p: [$SOLARIS_SPARC_P5P]($SOLARIS_SPARC_P5P)<br>
 Solaris Sparc .z: [$SOLARIS_SPARC_Z]($SOLARIS_SPARC_Z)<br>
 Solaris Intel .p5p: [$SOLARIS_INTEL_P5P]($SOLARIS_INTEL_P5P)<br>
@@ -166,14 +174,17 @@ arm_tgz="$ARM_TGZ"
 '''
 
 if __name__ == '__main__':
+    print('Fetching Indexer URLs...')
     for item in fetch_links(indexer_url):
         bash_template = format_template(bash_template, item, True)
         markdown_template = format_template(markdown_template, item, True)
 
+    print('Fetching Universal Forwarder URLs...')
     for item in fetch_links(uf_url):
         bash_template = format_template(bash_template, item, False)
         markdown_template = format_template(markdown_template, item, False)
     
+    print()
     print('Markdown:')
     print(markdown_template)
     print('Bash:')

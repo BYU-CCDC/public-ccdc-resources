@@ -10,17 +10,17 @@ INDEXES=( 'system' 'web' 'network' 'windows' 'misc' 'snoopy' )
 IP="$2"
 if [ "$IP" == "indexer" ] || [ "$IP" == "i" ]; then
     IP="indexer"
-    deb="https://download.splunk.com/products/splunk/releases/9.2.2/linux/splunk-9.2.2-d76edf6f0a15-linux-2.6-amd64.deb"
-    rpm="https://download.splunk.com/products/splunk/releases/9.2.2/linux/splunk-9.2.2-d76edf6f0a15.x86_64.rpm"
-    tgz="https://download.splunk.com/products/splunk/releases/9.2.2/linux/splunk-9.2.2-d76edf6f0a15-Linux-x86_64.tgz"
+    deb="https://download.splunk.com/products/splunk/releases/9.3.1/linux/splunk-9.3.1-0b8d769cb912-linux-2.6-amd64.deb"
+    rpm="https://download.splunk.com/products/splunk/releases/9.3.1/linux/splunk-9.3.1-0b8d769cb912.x86_64.rpm"
+    tgz="https://download.splunk.com/products/splunk/releases/9.3.1/linux/splunk-9.3.1-0b8d769cb912-Linux-x86_64.tgz"
     SPLUNKDIR="/opt/splunk"
 else
-    deb="https://download.splunk.com/products/universalforwarder/releases/9.2.2/linux/splunkforwarder-9.2.2-d76edf6f0a15-linux-2.6-amd64.deb"
-    rpm="https://download.splunk.com/products/universalforwarder/releases/9.2.2/linux/splunkforwarder-9.2.2-d76edf6f0a15.x86_64.rpm"
-    tgz="https://download.splunk.com/products/universalforwarder/releases/9.2.2/linux/splunkforwarder-9.2.2-d76edf6f0a15-Linux-x86_64.tgz"
-    arm_deb="https://download.splunk.com/products/universalforwarder/releases/9.2.2/linux/splunkforwarder-9.2.2-d76edf6f0a15-Linux-armv8.deb"
-    arm_rpm="https://download.splunk.com/products/universalforwarder/releases/9.2.2/linux/splunkforwarder-9.2.2-d76edf6f0a15.aarch64.rpm"
-    arm_tgz="https://download.splunk.com/products/universalforwarder/releases/9.2.2/linux/splunkforwarder-9.2.2-d76edf6f0a15-Linux-armv8.tgz"
+    deb="https://download.splunk.com/products/universalforwarder/releases/9.3.1/linux/splunkforwarder-9.3.1-0b8d769cb912-linux-2.6-amd64.deb"
+    rpm="https://download.splunk.com/products/universalforwarder/releases/9.3.1/linux/splunkforwarder-9.3.1-0b8d769cb912.x86_64.rpm"
+    tgz="https://download.splunk.com/products/universalforwarder/releases/9.3.1/linux/splunkforwarder-9.3.1-0b8d769cb912-Linux-x86_64.tgz"
+    arm_deb="https://download.splunk.com/products/universalforwarder/releases/9.3.1/linux/splunkforwarder-9.3.1-0b8d769cb912-Linux-armv8.deb"
+    arm_rpm="https://download.splunk.com/products/universalforwarder/releases/9.3.1/linux/splunkforwarder-9.3.1-0b8d769cb912.aarch64.rpm"
+    arm_tgz="https://download.splunk.com/products/universalforwarder/releases/9.3.1/linux/splunkforwarder-9.3.1-0b8d769cb912-Linux-armv8.tgz"
     SPLUNKDIR="/opt/splunkforwarder"
 fi
 #####################################################
@@ -31,14 +31,14 @@ function print_options {
     echo "Usage: ./splunk.sh <option> <forward-server-ip>"
     echo "Use \`indexer\` as the forward-server-ip to install the indexer"
     echo "OPTIONS: 
-    -> deb (debian-based distros)
+    -> deb (Debian-based distros)
     -> rpm (RHEL-based distros)
     -> tgz (generic .tgz file)
     -> arm_debian (deb for ARM machines)
     -> arm_rpm (rpm for ARM machines)
     -> arm_tgz (tgz for ARM machines)
-    -> * (replace * with name of variable obtained from print to download any package)
-    -> print (prints all urls)"
+    -> * (replace * with the name of a variable obtained from print to download any package)
+    -> print (prints all URLs)"
     echo
     exit 1
 }
@@ -629,8 +629,11 @@ function main {
     add_additional_logs
     sudo $SPLUNKDIR/bin/splunk stop
 
-    # Enable starting on boot
+    print_banner "Enabling systemd service"
     sudo $SPLUNKDIR/bin/splunk enable boot-start -systemd-managed 1
+
+    # Fixes weird permissions bug that happens sometimes
+    # sudo chown -R splunk:splunk $SPLUNKDIR
 
     print_banner "Starting Splunk"
     sudo $SPLUNKDIR/bin/splunk start
@@ -638,7 +641,7 @@ function main {
     print_banner "End of script"
     echo "[*] You can add future additional monitors with 'sudo $SPLUNKDIR/bin/splunk add monitor <PATH> -index <INDEX>'"
     echo "[*] You can add future additional scripted inputs with 'sudo $SPLUNKDIR/bin/splunk add exec <PATH> -interval <SECONDS> -index <INDEX>'"
-    echo "  - place any scripts in the $SPLUNKDIR/etc/apps/ccdc-app/bin/ directory"
+    echo "[*] Place these scripts in the $SPLUNKDIR/etc/apps/ccdc-app/bin/ directory"
     echo "[*] A debug log is located at $DEBUG_LOG"
     echo
 }
