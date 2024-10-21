@@ -17,6 +17,7 @@ These tools usually don't have installers or packages and can only be accessed t
 ## Security monitoring
 - [Artillery](https://github.com/BinaryDefense/artillery) - Security monitoring tool
 - [Security Onion 2](https://github.com/Security-Onion-Solutions/securityonion) - Security monitoring and log management platform
+- [Windows Event Log](https://www.ultimatewindowssecurity.com/securitylog/encyclopedia/default.aspx) - Reference for Windows Event IDs
 
 ## Threat hunting
 - [HELK](https://github.com/Cyb3rWard0g/HELK) - Threat hunting platform
