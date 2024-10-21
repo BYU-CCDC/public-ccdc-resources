@@ -251,8 +251,8 @@ function setup_splunk {
     if [ "$IP" == "indexer" ]; then
         setup_indexer
         # TODO: add firewall rules
-        sudo iptables -I INPUT 1 -p tcp -m multiport --dport 8000,9443 -j ACCEPT
-        sudo iptables -I INPUT 1 -p tcp --dport 9997 -j ACCEPT
+        # sudo iptables -I INPUT 1 -p tcp -m multiport --dport 8000,9443 -j ACCEPT
+        # sudo iptables -I INPUT 1 -p tcp --dport 9997 -j ACCEPT
     else
         setup_forward_server "$IP"
     fi
