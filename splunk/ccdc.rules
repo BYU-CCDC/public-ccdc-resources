@@ -1,48 +1,32 @@
 ###### CUSTOM CCDC RULES ######
 ### SYSTEM FILES ###
-# modification of /etc/passwd file
+# modification of sensitive files and directories
 -w /etc/passwd -p w -k CCDC_modify_passwd
-
-# modification of /etc/shadow file
 -w /etc/shadow -p w -k CCDC_modify_shadow
-
-# modification of /etc/services file
 -w /etc/services -p w -k CCDC_modify_services
-
-# modification of /etc/systemd/ directory
 -w /etc/systemd/ -p w -k CCDC_modify_systemd
-
-# modification of /etc/init.d/ directory
 -w /etc/init.d/ -p w -k CCDC_modify_initd
-
-# modification of /etc/profile.d/ directory
--w /etc/profile.d/ -p w -k CCDC_modify_profiled
-
-# modification of sshd config
+-w /etc/init/ -p w -k CCDC_modify_initd
+-w /etc/profile.d/ -p w -k CCDC_modify_profile
+-w /etc/profile -p w -k CCDC_modify_profile
 -w /etc/ssh/ -p w -k CCDC_modify_ssh_config
-
-# modification of global bashrc
 -w /etc/bash.bashrc -p w -k CCDC_modify_bashrc_global
 -w /etc/bashrc -p w -k CCDC_modify_bashrc_global
-
-### BINARIES ###
-# execution of passwd binary
--w /usr/bin/passwd -p x -k CCDC_exec_passwd
-
-# execution of whoami binary
--w /usr/bin/whoami -p x -k CCDC_exec_whoami
-
-# execution of useradd and adduser binaries
--w /usr/sbin/useradd -p x -k CCDC_exec_useradd
--w /usr/sbin/adduser -p x -k CCDC_exec_adduser
-
-# new shell
-#-w /bin/bash -p x -k CCDC_new_shell
-
-# modification or addition of binaries
+-w /etc/sudoers -p w -k CCDC_modify_sudoers
+-w /etc/sudoers.d/ -p w -k CCDC_modify_sudoers
+-w /etc/pam.d/ -p w -k CCDC_modify_pamd
+-w /tmp/ -p w -k CCDC_modify_tmp
 -w /usr/sbin/ -p w -k CCDC_modify_binaries
 -w /usr/bin/ -p w -k CCDC_modify_binaries
 -w /bin/ -p w -k CCDC_modify_binaries
+
+### BINARIES ###
+# execution of suspicious binaries
+-w /usr/bin/passwd -p x -k CCDC_exec_passwd
+-w /usr/bin/whoami -p x -k CCDC_exec_whoami
+-w /usr/sbin/useradd -p x -k CCDC_exec_useradd
+-w /usr/sbin/adduser -p x -k CCDC_exec_adduser
+#-w /bin/bash -p x -k CCDC_new_shell
 
 ### SYSCALLS ###
 # execve activity by web users (web shell)
