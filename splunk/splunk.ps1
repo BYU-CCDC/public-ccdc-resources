@@ -34,56 +34,37 @@ function error {
     )
     Write-Host "[X]" $msg
 }
-#####################################################
 
-print "Start of script"
-print "Please run this in an Adminstrator prompt. 3 seconds to CTRL + C if this is not the csae..."
-# Start-Sleep -Seconds 3
-
-# Set TLS 1.2 for compatability with older systems
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-
-$msi = ""
-if ($arch -eq 64) {
-    switch ($version) {
-        "7" {
-            $msi = $7_3_9_x64 # technically this is not supported for 7 
+function detect_version {
+    if ($arch -eq 64) {
+        switch ($version) {
+            "7" { return $7_3_9_x64 } # technically this is not supported for 7
+            "8" { return $7_3_9_x64 }
+            "2012" { return $9_1_6_x64 }
+            "2016" { return $9_2_3_x64 }
+            {$_ -in "10", "11", "2019", "2022"} { return $newest_x64 }
+            default { error "Invalid option"; exit 1 }
         }
-        "8" { $msi = $7_3_9_x64 }
-        "2012" { $msi = $9_1_6_x64 }
-        "2016" { $msi = $9_2_3_x64 }
-        {$_ -in "10", "11", "2019", "2022"} { $msi = $newest_x64 }
-        default { "Invalid option" }
     }
-}
-else {
-    switch ($version) {
-        "7" {
-            $msi = $7_3_9_x86 # technically this is not supported for 7 
+    else {
+        switch ($version) {
+            "7" { return = $7_3_9_x86 } # technically this is not supported for 7
+            "8" { return = $7_3_9_x86 }
+            "2012" { return = $9_1_6_x86 }
+            "2016" { return = $9_2_3_x86 }
+            {$_ -in "10", "11", "2019", "2022"} { return = $newest_x86 }
+            default { error "Invalid option"; exit 1 }
         }
-        "8" { $msi = $7_3_9_x86 }
-        "2012" { $msi = $9_1_6_x86 }
-        "2016" { $msi = $9_2_3_x86 }
-        {$_ -in "10", "11", "2019", "2022"} { $msi = $newest_x86 }
-        default { "Invalid option" }
     }
 }
 
-if ($ip -ne "indexer") {
-    # TODO: check that the IP is valid
-    $ip = $ip + ":9997"
-} else {
-    error "Indexer installation not implemented yet"
-    # TODO: implement indexer installation
-}
-
-if (-not (Test-Path "C:\Program Files\SplunkUniversalForwarder\bin\splunk.exe")) {
+function install_splunk {
     print "Installing Splunk..."
     $path = $(Get-Location).path + "\splunk.msi"
-    # print "Downloading the Splunk installer to $path"
-    # $wc = New-Object net.webclient
-    # $wc.Downloadfile($msi, $path)
-    # print "Download complete"
+    print "Downloading the Splunk installer to $path"
+    $wc = New-Object net.webclient
+    $wc.Downloadfile($msi, $path)
+    print "Download complete"
     print "Please enter a password for the new splunk user"
     print "WARNING: this needs to be at least 8 characters and match system password complexity requirements or else the install will fail"
     $securedValue = Read-Host -AsSecureString "Password"
@@ -112,16 +93,41 @@ if (-not (Test-Path "C:\Program Files\SplunkUniversalForwarder\bin\splunk.exe"))
         error "Splunk installation failed"
         exit 1
     }
+}
+
+function add_inputs {
+    print "Installing custom inputs.conf..."
+    $wc = New-Object net.webclient
+    $path = $(Get-Location).path + "\inputs.conf"
+    $wc.Downloadfile("$GITHUB_URL/splunk/windows/inputs.conf", $path)
+    # TODO: change this for the indexer?
+    Move-Item -Path $path -Destination "$SPLUNKDIR\etc\apps\SplunkUniversalForwarder\local\inputs.conf" -Force
+}
+#####################################################
+
+print "Start of script"
+print "Please run this in an Adminstrator prompt. 3 seconds to CTRL + C if this is not the csae..."
+Start-Sleep -Seconds 3
+
+# Set TLS 1.2 for compatability with older systems
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
+if ($ip -ne "indexer") {
+    # TODO: check that the IP is valid
+    $ip = $ip + ":9997"
+} else {
+    error "Indexer installation not implemented yet"
+    # TODO: implement indexer installation
+}
+
+$msi = detect_version
+
+if (-not (Test-Path "C:\Program Files\SplunkUniversalForwarder\bin\splunk.exe")) {
+    install_splunk
 } else {
     print "Splunk already installed"
 }
 
-# TODO: change this for the indexer
-# Get-Service SplunkForwarder
-# & "$SPLUNKDIR\bin\splunk.exe" status
+add_inputs
 
-# & "$SPLUNKDIR\bin\splunk.exe"
-print "Installing custom inputs.conf..."
-$wc = New-Object net.webclient
-$wc.Downloadfile("$GITHUB_URL/splunk/windows/inputs.conf", ".\inputs.conf")
-Move-Item -Path ".\inputs.conf" -Destination "$SPLUNKDIR\etc\apps\SplunkUniversalForwarder\local\inputs.conf" -Force
+print "End of script"
