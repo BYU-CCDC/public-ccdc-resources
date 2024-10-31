@@ -1,6 +1,7 @@
 #!/bin/bash
 DISTRO=$1
 VERSION=$2
+GITHUB_URL="https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main"
 
 function print_banner {
     echo
@@ -21,7 +22,7 @@ function install {
         "ubuntu")
             if [ $VERSION -ge 18 ]; then
                 print_banner "Ubuntu $VERSION"
-                wget -q https://packages.microsoft.com/config/ubuntu/$(lsb_release -rs)/packages-microsoft-prod.deb -O packages-microsoft-prod.deb
+                wget --no-check-certificate -q https://packages.microsoft.com/config/ubuntu/$(lsb_release -rs)/packages-microsoft-prod.deb -O packages-microsoft-prod.deb
                 sudo dpkg -i packages-microsoft-prod.deb
                 sudo apt-get update
                 sudo apt-get install sysmonforlinux
@@ -34,14 +35,14 @@ function install {
             if [ $VERSION -ge 9 ]; then
                 print_banner "Debian $VERSION"
                 if [ $VERSION -lt 11 ]; then
-                    wget -qO- https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > microsoft.asc.gpg
+                    wget --no-check-certificate -qO- https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > microsoft.asc.gpg
                     sudo mv microsoft.asc.gpg /etc/apt/trusted.gpg.d/
-                    wget -q https://packages.microsoft.com/config/debian/$VERSION/prod.list
+                    wget --no-check-certificate -q https://packages.microsoft.com/config/debian/$VERSION/prod.list
                     sudo mv prod.list /etc/apt/sources.list.d/microsoft-prod.list
                     sudo chown root:root /etc/apt/trusted.gpg.d/microsoft.asc.gpg
                     sudo chown root:root /etc/apt/sources.list.d/microsoft-prod.list
                 else
-                    wget -q https://packages.microsoft.com/config/debian/$VERSION/packages-microsoft-prod.deb -O packages-microsoft-prod.deb
+                    wget --no-check-certificate -q https://packages.microsoft.com/config/debian/$VERSION/packages-microsoft-prod.deb -O packages-microsoft-prod.deb
                     sudo dpkg -i packages-microsoft-prod.deb
                 fi
                 sudo apt-get update
@@ -58,7 +59,7 @@ function install {
                 print_banner "Fedora $VERSION"
                 if [ $VERSION -lt 37 ]; then
                     sudo rpm --import https://packages.microsoft.com/keys/microsoft.asc
-                    sudo wget -q -O /etc/yum.repos.d/microsoft-prod.repo https://packages.microsoft.com/config/fedora/$VERSION/prod.repo
+                    sudo wget --no-check-certificate -q -O /etc/yum.repos.d/microsoft-prod.repo https://packages.microsoft.com/config/fedora/$VERSION/prod.repo
                 else
                     sudo rpm -Uvh https://packages.microsoft.com/config/fedora/$VERSION/packages-microsoft-prod.rpm
                 fi
@@ -73,7 +74,7 @@ function install {
                 print_banner "RHEL $VERSION"
                 if [ $VERSION -lt 8 ]; then
                     sudo rpm --import https://packages.microsoft.com/keys/microsoft.asc
-                    sudo wget -q -O /etc/yum.repos.d/microsoft-prod.repo https://packages.microsoft.com/config/rhel/7/prod.repo
+                    sudo wget --no-check-certificate -q -O /etc/yum.repos.d/microsoft-prod.repo https://packages.microsoft.com/config/rhel/7/prod.repo
                     sudo yum install sysmonforlinux
                 else
                     sudo rpm -Uvh https://packages.microsoft.com/config/rhel/$VERSION/packages-microsoft-prod.rpm
@@ -109,7 +110,7 @@ function install {
                 print_banner "OpenSUSE $VERSION"
                 sudo zypper install libicu
                 sudo rpm --import https://packages.microsoft.com/keys/microsoft.asc
-                wget -q https://packages.microsoft.com/config/opensuse/15/prod.repo
+                wget --no-check-certificate -q https://packages.microsoft.com/config/opensuse/15/prod.repo
                 sudo mv prod.repo /etc/zypp/repos.d/microsoft-prod.repo
                 sudo chown root:root /etc/zypp/repos.d/microsoft-prod.repo
                 sudo zypper install sysmonforlinux
@@ -125,4 +126,10 @@ function install {
     esac
 }
 
+function configure {
+    sudo wget $GITHUB_URL/linux/sysmon/sysmon-config.xml -O /opt/ccdc/sysmon-config.xml
+    sudo sysmon -accepteula -i /opt/ccdc/sysmon-config.xml
+}
+
 install
+configure
