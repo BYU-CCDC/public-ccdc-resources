@@ -7,6 +7,7 @@ $advancedAuditingFile = "advancedAuditing.ps1"
 $patchURLFile = "patchURLs.json"
 $groupManagementFile = "groupManagement.ps1"
 $mainFunctionsFile = "mainFunctionsList.txt"
+$splunkFile = "../../splunk/splunk.ps1"
 
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 $neededFiles = @($portsFile, $advancedAuditingFile, $patchURLFile, $groupManagementFile, $mainFunctionsFile)
@@ -1181,6 +1182,15 @@ renderXml=false
 
 Initialize-Log
 
+# Upgrade SMB
+$confirmation = Prompt-Yes-No -Message "Upgrade SMB? (y/n)"
+if ($confirmation.toLower() -eq "y") {
+    Write-Host "`n***Upgrading SMB...***" -ForegroundColor Magenta
+    Upgrade-SMB
+} else {
+    Write-Host "Skipping..." -ForegroundColor Red
+}
+
 
 # Group-Management
 $confirmation = Prompt-Yes-No -Message "Do Group Management? (y/n)"
@@ -1315,16 +1325,6 @@ $confirmation = Prompt-Yes-No -Message "Install EternalBlue Patch? (y/n)"
 if ($confirmation.toLower() -eq "y") {
     Write-Host "`n***Installing EternalBlue Patch...***" -ForegroundColor Magenta
     Install-EternalBluePatch
-} else {
-    Write-Host "Skipping..." -ForegroundColor Red
-}
-
-
-# Upgrade SMB
-$confirmation = Prompt-Yes-No -Message "Upgrade SMB? (y/n)"
-if ($confirmation.toLower() -eq "y") {
-    Write-Host "`n***Upgrading SMB...***" -ForegroundColor Magenta
-    Upgrade-SMB
 } else {
     Write-Host "Skipping..." -ForegroundColor Red
 }
