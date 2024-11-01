@@ -28,7 +28,7 @@ else
 fi
 #####################################################
 
-###################### FUNCTIONS ######################
+##################### FUNCTIONS #####################
 # Prints script options
 function print_options {
     echo "Usage: ./splunk.sh <option> <forward-server-ip>"
@@ -75,6 +75,11 @@ function check_prereqs {
 
     if ! command -v unzip &>/dev/null; then
         echo "[X] ERROR: Please install unzip before using this script"
+        exit 1
+    fi
+
+    if ! command -v setfacl &>/dev/null; then
+        echo "[X] ERROR: Please install acl before using this script"
         exit 1
     fi
 
@@ -201,7 +206,7 @@ function setup_indexer {
     done
 
     echo "[*] Installing Searches"
-    wget $GITHUB_URL/splunk/savedsearches.conf
+    wget $GITHUB_URL/splunk/indexer/savedsearches.conf
     sudo mkdir -p $SPLUNKDIR/etc/users/splunk/search/local/
     if sudo cp $SPLUNKDIR/etc/users/splunk/search/local/savedsearches.conf $SPLUNKDIR/etc/users/splunk/search/local/savedsearches.bk &>/dev/null; then
         echo "[*] Successfully backed up old savedsearches.conf as savedsearches.bk"
@@ -220,14 +225,16 @@ function setup_splunk {
     fi
 
     # Create splunk user/group
-    echo "[*] Creating splunk user and group"
-    sudo useradd splunk -d "$SPLUNKDIR"
-    if ! getent group "splunk" > /dev/null; then
-        sudo groupadd splunk
-        sudo usermod -aG splunk splunk
-    fi
-    sudo passwd splunk
-    echo "[*] Please provide user 'splunk' when prompted later in the script"
+    # if ! getent user "splunk" > /dev/null; then
+    #     echo "[*] Creating splunk user and group"
+    #     sudo useradd splunk -d "$SPLUNKDIR"
+    #     sudo passwd splunk
+    # fi
+    # if ! getent group "splunk" > /dev/null; then
+    #     sudo groupadd splunk
+    #     sudo usermod -aG splunk splunk
+    # fi
+    echo "[*] Please provide the 'splunk' user and password when prompted for an administrator username"
 
     # Set ACL to allow splunk to read any log files (execute needed for directories)
     echo "[*] Giving splunk user access to /var/log/"
@@ -497,20 +504,25 @@ function add_mysql_logs {
     fi
 }
 
-# Installs custom CCDC splunk app
+# Installs custom CCDC splunk add-on
+function install_ccdc_add_on {
+    print_banner "Installing CCDC Splunk add-on"
+    wget $GITHUB_URL/splunk/ccdc-add-on/ccdc-add-on.spl
+    sudo -H -u splunk $SPLUNKDIR/bin/splunk install app ccdc-add-on.spl
+}
+
+# Installs custom CCDC splunk add-on
 function install_ccdc_app {
-    print_banner "Installing CCDC Splunk app"
-    sudo wget $GITHUB_URL/splunk/ccdc-app.zip
-    sudo unzip ccdc-app.zip
-    sudo mv ccdc-app $SPLUNKDIR/etc/apps/ccdc-app
-    sudo chown -R splunk:splunk $SPLUNKDIR/etc/apps/ccdc-app
+    print_banner "Installing CCDC Splunk app (for indexer)"
+    wget $GITHUB_URL/splunk/ccdc-app/ccdc-app.spl
+    sudo -H -u splunk $SPLUNKDIR/bin/splunk install app ccdc-app.spl
 }
 
 # Adds scripted inputs
 function add_scripts {
     print_banner "Adding scripted inputs"
     echo "[*] Adding user sessions script"
-    add_script "$SPLUNKDIR/etc/apps/ccdc-app/bin/sessions.sh" "system" "180" "ccdc-sessions"
+    add_script "$SPLUNKDIR/etc/apps/ccdc-add-on/bin/sessions.sh" "system" "180" "ccdc-sessions"
 }
 
 # Adds monitors for the Splunk indexer service itself
@@ -571,7 +583,7 @@ function setup_monitors {
         add_ssh_key_logs
         add_web_logs
         add_mysql_logs
-        install_ccdc_app
+        install_ccdc_add_on
         add_scripts
 
         if [ "$IP" == "indexer" ]; then
@@ -613,7 +625,7 @@ function install_auditd {
     
     if [ "$option" != "n" ]; then
         print_banner "Installing auditd (file monitor)"
-        wget $GITHUB_URL/splunk/auditd.sh
+        wget $GITHUB_URL/splunk/linux/auditd.sh
         chmod +x auditd.sh
         ./auditd.sh
         add_monitor "/var/log/audit/audit.log" "system"
@@ -705,6 +717,8 @@ function main {
         sudo -H -u splunk $SPLUNKDIR/bin/splunk stop
         echo "[*] Enabling systemd service"
         sudo $SPLUNKDIR/bin/splunk enable boot-start -systemd-managed 1 -user splunk
+        sudo systemctl start Splunkd
+    else
         sudo -H -u splunk $SPLUNKDIR/bin/splunk start
     fi
 
@@ -720,7 +734,7 @@ function main {
     print_banner "End of script"
     echo "[*] You can add future additional monitors with 'sudo -H -u splunk $SPLUNKDIR/bin/splunk add monitor <PATH> -index <INDEX>'"
     echo "[*] You can add future additional scripted inputs with 'sudo -H -u splunk $SPLUNKDIR/bin/splunk add exec <PATH> -interval <SECONDS> -index <INDEX>'"
-    echo "[*] Place these scripts in the $SPLUNKDIR/etc/apps/ccdc-app/bin/ directory"
+    echo "[*] Place these scripts in the $SPLUNKDIR/etc/apps/ccdc-add-on/bin/ directory"
     echo "[*] A debug log is located at $DEBUG_LOG"
     echo
 }
