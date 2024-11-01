@@ -150,6 +150,7 @@ function install_splunk {
                 download "$tgz" splunk.tgz
                 echo "******* Extracting to $SPLUNKDIR *******"
                 sudo tar -xvf splunk.tgz -C /opt/ &> /dev/null
+                #TODO: make sure it actually extracts to $SPLUNKDIR
             ;;
             arm_deb )
                 print_banner "Installing ARM .deb package" 
