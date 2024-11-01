@@ -51,7 +51,7 @@ function add_audit_rules {
     CUSTOM_RULE_FILE='/etc/audit/rules.d/ccdc.rules'
 
     # Download custom rule file
-    sudo wget $GITHUB_URL/splunk/ccdc.rules
+    sudo wget $GITHUB_URL/splunk/linux/ccdc.rules
     sudo mv ./ccdc.rules $CUSTOM_RULE_FILE
     sudo chown root:root $CUSTOM_RULE_FILE
     sudo chmod 600 $CUSTOM_RULE_FILE
