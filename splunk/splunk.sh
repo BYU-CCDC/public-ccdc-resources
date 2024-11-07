@@ -201,7 +201,9 @@ function install_splunk {
 
 function create_splunk_user {
     # Create splunk user/group
-    if ! getent user "splunk" > /dev/null; then
+    if id "splunk" &>/dev/null; then
+        echo "[*] Splunk user already exists"
+    else
         echo "[*] Creating splunk user"
         sudo useradd splunk -d "$SPLUNKDIR"
         
@@ -241,8 +243,8 @@ PASSWORD = $password" | sudo tee -a $SPLUNKDIR/etc/system/local/user-seed.conf
             sudo groupadd splunk
             sudo usermod -aG splunk splunk
         fi
-    else
-        echo "[*] Splunk user already exists"
+
+        echo "[*] Please remember these credentials for when Splunk asks for them later during the configuration process"
     fi
 
     # Set ACL to allow splunk to read any log files (execute needed for directories)
@@ -552,6 +554,7 @@ function add_mysql_logs {
 function install_ccdc_add_on {
     print_banner "Installing CCDC Splunk add-on"
     wget $GITHUB_URL/splunk/ccdc-add-on/ccdc-add-on.spl
+    sudo chown splunk:splunk ccdc-add-on.spl
     sudo -H -u splunk $SPLUNKDIR/bin/splunk install app ccdc-add-on.spl
 }
 
@@ -559,6 +562,7 @@ function install_ccdc_add_on {
 function install_ccdc_app {
     print_banner "Installing CCDC Splunk app (for indexer)"
     wget $GITHUB_URL/splunk/ccdc-app/ccdc-app.spl
+    sudo chown splunk:splunk ccdc-app.spl
     sudo -H -u splunk $SPLUNKDIR/bin/splunk install app ccdc-app.spl
 }
 
