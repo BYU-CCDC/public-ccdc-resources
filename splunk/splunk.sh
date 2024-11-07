@@ -108,6 +108,11 @@ function print_banner {
     echo
 }
 
+function get_silent_input_string {
+    read -r -s -p "$1" input
+    echo "$input"
+}
+
 function download {
     url=$1
     output=$2
@@ -194,6 +199,60 @@ function install_splunk {
     fi
 }
 
+function create_splunk_user {
+    # Create splunk user/group
+    if ! getent user "splunk" > /dev/null; then
+        echo "[*] Creating splunk user"
+        sudo useradd splunk -d "$SPLUNKDIR"
+        
+        # Setting splunk password
+        while true; do
+                password=""
+                confirm_password=""
+
+                # Ask for password
+                password=$(get_silent_input_string "Enter password for splunk user: ")
+                echo
+
+                # Confirm password
+                confirm_password=$(get_silent_input_string "Confirm password: ")
+                echo
+
+                if [ "$password" != "$confirm_password" ]; then
+                    echo "Passwords do not match. Please retry."
+                    continue
+                fi
+
+                if ! echo "splunk:$password" | sudo chpasswd; then
+                    echo "[X] ERROR: Failed to set password for splunk user"
+                else
+                    echo "[*] Password for splunk user has been set."
+                    break
+                fi
+            done
+        
+        # Add splunk as forwarder/indexer admin
+        echo "[*] Adding splunk user to user-seed.conf"
+        echo "[user_info]
+USERNAME = splunk
+PASSWORD = $password" | sudo tee -a $SPLUNKDIR/etc/system/local/user-seed.conf
+
+        if ! getent group "splunk" > /dev/null; then
+            sudo groupadd splunk
+            sudo usermod -aG splunk splunk
+        fi
+    else
+        echo "[*] Splunk user already exists"
+    fi
+
+    # Set ACL to allow splunk to read any log files (execute needed for directories)
+    echo "[*] Giving splunk user access to /var/log/"
+    sudo setfacl -R -m u:splunk:rx /var/log/
+
+    # Chowning splunk directory
+    sudo chown -R splunk:splunk $SPLUNKDIR
+}
+
 # Special function only called when setting up indexer
 function setup_indexer {
     print_banner "Configuring Indexer"
@@ -225,36 +284,19 @@ function setup_splunk {
         exit
     fi
 
-    # Create splunk user/group
-    # if ! getent user "splunk" > /dev/null; then
-    #     echo "[*] Creating splunk user and group"
-    #     sudo useradd splunk -d "$SPLUNKDIR"
-    #     sudo passwd splunk
-    # fi
-    # if ! getent group "splunk" > /dev/null; then
-    #     sudo groupadd splunk
-    #     sudo usermod -aG splunk splunk
-    # fi
-    echo "[*] Please provide the 'splunk' user and password when prompted for an administrator username"
-
-    # Set ACL to allow splunk to read any log files (execute needed for directories)
-    echo "[*] Giving splunk user access to /var/log/"
-    sudo setfacl -R -m u:splunk:rx /var/log/
-
     install_splunk "$1" "$2"
-    sudo chown -R splunk:splunk $SPLUNKDIR
 
     if sudo [ ! -e "$SPLUNKDIR/bin/splunk" ]; then
         echo "[X] ERROR: Splunk failed to install"
         exit 1
+    else
+        echo "[*] Splunk installed successfully"
     fi
 
-    echo "[*] Starting splunk"
-    sudo -H -u splunk $SPLUNKDIR/bin/splunk start --accept-license
+    create_splunk_user
 
-    # echo "[*] Setting splunk user"
-    # TODO: fix password by pulling from /etc/passwd?
-    # sudo -H -u splunk $SPLUNKDIR/bin/splunk add user splunk -role Admin -password temporarypassword
+    echo "[*] Starting splunk"
+    sudo -H -u splunk $SPLUNKDIR/bin/splunk start --accept-license --no-prompt
 
     if [ "$IP" == "indexer" ]; then
         setup_indexer
@@ -264,6 +306,7 @@ function setup_splunk {
     else
         setup_forward_server "$IP"
     fi
+    sudo chown -R splunk:splunk $SPLUNKDIR
 }
 
 # Checks for existence of a file or directory and add it as a monitor if it exists
