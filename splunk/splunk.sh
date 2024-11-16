@@ -13,18 +13,20 @@ if [ "$IP" == "indexer" ] || [ "$IP" == "i" ]; then
     IP="indexer"
     SPLUNKDIR="/opt/splunk"
 
-    deb="https://download.splunk.com/products/splunk/releases/9.2.3/linux/splunk-9.2.3-282efff6aa8b-linux-2.6-amd64.deb"
-    rpm="https://download.splunk.com/products/splunk/releases/9.2.3/linux/splunk-9.2.3-282efff6aa8b.x86_64.rpm"
-    tgz="https://download.splunk.com/products/splunk/releases/9.2.3/linux/splunk-9.2.3-282efff6aa8b-Linux-x86_64.tgz"
+    # Indexer
+    deb="https://download.splunk.com/products/splunk/releases/9.2.4/linux/splunk-9.2.4-c103a21bb11d-linux-2.6-amd64.deb"
+    rpm="https://download.splunk.com/products/splunk/releases/9.2.4/linux/splunk-9.2.4-c103a21bb11d.x86_64.rpm"
+    tgz="https://download.splunk.com/products/splunk/releases/9.2.4/linux/splunk-9.2.4-c103a21bb11d-Linux-x86_64.tgz"
 else
     SPLUNKDIR="/opt/splunkforwarder"
     
-    deb="https://download.splunk.com/products/universalforwarder/releases/9.2.3/linux/splunkforwarder-9.2.3-282efff6aa8b-linux-2.6-amd64.deb"
-    rpm="https://download.splunk.com/products/universalforwarder/releases/9.2.3/linux/splunkforwarder-9.2.3-282efff6aa8b.x86_64.rpm"
-    tgz="https://download.splunk.com/products/universalforwarder/releases/9.2.3/linux/splunkforwarder-9.2.3-282efff6aa8b-Linux-x86_64.tgz"
-    arm_deb="https://download.splunk.com/products/universalforwarder/releases/9.2.3/linux/splunkforwarder-9.2.3-282efff6aa8b-Linux-armv8.deb"
-    arm_rpm="https://download.splunk.com/products/universalforwarder/releases/9.2.3/linux/splunkforwarder-9.2.3-282efff6aa8b.aarch64.rpm"
-    arm_tgz="https://download.splunk.com/products/universalforwarder/releases/9.2.3/linux/splunkforwarder-9.2.3-282efff6aa8b-Linux-armv8.tgz"
+    # Forwarder
+    deb="https://download.splunk.com/products/universalforwarder/releases/9.2.4/linux/splunkforwarder-9.2.4-c103a21bb11d-linux-2.6-amd64.deb"
+    rpm="https://download.splunk.com/products/universalforwarder/releases/9.2.4/linux/splunkforwarder-9.2.4-c103a21bb11d.x86_64.rpm"
+    tgz="https://download.splunk.com/products/universalforwarder/releases/9.2.4/linux/splunkforwarder-9.2.4-c103a21bb11d-Linux-x86_64.tgz"
+    arm_deb="https://download.splunk.com/products/universalforwarder/releases/9.2.4/linux/splunkforwarder-9.2.4-c103a21bb11d-Linux-armv8.deb"
+    arm_rpm="https://download.splunk.com/products/universalforwarder/releases/9.2.4/linux/splunkforwarder-9.2.4-c103a21bb11d.aarch64.rpm"
+    arm_tgz="https://download.splunk.com/products/universalforwarder/releases/9.2.4/linux/splunkforwarder-9.2.4-c103a21bb11d-Linux-armv8.tgz"
 fi
 #####################################################
 
@@ -209,35 +211,34 @@ function create_splunk_user {
         
         # Setting splunk password
         while true; do
-                password=""
-                confirm_password=""
+            password=""
+            confirm_password=""
 
-                # Ask for password
-                password=$(get_silent_input_string "Enter password for splunk user: ")
-                echo
+            # Ask for password
+            password=$(get_silent_input_string "Enter password for splunk user: ")
+            echo
 
-                # Confirm password
-                confirm_password=$(get_silent_input_string "Confirm password: ")
-                echo
+            # Confirm password
+            confirm_password=$(get_silent_input_string "Confirm password: ")
+            echo
 
-                if [ "$password" != "$confirm_password" ]; then
-                    echo "Passwords do not match. Please retry."
-                    continue
-                fi
+            if [ "$password" != "$confirm_password" ]; then
+                echo "Passwords do not match. Please retry."
+                continue
+            fi
 
-                if ! echo "splunk:$password" | sudo chpasswd; then
-                    echo "[X] ERROR: Failed to set password for splunk user"
-                else
-                    echo "[*] Password for splunk user has been set."
-                    break
-                fi
-            done
+            if ! echo "splunk:$password" | sudo chpasswd; then
+                echo "[X] ERROR: Failed to set password for splunk user"
+            else
+                echo "[*] Password for splunk user has been set."
+                break
+            fi
+        done
         
         # Add splunk as forwarder/indexer admin
         echo "[*] Adding splunk user to user-seed.conf"
-        echo "[user_info]
-USERNAME = splunk
-PASSWORD = $password" | sudo tee -a $SPLUNKDIR/etc/system/local/user-seed.conf
+        # This isn't perfectly secure- plaintext password shows up in ps and the temporary seed file
+        sudo sh -c "printf '[user_info]\nUSERNAME = splunk\nPASSWORD = $password' > $SPLUNKDIR/etc/system/local/user-seed.conf"
 
         if ! getent group "splunk" > /dev/null; then
             sudo groupadd splunk
@@ -780,9 +781,8 @@ function main {
     # fi
 
     print_banner "End of script"
-    echo "[*] You can add future additional monitors with 'sudo -H -u splunk $SPLUNKDIR/bin/splunk add monitor <PATH> -index <INDEX>'"
-    echo "[*] You can add future additional scripted inputs with 'sudo -H -u splunk $SPLUNKDIR/bin/splunk add exec <PATH> -interval <SECONDS> -index <INDEX>'"
-    echo "[*] Place these scripts in the $SPLUNKDIR/etc/apps/ccdc-add-on/bin/ directory"
+    echo "[*] Add future additional monitors with 'sudo -H -u splunk $SPLUNKDIR/bin/splunk add monitor <PATH> -index <INDEX>'"
+    echo "[*] Add future additional scripted inputs with 'sudo -H -u splunk $SPLUNKDIR/bin/splunk add exec $SPLUNKDIR/etc/apps/ccdc-add-on/bin/<SCRIPT> -interval <SECONDS> -index <INDEX>'"
     echo "[*] A debug log is located at $DEBUG_LOG"
     echo
 }
