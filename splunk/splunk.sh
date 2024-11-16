@@ -299,7 +299,16 @@ function setup_splunk {
     create_splunk_user
 
     echo "[*] Starting splunk"
-    sudo -H -u splunk $SPLUNKDIR/bin/splunk start --accept-license --no-prompt
+    timeout 30s sudo -H -u splunk $SPLUNKDIR/bin/splunk start --accept-license --no-prompt
+
+    # Timeout
+    if [ $? -eq 124 ]; then
+        timeout 30s sudo -H -u splunk $SPLUNKDIR/bin/splunk start --accept-license --no-prompt
+        if [ $? -eq 124 ]; then
+            echo "[X] ERROR: Splunk failed to start"
+            exit 1
+        fi
+    fi
 
     if [ "$IP" == "indexer" ]; then
         setup_indexer
