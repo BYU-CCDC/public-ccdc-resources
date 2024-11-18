@@ -77,6 +77,13 @@ for distro in hrefs:
                     name = [package for package in sysmon_packages if best in package][0]
                     downloads[f"{distro.rstrip('/')}-{version.rstrip('/')}"]['sysmon'] = s_packages_url + 'sysmonforlinux/' + name
 
-print(downloads)
-with open("links.json", "w") as file:
-    json.dump(downloads, file, indent=4)
+print()
+# print(downloads)
+# with open("links.json", "w") as file:
+#     json.dump(downloads, file, indent=4)
+
+for candidate in downloads:
+    if 'sysmon' in downloads[candidate] and 'sysinternals' in downloads[candidate]:
+        var_name = candidate.replace('-', '_').replace('.', '_')
+        print(f'{var_name + "_sysmon"}="{downloads[candidate]["sysmon"]}"')
+        print(f'{var_name + "_sysinternals"}="{downloads[candidate]["sysinternals"]}"')

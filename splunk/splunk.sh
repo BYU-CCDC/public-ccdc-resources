@@ -570,6 +570,7 @@ function install_ccdc_add_on {
 
 # Installs custom CCDC splunk add-on
 function install_ccdc_app {
+    # TODO: this is not being called anywhere yet
     print_banner "Installing CCDC Splunk app (for indexer)"
     wget $GITHUB_URL/splunk/ccdc-app/ccdc-app.spl
     sudo chown splunk:splunk ccdc-app.spl
@@ -677,66 +678,62 @@ function add_custom_config {
 
 # Install auditd for file monitoring
 function install_auditd {
-    echo "[*] Would you like to install/setup auditd?"
-    read -r -p "(Y/n): " option
-    option=$(echo "$option" | tr -d ' ') # truncates any spaces accidentally put in
-    
-    if [ "$option" != "n" ]; then
-        print_banner "Installing auditd (file monitor)"
-        wget $GITHUB_URL/splunk/linux/auditd.sh
-        chmod +x auditd.sh
-        ./auditd.sh
-        add_monitor "/var/log/audit/audit.log" "system"
-    fi
+    print_banner "Installing auditd"
+    wget $GITHUB_URL/splunk/linux/auditd.sh
+    chmod +x auditd.sh
+    ./auditd.sh
+    add_monitor "/var/log/audit/audit.log" "system"
 }
 
 # Install snoopy for bash logging
 function install_snoopy {
     # TODO: this needs work
-    echo "[*] Would you like to install/setup snoopy?"
-    read -r -p "(Y/n): " option
-    option=$(echo "$option" | tr -d ' ') # truncates any spaces accidentally put in
-
-    if [ "$option" != "n" ]; then
-        print_banner "Installing Snoopy (command logger)"
-        wget -O install-snoopy.sh https://github.com/a2o/snoopy/raw/install/install/install-snoopy.sh
-        chmod 755 install-snoopy.sh
-        if command -v snoopyctl &>/dev/null; then
-            echo "[*] Snoopy is already installed"
-            return
-        fi
-        # If on Fedora, install these programs
-        if command -v dnf &>/dev/null; then
-            sudo dnf install -y gcc gzip make procps socat tar wget
-        fi
-        if ! sudo ./install-snoopy.sh stable; then
-            echo
-            echo "[X] ERROR: Install failed. If you would like to try installing an older version, "
-            echo "    please run \`./install-snoopy.sh X.Y.Z\` with X.Y.Z being the version number."
-            echo ""
-            echo "Suggested versions:"
-            echo "    - 2.5.1/stable (current, 2022-09-28)"
-            echo "    - 2.4.15 (2021-10-17)"
-            echo "    - 2.3.2 (2015-05-28)"
-            echo ""
-        else
-            SNOOPY_CONFIG='/etc/snoopy.ini'
-            if sudo [ -f $SNOOPY_CONFIG ]; then
-                sudo touch /var/log/snoopy.log
-                # Unfortunately required by snoopy in order to use file other than syslog/messages
-                SNOOPY_LOG='/var/log/snoopy.log'
-                sudo chmod 666 $SNOOPY_LOG
-                echo "filter_chain = \"exclude_spawns_of:splunkd,btool\"" | sudo tee -a $SNOOPY_CONFIG
-                echo "output = file:$SNOOPY_LOG" | sudo tee -a $SNOOPY_CONFIG
-                echo
-                echo "[*] Set Snoopy output to $SNOOPY_LOG."
-                sudo -H -u splunk $SPLUNKDIR/bin/splunk add monitor "$SNOOPY_LOG" -index "snoopy" -sourcetype "snoopy"
-            else
-                echo "[X] ERROR: Could not find Snoopy config file. Please add \`output = file:/var/log/snoopy.log\` to the end of the config."
-            fi
-            echo "[*] Snoopy installed successfully."
-        fi
+    print_banner "Installing Snoopy"
+    wget -O install-snoopy.sh https://github.com/a2o/snoopy/raw/install/install/install-snoopy.sh
+    chmod 755 install-snoopy.sh
+    if command -v snoopyctl &>/dev/null; then
+        echo "[*] Snoopy is already installed"
+        return
     fi
+    # If on Fedora, install these programs
+    if command -v dnf &>/dev/null; then
+        sudo dnf install -y gcc gzip make procps socat tar wget
+    fi
+    if ! sudo ./install-snoopy.sh stable; then
+        echo
+        echo "[X] ERROR: Install failed. If you would like to try installing an older version, "
+        echo "    please run \`./install-snoopy.sh X.Y.Z\` with X.Y.Z being the version number."
+        echo ""
+        echo "Suggested versions:"
+        echo "    - 2.5.1/stable (current, 2022-09-28)"
+        echo "    - 2.4.15 (2021-10-17)"
+        echo "    - 2.3.2 (2015-05-28)"
+        echo ""
+    else
+        SNOOPY_CONFIG='/etc/snoopy.ini'
+        if sudo [ -f $SNOOPY_CONFIG ]; then
+            sudo touch /var/log/snoopy.log
+            # Unfortunately required by snoopy in order to use file other than syslog/messages
+            SNOOPY_LOG='/var/log/snoopy.log'
+            sudo chmod 666 $SNOOPY_LOG
+            echo "filter_chain = \"exclude_spawns_of:splunkd,btool\"" | sudo tee -a $SNOOPY_CONFIG
+            echo "output = file:$SNOOPY_LOG" | sudo tee -a $SNOOPY_CONFIG
+            echo
+            echo "[*] Set Snoopy output to $SNOOPY_LOG."
+            sudo -H -u splunk $SPLUNKDIR/bin/splunk add monitor "$SNOOPY_LOG" -index "snoopy" -sourcetype "snoopy"
+        else
+            echo "[X] ERROR: Could not find Snoopy config file. Please add \`output = file:/var/log/snoopy.log\` to the end of the config."
+        fi
+        echo "[*] Snoopy installed successfully."
+    fi
+}
+
+function install_sysmon {
+    print_banner "Installing Sysmon"
+    wget $GITHUB_URL/linux/sysmon/sysmon.sh
+    chmod +x sysmon.sh
+    ./sysmon.sh
+    # TODO: add monitor for sysmon logs
 }
 #####################################################
 
@@ -780,8 +777,18 @@ function main {
         sudo -H -u splunk $SPLUNKDIR/bin/splunk start
     fi
 
-    install_auditd
-    install_snoopy
+    echo "[*] Would you like to install additional logging sources?"
+    echo "   - auditd (file monitor)"
+    echo "   - snoopy (command logger)"
+    echo "   - sysmon (system and network monitor)"
+    read -r -p "(Y/n): " option
+    option=$(echo "$option" | tr -d ' ') # truncates any spaces accidentally put in
+
+    if [ "$option" != "n" ]; then
+        install_auditd
+        install_snoopy
+        install_sysmon
+    fi
 
     # if [ "$IP" == "indexer" ]; then
         # TODO: Auto dashboard import doesn't work
