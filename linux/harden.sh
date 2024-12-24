@@ -3,7 +3,7 @@
 
 ###################### GLOBALS ######################
 LOG='/var/log/ccdc/harden.log'
-GITHUB_URL='https://raw.githubusercontent.com/deltabluejay/public-ccdc-resources/refs/heads/dev'
+GITHUB_URL="https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/refs/heads/dev"
 pm=""
 sudo_group=""
 ccdc_users=( "ccdcuser1" "ccdcuser2" )
