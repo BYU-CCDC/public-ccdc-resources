@@ -7,9 +7,8 @@ param (
 )
 
 ################### DOWNLOAD URLS ###################
-# $GITHUB_URL = "https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main"
-$GITHUB_URL = "https://raw.githubusercontent.com/deltabluejay/public-ccdc-resources/main"
-$SPLUNKDIR = "C:\Program Files\SplunkUniversalForwarder"
+$GITHUB_URL = "https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main"
+$SPLUNKDIR = ""
 $9_2_3_x64 = "https://download.splunk.com/products/universalforwarder/releases/9.2.3/windows/splunkforwarder-9.2.3-282efff6aa8b-x64-release.msi"
 $9_2_3_x86 = "https://download.splunk.com/products/universalforwarder/releases/9.2.3/windows/splunkforwarder-9.2.3-282efff6aa8b-x86-release.msi"
 $9_1_6_x64 = "https://download.splunk.com/products/universalforwarder/releases/9.1.6/windows/splunkforwarder-9.1.6-a28f08fac354-x64-release.msi"
@@ -60,6 +59,13 @@ function detect_version {
 
 function install_splunk {
     print "Installing Splunk..."
+    $msi = detect_version
+
+    if (Test-Path "C:\Program Files\SplunkUniversalForwarder\bin\splunk.exe") {
+        print "Splunk already installed"
+        return
+    }
+
     $path = $(Get-Location).path + "\splunk.msi"
     print "Downloading the Splunk installer to $path"
     $wc = New-Object net.webclient
@@ -95,39 +101,59 @@ function install_splunk {
     }
 }
 
-function add_inputs {
+function install_custom_inputs {
     print "Installing custom inputs.conf..."
+    print "This adds Windows Event Log monitors: System, Security, Application, PowerShell, Sysmon"
     $wc = New-Object net.webclient
     $path = $(Get-Location).path + "\inputs.conf"
     $wc.Downloadfile("$GITHUB_URL/splunk/windows/inputs.conf", $path)
     # TODO: change this for the indexer?
+    # TODO: check that inputs doesn't already exist or add to it
     Move-Item -Path $path -Destination "$SPLUNKDIR\etc\apps\SplunkUniversalForwarder\local\inputs.conf" -Force
+}
+
+function add_monitor {
+    param (
+        [string]$source
+        [string]$index
+        [string]$sourcetype = "auto"
+    )
+    & "$SPLUNKDIR\bin\splunk.exe" add monitor $source -index $index -sourcetype $sourcetype
 }
 #####################################################
 
 print "Start of script"
-print "Please run this in an Adminstrator prompt. 3 seconds to CTRL + C if this is not the csae..."
+print "Please run this in an Administrator prompt. 3 seconds to CTRL + C if this is not the case..."
 Start-Sleep -Seconds 3
 
-# Set TLS 1.2 for compatability with older systems
+# Set TLS 1.2 for compatibility with older systems
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-if ($ip -ne "indexer") {
-    # TODO: check that the IP is valid
-    $ip = $ip + ":9997"
-} else {
-    error "Indexer installation not implemented yet"
+if ($ip -e "indexer" -or $ip -e "i") {
+    $SPLUNKDIR = "C:\Program Files\Splunk"  # TODO: check this path
     # TODO: implement indexer installation
-}
-
-$msi = detect_version
-
-if (-not (Test-Path "C:\Program Files\SplunkUniversalForwarder\bin\splunk.exe")) {
-    install_splunk
+    error "Indexer installation not implemented yet"
 } else {
-    print "Splunk already installed"
+    $SPLUNKDIR = "C:\Program Files\SplunkUniversalForwarder"
+    $ip = $ip + ":9997"
+
+    # Check that the IP is valid
+    $regex = '^((25[0-5]|2[0-4][0-9]|[0-1]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[0-1]?[0-9][0-9]?)$'
+    if (-not ($ip -match $regex)) {
+        Write-Output "Invalid IP"
+        exit 1
+    }
 }
 
-add_inputs
+install_splunk
+install_custom_inputs
+
+print "Adding firewall logs..."
+netsh advfirewall set allprofiles logging allowedconnections enable
+netsh advfirewall set allprofiles logging droppedconnections enable
+add_monitor "C:\Windows\System32\LogFiles\Firewall\pfirewall.log" "windows"
+
+print "Adding web logs..."
+add_monitor "C:\inetpub\logs\LogFiles\" "web"
 
 print "End of script"
