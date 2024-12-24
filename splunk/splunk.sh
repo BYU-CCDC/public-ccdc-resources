@@ -11,6 +11,7 @@ SPLUNK_HOME="/opt/splunkforwarder"
 # Special variables recognized by Splunk CLI for authentication
 SPLUNK_USERNAME="splunk"
 SPLUNK_PASSWORD=""
+SPLUNK_ONLY=false
 
 # Indexer
 indexer_deb="https://download.splunk.com/products/splunk/releases/9.2.4/linux/splunk-9.2.4-c103a21bb11d-linux-2.6-amd64.deb"
@@ -24,7 +25,9 @@ tgz="https://download.splunk.com/products/universalforwarder/releases/9.2.4/linu
 arm_deb="https://download.splunk.com/products/universalforwarder/releases/9.2.4/linux/splunkforwarder-9.2.4-c103a21bb11d-Linux-armv8.deb"
 arm_rpm="https://download.splunk.com/products/universalforwarder/releases/9.2.4/linux/splunkforwarder-9.2.4-c103a21bb11d.aarch64.rpm"
 arm_tgz="https://download.splunk.com/products/universalforwarder/releases/9.2.4/linux/splunkforwarder-9.2.4-c103a21bb11d-Linux-armv8.tgz"
-tgz_9_0_9="https://download.splunk.com/products/universalforwarder/releases/9.0.9/linux/splunkforwarder-9.0.9-6315942c563f-Linux-x86_64.tgz"
+old_deb="https://download.splunk.com/products/universalforwarder/releases/9.0.9/linux/splunkforwarder-9.0.9-6315942c563f-linux-2.6-amd64.deb"
+old_rpm="https://download.splunk.com/products/universalforwarder/releases/9.0.9/linux/splunkforwarder-9.0.9-6315942c563f.x86_64.rpm"
+old_tgz="https://download.splunk.com/products/universalforwarder/releases/9.0.9/linux/splunkforwarder-9.0.9-6315942c563f-Linux-x86_64.tgz"
 #####################################################
 
 ##################### FUNCTIONS #####################
@@ -57,7 +60,7 @@ function get_input_string {
 }
 
 function faketty () {
-    script -qefc "$(printf "%q " "$@")" /dev/null
+    script -qfc "$(printf "%q " "$@")" /dev/null
 }
 
 function download {
@@ -76,18 +79,23 @@ function download {
 }
 
 function print_usage {
-    echo "Usage:  ./splunk.sh -f <INDEXER IP> [flags]"
+    echo "Usage:"
+    echo "  ./splunk.sh -f <INDEXER IP> [flags]"
+    echo "  ./splunk.sh -a <LOG_PATH>"
     echo
-    echo "Flags: 
+    echo "Flags:
   -h    Show this help message
   -f    IP of the splunk indexer (required unless -i is used)
   -i    Install the indexer instead of the forwarder
-  -u    Print Splunk package URLs
   -p    Package type (defaults to auto; see below)
-  -g    Change the GitHub URL for downloading files (for debug or local hosting)"
+  -u    Print Splunk package URLs
+  -S    Install Splunk only (no additional logging)
+  -g    Change the GitHub URL for downloading files (for debug or local hosting)
+  -a    Add a new monitor (use only after installation)"
     echo
     echo "Available packages:
   auto (default; autodetects best package format based on package manager)
+  * (catch-all; replace with any variable in the script)
   Forwarder:
     deb (Debian-based distros)
     rpm (RHEL-based distros)
@@ -98,7 +106,9 @@ function print_usage {
   Indexer:
     indexer_deb (Debian-based distros)
     indexer_rpm (RHEL-based distros)
-    indexer_tgz (generic .tgz file)"
+    indexer_tgz (generic .tgz file)
+    
+Hint: if you're getting glibc errors, try one of the old packages (old_deb, old_rpm, old_tgz)"
 }
 
 function autodetect_os {
@@ -436,7 +446,7 @@ function setup_splunk {
     # (this will do nothing if already logged in)
     res=-1
     while [ $res -ne 0 ]; do
-        if [ $SPLUNK_PASSWORD == "" ]; then
+        if [ "$SPLUNK_PASSWORD" == "" ]; then
             SPLUNK_PASSWORD=$(get_silent_input_string "Enter the password for splunk user: ")
         fi
         sudo -H -u splunk $SPLUNK_HOME/bin/splunk login -auth "$SPLUNK_USERNAME:$SPLUNK_PASSWORD"
@@ -531,6 +541,7 @@ function add_firewall_logs {
         add_monitor "$FIREWALL_LOG" "$INDEX"
         info "ufw logs also contained in /var/log/syslog"
     elif sudo command -v iptables &>/dev/null; then
+        # TODO: make this the main option and make it actually work with harden.sh
         info "iptables detected"
         FIREWALL_LOG="/var/log/iptables.log"
 
@@ -769,7 +780,7 @@ function install_auditd {
 }
 
 function install_snoopy {
-    # TODO: this needs work
+    version="$1"
     print_banner "Installing Snoopy (trying version $version)"
     if sudo [ -e /usr/local/lib/libsnoopy.so ]; then
         info "Snoopy is already installed"
@@ -784,6 +795,9 @@ function install_snoopy {
         apt )
         ;;
         dnf|zypper|yum )
+            if sudo test -f "/etc/centos-release" || sudo test -f "/etc/redhat-release"; then
+                sudo "$PM" install -y epel-release
+            fi
             sudo "$PM" install -y gcc gzip make procps socat tar wget
         ;;
         * )
@@ -791,8 +805,7 @@ function install_snoopy {
     esac
 
     # Try installing Snoopy
-    version="$1"
-    download https://github.com/a2o/snoopy/releases/download/snoopy-$version/snoopy-$version.tar.gz "snoopy-$version.tar.gz"
+    download "https://github.com/a2o/snoopy/releases/download/snoopy-$version/snoopy-$version.tar.gz" "snoopy-$version.tar.gz"
     if ! sudo ./install-snoopy.sh "./snoopy-$version.tar.gz"; then
         # If it fails
         error "Snoopy installation for version $version failed"
@@ -811,8 +824,8 @@ function install_snoopy {
             echo
             info "Set Snoopy output to $SNOOPY_LOG."
             # Restart snoopy
-            sudo snoopy-disable
-            sudo snoopy-enable
+            sudo /usr/local/sbin/snoopy-disable
+            sudo /usr/local/sbin/snoopy-enable
             sudo -H -u splunk $SPLUNK_HOME/bin/splunk add monitor "$SNOOPY_LOG" -index "snoopy" -sourcetype "snoopy"
         else
             error "Could not find Snoopy config file. Please add \`output = file:/var/log/snoopy.log\` to the end of the config."
@@ -844,10 +857,10 @@ function main {
     setup_splunk
 
     setup_monitors
-    add_additional_logs
+    # add_additional_logs
 
+    sudo -H -u splunk $SPLUNK_HOME/bin/splunk stop
     if command -v systemctl &> /dev/null; then
-        sudo -H -u splunk $SPLUNK_HOME/bin/splunk stop
         info "Enabling systemd service"
         sudo $SPLUNK_HOME/bin/splunk enable boot-start -systemd-managed 1 -user splunk
         if [ "$INDEXER" == true ]; then
@@ -863,13 +876,14 @@ function main {
     fi
 
     echo
-    info "Would you like to install additional logging sources?"
-    echo "   - auditd (file monitor)"
-    echo "   - snoopy (command logger)"
-    echo "   - sysmon (system and network monitor)"
-    option=$(get_input_string "(Y/n): " | tr -d ' ')
 
-    if [ "$option" != "n" ]; then
+    if [ "$SPLUNK_ONLY" == false ]; then
+        print_banner "Installing additional logging sources"
+        info "Installing and configuring:"
+        echo "   - auditd (file monitor)"
+        echo "   - snoopy (command logger)"
+        echo "   - sysmon (system and network monitor)"
+
         install_auditd
         if ! install_snoopy "2.5.2"; then
             if ! install_snoopy "2.4.15"; then
@@ -879,16 +893,20 @@ function main {
             fi
         fi
         install_sysmon
+    else
+        info "Skipping installation of additional logging sources"
     fi
 
     print_banner "End of script"
-    info "Add future additional monitors with 'sudo -H -u splunk $SPLUNK_HOME/bin/splunk add monitor <PATH> -index <INDEX>'"
-    info "Add future additional scripted inputs with 'sudo -H -u splunk $SPLUNK_HOME/bin/splunk add exec $SPLUNK_HOME/etc/apps/ccdc-add-on/bin/<SCRIPT> -interval <SECONDS> -index <INDEX>'"
+    info "You can add additional monitors with this script."
+    echo "   Usage: ./splunk.sh -a <LOG_PATH>"
+    # info "Add future additional scripted inputs with 'sudo -H -u splunk $SPLUNK_HOME/bin/splunk add exec $SPLUNK_HOME/etc/apps/ccdc-add-on/bin/<SCRIPT> -interval <SECONDS> -index <INDEX>'"
+    echo
     info "A debug log is located at $DEBUG_LOG"
     echo
 }
 
-while getopts "hp:f:ig:u" opt; do
+while getopts "hp:f:ig:uSa:" opt; do
     case $opt in
         h)
             print_usage
@@ -897,16 +915,25 @@ while getopts "hp:f:ig:u" opt; do
         u)
             # prints download urls for Splunk
             echo "Linux indexer deb (indexer_deb): $indexer_deb"
+            echo
             echo "Linux indexer rpm (indexer_rpm): $indexer_rpm"
+            echo
             echo "Linux indexer tgz (indexer_tgz): $indexer_tgz"
+            echo
             echo "Linux deb (deb): $deb"
+            echo
             echo "Linux rpm (rpm): $rpm"
+            echo
             echo "Linux tgz (tgz): $tgz"
+            echo
             echo "Linux ARM deb (arm_deb): $arm_deb"
+            echo
             echo "Linux ARM rpm (arm_rpm): $arm_rpm"
+            echo
             echo "Linux ARM tgz (arm_tgz): $arm_tgz"
+            echo
             echo "A full list of URLs can be found in the markdown page on Github"
-            exit
+            exit 0
             ;;
         p)
             PACKAGE=$OPTARG
@@ -920,6 +947,27 @@ while getopts "hp:f:ig:u" opt; do
             ;;
         g)
             GITHUB_URL=$OPTARG
+            ;;
+        S)
+            SPLUNK_ONLY=true
+            ;;
+        a)
+            # this assumes it is a forwarder installation
+            while true; do
+                info "Indexes: ${INDEXES[*]}"
+                index=$(get_input_string "Select an index: " | tr -d ' ')
+                matches=false
+                for value in "${INDEXES[@]}"
+                do
+                  [[ "$index" = "$value" ]] && matches=true
+                done
+                if [ "$matches" = true ]; then
+                    break
+                fi
+                error "Invalid index: $index"
+            done
+            add_monitor "$OPTARG" "$index"
+            exit 0
             ;;
         \?)
             error "Invalid option: $OPTARG"
@@ -937,7 +985,7 @@ DEBUG_LOG_PATH=$(dirname "$DEBUG_LOG")
 if [ ! -d "$DEBUG_LOG_PATH" ]; then
     sudo mkdir -p "$DEBUG_LOG_PATH"
     sudo chown root:root "$DEBUG_LOG_PATH"
-    sudo chmod 755 "$DEBUG_LOG_PATH"
+    sudo chmod 700 "$DEBUG_LOG_PATH"
 fi
 main 2>&1 | sudo tee $DEBUG_LOG
 #####################################################
