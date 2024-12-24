@@ -1,7 +1,7 @@
 #!/bin/bash
 ###################### GLOBALS ######################
 pm=""
-GITHUB_URL='https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main'
+GITHUB_URL="https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main"
 #####################################################
 
 ##################### FUNCTIONS #####################
@@ -77,8 +77,6 @@ function add_audit_rules {
 #####################################################
 
 ####################### START #######################
-echo "[*] Beginning of script"
 detect_package_manager
 install_auditd
 add_audit_rules
-echo "[*] End of script"

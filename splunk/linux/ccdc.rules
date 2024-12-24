@@ -10,7 +10,7 @@
 -w /etc/profile.d/ -p w -k CCDC_modify_profile
 -w /etc/profile -p w -k CCDC_modify_profile
 -w /etc/ssh/ -p w -k CCDC_modify_ssh_config
--w /etc/bash.bashrc -p w -k CCDC_modify_bashrc_global
+#-w /etc/bash.bashrc -p w -k CCDC_modify_bashrc_global
 -w /etc/bashrc -p w -k CCDC_modify_bashrc_global
 -w /etc/sudoers -p w -k CCDC_modify_sudoers
 -w /etc/sudoers.d/ -p w -k CCDC_modify_sudoers
@@ -19,6 +19,7 @@
 -w /usr/sbin/ -p w -k CCDC_modify_binaries
 -w /usr/bin/ -p w -k CCDC_modify_binaries
 -w /bin/ -p w -k CCDC_modify_binaries
+-w /var/www/ -p w -k CCDC_modify_web
 
 ### BINARIES ###
 # execution of suspicious binaries

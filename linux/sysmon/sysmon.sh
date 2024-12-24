@@ -479,8 +479,8 @@ function install_from_package {
     # Install the packages
     case $package_type in
         "deb")
-            sudo dpkg -i "./sysinternals.$package_type"
-            sudo dpkg -i "./sysmon.$package_type"
+            sudo apt-get install -f "./sysinternals.$package_type"
+            sudo apt-get install -f "./sysmon.$package_type"
             ;;
         "rpm")
             sudo which dnf &> /dev/null

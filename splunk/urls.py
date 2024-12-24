@@ -238,9 +238,9 @@ AIX PPC .tgz:
 
 bash_template = '''\
 # Indexer
-deb="$INDEXER_DEB"
-rpm="$INDEXER_RPM"
-tgz="$INDEXER_TGZ"
+indexer_deb="$INDEXER_DEB"
+indexer_rpm="$INDEXER_RPM"
+indexer_tgz="$INDEXER_TGZ"
 
 # Forwarder
 deb="$DEB"
