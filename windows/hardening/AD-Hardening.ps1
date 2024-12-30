@@ -232,7 +232,7 @@ function Add-Competition-Users {
             }
 
             if ($UserArray.indexOf($user) -eq 2) {
-                New-ADGroup -Name "Workstation Admins" -Scope Global
+                New-ADGroup -Name "Workstation Admins" -GroupScope Global
                 Add-ADGroupMember -Identity "Workstation Admins" -Members $user
 
                 while ($true) {
