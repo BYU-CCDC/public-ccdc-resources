@@ -55,7 +55,7 @@ function GetCompetitionUsers {
         $user2 = Read-Host "Please enter the second username"
 
         # Prompt the user for the third username
-        $user2 = Read-Host "Please enter the third username"
+        $user3 = Read-Host "Please enter the third username"
 
         # Combine the usernames with a newline between them
         $content = "$user1`n$user2`n$user3"
