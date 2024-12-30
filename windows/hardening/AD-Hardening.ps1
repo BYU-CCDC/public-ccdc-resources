@@ -1,31 +1,31 @@
 Import-Module ActiveDirectory
 Import-Module GroupPolicy
 
-$ccdcRepoPath = "https://tinyurl.com/byunccdc"
-$portsFile = "windows/hardening/ports.json"
-$advancedAuditingFile = "windows/hardening/advancedAuditing.ps1"
-$patchURLFile = "windows/hardening/patchURLs.json"
-$groupManagementFile = "windows/hardening/groupManagement.ps1"
-$mainFunctionsFile = "windows/hardening/mainFunctionsList.txt"
-$splunkFile = "splunk/splunk.ps1"
+$ccdcRepoWindowsHardeningPath = "https://tinyurl.com/byunccdc/windows/hardening"
+$portsFile = "ports.json"
+$advancedAuditingFile = "advancedAuditing.ps1"
+$patchURLFile = "patchURLs.json"
+$groupManagementFile = "groupManagement.ps1"
+$mainFunctionsFile = "mainFunctionsList.txt"
+$splunkFile = "../../splunk/splunk.ps1"
 
 # Backup existing firewall rules
 netsh advfirewall export ./firewallbackup.wfw
 
 # Block SMB initially, we'll turn it back on in the firewall section
 # Inbound rules
-netsh advfirewall firewall add rule name="TCP Inbound SMB" dir=in action=deny protocol=TCP localport=139
-netsh advfirewall firewall add rule name="UDP Inbound SMB" dir=in action=deny protocol=UDP localport=139
+netsh advfirewall firewall add rule name="TCP Inbound SMB" dir=in action=block protocol=TCP localport=139
+netsh advfirewall firewall add rule name="UDP Inbound SMB" dir=in action=block protocol=UDP localport=139
 # Outbound rules
-netsh advfirewall firewall add rule name="TCP Outbound SMB" dir=out action=deny protocol=TCP localport=139
-netsh advfirewall firewall add rule name="UDP Outbound SMB" dir=out action=deny protocol=UDP localport=139
+netsh advfirewall firewall add rule name="TCP Outbound SMB" dir=out action=block protocol=TCP localport=139
+netsh advfirewall firewall add rule name="UDP Outbound SMB" dir=out action=block protocol=UDP localport=139
 
 # Inbound rules
-netsh advfirewall firewall add rule name="TCP Inbound SMB" dir=in action=deny protocol=TCP localport=445
-netsh advfirewall firewall add rule name="UDP Inbound SMB" dir=in action=deny protocol=UDP localport=445
+netsh advfirewall firewall add rule name="TCP Inbound SMB" dir=in action=block protocol=TCP localport=445
+netsh advfirewall firewall add rule name="UDP Inbound SMB" dir=in action=block protocol=UDP localport=445
 # Outbound rules
-netsh advfirewall firewall add rule name="TCP Outbound SMB" dir=out action=deny protocol=TCP localport=445
-netsh advfirewall firewall add rule name="UDP Outbound SMB" dir=out action=deny protocol=UDP localport=445
+netsh advfirewall firewall add rule name="TCP Outbound SMB" dir=out action=block protocol=TCP localport=445
+netsh advfirewall firewall add rule name="UDP Outbound SMB" dir=out action=block protocol=UDP localport=445
 
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 $neededFiles = @($portsFile, $advancedAuditingFile, $patchURLFile, $groupManagementFile, $mainFunctionsFile, $splunkFile)
@@ -33,12 +33,12 @@ foreach ($file in $neededFiles) {
     $filename = $(Split-Path -Path $file -Leaf)
     try {
         if (-not (Test-Path "$pwd\$filename")) {
-            Invoke-WebRequest -Uri "$ccdcRepoPath/$file" -OutFile "$pwd\$filename"
+            Invoke-WebRequest -Uri "$ccdcRepoWindowsHardeningPath/$file" -OutFile "$pwd\$filename"
         }
     } catch {
         Write-Host $_.Exception.Message -ForegroundColor Yellow
         Write-Host "Error Occurred..."
-        Write-Host "Download $file from $ccdcRepoPath"
+        Write-Host "Download $file from $ccdcRepoWindowsHardeningPath"
         exit
     }
 }
@@ -1105,7 +1105,7 @@ function Enable-Auditing {
 function Configure-Sysmon-Connect-Splunk {
     try {
         # Define base URL and local directory for the Sysmon files
-        $sysmonPath = "$ccdcRepoPath/windows/hardening/sysmon"
+        $sysmonPath = "$ccdcRepoWindowsHardeningPath/sysmon"
         $localSysmonDir = ".\sysmon"
 
         # Ensure the Sysmon directory exists
