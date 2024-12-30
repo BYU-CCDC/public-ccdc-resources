@@ -54,8 +54,11 @@ function GetCompetitionUsers {
         # Prompt the user for the second username
         $user2 = Read-Host "Please enter the second username"
 
+        # Prompt the user for the third username
+        $user2 = Read-Host "Please enter the third username"
+
         # Combine the usernames with a newline between them
-        $content = "$user1`n$user2"
+        $content = "$user1`n$user2`n$user3"
 
         # Write the usernames to users.txt in the current directory
         Set-Content -Path ".\users.txt" -Value $content
@@ -222,6 +225,15 @@ function Add-Competition-Users {
 
                 # Can cause problems if domain functional level isn't above Windows Server 2008 R2
                 Add-ADGroupMember -Identity "Protected Users" -Members $user
+
+                while ($true) {
+                    Get-Set-Password -user $user
+                }
+            }
+
+            if ($UserArray.indexOf($user) -eq 2) {
+                New-ADGroup -Name "Workstation Admins" -Scope Global
+                Add-ADGroupMember -Identity "Workstation Admins" -Members $user
 
                 while ($true) {
                     Get-Set-Password -user $user
