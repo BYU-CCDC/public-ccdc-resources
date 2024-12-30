@@ -1,13 +1,13 @@
 Import-Module ActiveDirectory
 Import-Module GroupPolicy
 
-$ccdcRepoWindowsHardeningPath = "https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main/windows/hardening"
-$portsFile = "ports.json"
-$advancedAuditingFile = "advancedAuditing.ps1"
-$patchURLFile = "patchURLs.json"
-$groupManagementFile = "groupManagement.ps1"
-$mainFunctionsFile = "mainFunctionsList.txt"
-$splunkFile = "../../splunk/splunk.ps1"
+$ccdcRepoWindowsPath = "https://tinyurl.com/byunccdc/"
+$portsFile = "windows/hardening/ports.json"
+$advancedAuditingFile = "windows/hardening/advancedAuditing.ps1"
+$patchURLFile = "windows/hardening/patchURLs.json"
+$groupManagementFile = "windows/hardening/groupManagement.ps1"
+$mainFunctionsFile = "windows/hardening/mainFunctionsList.txt"
+$splunkFile = "splunk/splunk.ps1"
 
 # Inbound rules
 netsh advfirewall firewall add rule name="TCP Inbound SMB" dir=in action=allow protocol=TCP localport=139
@@ -29,12 +29,12 @@ foreach ($file in $neededFiles) {
     try {
         if (-not (Test-Path "$pwd\$file")) {
             $wc = New-Object net.webclient
-            $wc.DownloadFile("$ccdcRepoWindowsHardeningPath/$file", "$pwd\$file")
+            $wc.DownloadFile("$ccdcRepoWindowsPath/$file", "$pwd\$file")
         }
     } catch {
         Write-Host $_.Exception.Message -ForegroundColor Yellow
         Write-Host "Error Occurred..."
-        Write-Host "Download $file from $ccdcRepoWindowsHardeningPath"
+        Write-Host "Download $file from $ccdcRepoWindowsPath"
         exit
     }
 }
@@ -1101,7 +1101,7 @@ function Enable-Auditing {
 function Configure-Sysmon-Connect-Splunk {
     try {
         # Define base URL and local directory for the Sysmon files
-        $sysmonPath = "$ccdcRepoWindowsHardeningPath/sysmon"
+        $sysmonPath = "$ccdcRepoWindowsPath/windows/hardening/sysmon"
         $localSysmonDir = ".\sysmon"
 
         # Ensure the Sysmon directory exists
