@@ -33,7 +33,7 @@ foreach ($file in $neededFiles) {
     $filename = $(Split-Path -Path $file -Leaf)
     try {
         if (-not (Test-Path "$pwd\$filename")) {
-            Invoke-WebRequest -Uri "$ccdcRepoPath/$file" -OutFile "$pwd\$filename")
+            Invoke-WebRequest -Uri "$ccdcRepoPath/$file" -OutFile "$pwd\$filename"
         }
     } catch {
         Write-Host $_.Exception.Message -ForegroundColor Yellow
