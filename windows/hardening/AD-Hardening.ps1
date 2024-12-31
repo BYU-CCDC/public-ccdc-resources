@@ -1170,13 +1170,13 @@ function Configure-Secure-GPO {
             "Configure Winreg Exact Paths" = @{
                 "Key" = "HKLM\System\CurrentControlSet\Control\SecurePipeServers\Winreg\AllowedExactPaths"
                 "ValueName" = "Machine"
-                "Type" = "MULTI_SZ"
+                "Type" = "MultiString"
                 "Value" =  ""
             }
             "Configure Winreg Allowed Paths" = @{
                 "Key" = "HKLM\System\CurrentControlSet\Control\SecurePipeServers\Winreg\AllowedPaths"
                 "ValueName" = "Machine"
-                "Type" = "MULTI_SZ"
+                "Type" = "MultiString"
                 "Value" = ""
             }
             "Configure ProtectionMode" = @{
