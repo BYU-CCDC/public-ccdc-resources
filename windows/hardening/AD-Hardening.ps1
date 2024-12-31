@@ -986,6 +986,295 @@ function Configure-Secure-GPO {
                 "Value" = 2
                 "Type" = "DWORD"
             }
+            #other best practice keys
+            "Configure SecurityLevel" = @{
+                "Key" = "HKLM\Software\Microsoft\Windows NT\CurrentVersion\Setup\RecoveryConsole"
+                "ValueName" = "SecurityLevel"
+                "Type" = "DWORD"
+                "Value" = 0
+            }
+            "Configure SetCommand" = @{
+                "Key" = "HKLM\Software\Microsoft\Windows NT\CurrentVersion\Setup\RecoveryConsole"
+                "ValueName" = "SetCommand"
+                "Type" = "DWORD"
+                "Value" = 0
+            }
+            "Configure AllocateCDRoms" = @{
+                "Key" = "HKLM\Software\Microsoft\Windows NT\CurrentVersion\Winlogon"
+                "ValueName" = "AllocateCDRoms"
+                "Type" = "String"
+                "Value" = "1"
+            }
+            "Configure AllocateFloppies" = @{
+                "Key" = "HKLM\Software\Microsoft\Windows NT\CurrentVersion\Winlogon"
+                "ValueName" = "AllocateFloppies"
+                "Type" = "String"
+                "Value" = "1"
+            }
+            "Configure CachedLogonsCount" = @{
+                "Key" = "HKLM\Software\Microsoft\Windows NT\CurrentVersion\Winlogon"
+                "ValueName" = "CachedLogonsCount"
+                "Type" = "String"
+                "Value" = "0"
+            }
+            "Configure ForceUnlockLogon" = @{
+                "Key" = "HKLM\Software\Microsoft\Windows NT\CurrentVersion\Winlogon"
+                "ValueName" = "ForceUnlockLogon"
+                "Type" = "DWORD"
+                "Value" = 1
+            }
+            "Configure ConsentPromptBehaviorAdmin" = @{
+                "Key" = "HKLM\Software\Microsoft\Windows\CurrentVersion\Policies\System"
+                "ValueName" = "ConsentPromptBehaviorAdmin"
+                "Type" = "DWORD"
+                "Value" = 1
+            }
+            "Configure ConsentPromptBehaviorUser" = @{
+                "Key" = "HKLM\Software\Microsoft\Windows\CurrentVersion\Policies\System"
+                "ValueName" = "ConsentPromptBehaviorUser"
+                "Type" = "DWORD"
+                "Value" = 1
+            }
+            "Configure DisableCAD" = @{
+                "Key" = "HKLM\Software\Microsoft\Windows\CurrentVersion\Policies\System"
+                "ValueName" = "DisableCAD"
+                "Type" = "DWORD"
+                "Value" = 0
+            }
+            "Configure EnableLUA" = @{
+                "Key" = "HKLM\Software\Microsoft\Windows\CurrentVersion\Policies\System"
+                "ValueName" = "EnableLUA"
+                "Type" = "DWORD"
+                "Value" = 1
+            }
+            "Configure FilterAdministratorToken" = @{
+                "Key" = "HKLM\Software\Microsoft\Windows\CurrentVersion\Policies\System"
+                "ValueName" = "FilterAdministratorToken"
+                "Type" = "DWORD"
+                "Value" = 1
+            }
+            "Configure NoConnectedUser" = @{
+                "Key" = "HKLM\Software\Microsoft\Windows\CurrentVersion\Policies\System"
+                "ValueName" = "NoConnectedUser"
+                "Type" = "DWORD"
+                "Value" = 1
+            }
+            "Configure PromptOnSecureDesktop" = @{
+                "Key" = "HKLM\Software\Microsoft\Windows\CurrentVersion\Policies\System"
+                "ValueName" = "PromptOnSecureDesktop"
+                "Type" = "DWORD"
+                "Value" = 1
+            }
+            "Configure ForceKeyProtection" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Cryptography"
+                "ValueName" = "ForceKeyProtection"
+                "Type" = "DWORD"
+                "Value" = 2
+            }
+            "Configure AuthenticodeEnabled" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows\Safer\CodeIdentifiers"
+                "ValueName" = "AuthenticodeEnabled"
+                "Type" = "DWORD"
+                "Value" = 1
+            }
+            "Configure AuditBaseObjects" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Control\Lsa"
+                "ValueName" = "AuditBaseObjects"
+                "Type" = "DWORD"
+                "Value" = 0
+            }
+            "Configure DisableDomainCreds" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Control\Lsa"
+                "ValueName" = "DisableDomainCreds"
+                "Type" = "DWORD"
+                "Value" = 1
+            }
+            "Configure EveryoneIncludesAnonymous" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Control\Lsa"
+                "ValueName" = "EveryoneIncludesAnonymous"
+                "Type" = "DWORD"
+                "Value" = 0
+            }
+            "Configure Enabled" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Control\Lsa\FIPSAlgorithmPolicy"
+                "ValueName" = "Enabled"
+                "Type" = "DWORD"
+                "Value" = 1
+            }
+            "Configure FullPrivilegeAuditing" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Control\Lsa"
+                "ValueName" = "FullPrivilegeAuditing"
+                "Type" = "Binary"
+                "Value" = 0
+            }
+            "Configure LimitBlankPasswordUse" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Control\Lsa"
+                "ValueName" = "LimitBlankPasswordUse"
+                "Type" = "DWORD"
+                "Value" = 1
+            }
+            "Configure NTLMMinClientSec" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Control\Lsa\MSV1_0"
+                "ValueName" = "NTLMMinClientSec"
+                "Type" = "DWORD"
+                "Value" = 537395200
+            }
+            "Configure NTLMMinServerSec" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Control\Lsa\MSV1_0"
+                "ValueName" = "NTLMMinServerSec"
+                "Type" = "DWORD"
+                "Value" = 537395200
+            }
+            "Configure NoLMHash" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Control\Lsa"
+                "ValueName" = "NoLMHash"
+                "Type" = "DWORD"
+                "Value" = 1
+            }
+            "Configure RestrictAnonymous" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Control\Lsa"
+                "ValueName" = "RestrictAnonymous"
+                "Type" = "DWORD"
+                "Value" = 1
+            }
+            "Configure RestrictAnonymousSAM" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Control\Lsa"
+                "ValueName" = "RestrictAnonymousSAM"
+                "Type" = "DWORD"
+                "Value" = 1
+            }
+            "Configure RestrictRemoteSAM" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Control\Lsa"
+                "ValueName" = "RestrictRemoteSAM"
+                "Type" = "String"
+                "Value" = "O:BAG:BAD:(A;;RC;;;BA)"
+            }
+            "Configure SCENoApplyLegacyAuditPolicy" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Control\Lsa"
+                "ValueName" = "SCENoApplyLegacyAuditPolicy"
+                "Type" = "DWORD"
+                "Value" = 1
+            }
+            "Configure SubmitControl" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Control\Lsa"
+                "ValueName" = "SubmitControl"
+                "Type" = "DWORD"
+                "Value" = 0
+            }
+            "Configure AddPrinterDrivers" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Control\Print\Providers\LanMan Print Services\Servers"
+                "ValueName" = "AddPrinterDrivers"
+                "Type" = "DWORD"
+                "Value" = 1
+            }
+            "Configure Machine" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Control\SecurePipeServers\Winreg\AllowedExactPaths"
+                "ValueName" = "Machine"
+                "Type" = "MULTI_SZ"
+                "Value" =  ""
+            }
+            "Configure Machine" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Control\SecurePipeServers\Winreg\AllowedPaths"
+                "ValueName" = "Machine"
+                "Type" = "MULTI_SZ"
+                "Value" = ""
+            }
+            "Configure ProtectionMode" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Control\Session Manager"
+                "ValueName" = "ProtectionMode"
+                "Type" = "DWORD"
+                "Value" = 1
+            }
+            "Configure EnableSecuritySignature" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Services\LanManServer\Parameters"
+                "ValueName" = "EnableSecuritySignature"
+                "Type" = "DWORD"
+                "Value" = 1
+            }
+            "Configure RequireSecuritySignature" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Services\LanManServer\Parameters"
+                "ValueName" = "RequireSecuritySignature"
+                "Type" = "DWORD"
+                "Value" = 1
+            }
+            "Configure RestrictNullSessAccess" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Services\LanManServer\Parameters"
+                "ValueName" = "RestrictNullSessAccess"
+                "Type" = "DWORD"
+                "Value" = 1
+            }
+            "Configure EnablePlainTextPassword" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Services\LanmanWorkstation\Parameters"
+                "ValueName" = "EnablePlainTextPassword"
+                "Type" = "DWORD"
+                "Value" = 0
+            }
+            "Configure EnableSecuritySignature" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Services\LanmanWorkstation\Parameters"
+                "ValueName" = "EnableSecuritySignature"
+                "Type" = "DWORD"
+                "Value" = 1
+            }
+            "Configure RequireSecuritySignature" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Services\LanmanWorkstation\Parameters"
+                "ValueName" = "RequireSecuritySignature"
+                "Type" = "DWORD"
+                "Value" = 1
+            }
+            "Configure LDAPClientIntegrity" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Services\LDAP"
+                "ValueName" = "LDAPClientIntegrity"
+                "Type" = "DWORD"
+                "Value" = 2
+            }
+            "Configure DisablePasswordChange" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Services\Netlogon\Parameters"
+                "ValueName" = "DisablePasswordChange"
+                "Type" = "DWORD"
+                "Value" = 0
+            }
+            "Configure RefusePasswordChange" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Services\Netlogon\Parameters"
+                "ValueName" = "RefusePasswordChange"
+                "Type" = "DWORD"
+                "Value" = 0
+            }
+            "Configure RequireSignOrSeal" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Services\Netlogon\Parameters"
+                "ValueName" = "RequireSignOrSeal"
+                "Type" = "DWORD"
+                "Value" = 1
+            }
+            "Configure RequireStrongKey" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Services\Netlogon\Parameters"
+                "ValueName" = "RequireStrongKey"
+                "Type" = "DWORD"
+                "Value" = 1
+            }
+            "Configure SealSecureChannel" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Services\Netlogon\Parameters"
+                "ValueName" = "SealSecureChannel"
+                "Type" = "DWORD"
+                "Value" = 1
+            }
+            "Configure SignSecureChannel" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Services\Netlogon\Parameters"
+                "ValueName" = "SignSecureChannel"
+                "Type" = "DWORD"
+                "Value" = 1
+            }
+            "Configure LdapEnforceChannelBinding" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Services\NTDS\Parameters"
+                "ValueName" = "LdapEnforceChannelBinding"
+                "Type" = "DWORD"
+                "Value" = 2
+            }
+            "Configure LDAPServerIntegrity" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Services\NTDS\Parameters"
+                "ValueName" = "LDAPServerIntegrity"
+                "Type" = "DWORD"
+                "Value" = 2
+            }
 
         }
 
