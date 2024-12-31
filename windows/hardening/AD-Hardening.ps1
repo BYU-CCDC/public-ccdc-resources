@@ -199,7 +199,9 @@ function Change-Current-User-Password {
     $currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent()
     if ($currentUser.AuthenticationType -ne "Local") {
         Write-Host "User is a domain user."
-        Get-Set-Password -User $env:username
+        while ($true) {
+            Get-Set-Password -User $env:username
+        }
     } else {
         Write-Host "User is a local user."
         while ($true) {
@@ -665,84 +667,84 @@ function Configure-Secure-GPO {
 
         # Define configurations
         $configurations = @{
-            "Moderating Access to Control Panel" = @{
-                "Key" = "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer"
-                "ValueName" = "NoControlPanel"
-                "Value" = 1
-                "Type" = "DWORD"
-            }
+            #"Moderating Access to Control Panel" = @{
+                #"Key" = "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer"
+                #"ValueName" = "NoControlPanel"
+                #"Value" = 1
+                #"Type" = "DWORD"
+            #}
             "Prevent Windows from Storing LAN Manager Hash" = @{
                 "Key" = "HKLM\System\CurrentControlSet\Control\Lsa"
                 "ValueName" = "NoLMHash"
                 "Value" = 1
                 "Type" = "DWORD"
             }
-            "Control Access to Command Prompt" = @{
-                "Key" = "HKCU\Software\Policies\Microsoft\Windows\System"
-                "ValueName" = "DisableCMD"
-                "Value" = 2
-                "Type" = "DWORD"
-            }
+            #"Control Access to Command Prompt" = @{
+                #"Key" = "HKCU\Software\Policies\Microsoft\Windows\System"
+                #"ValueName" = "DisableCMD"
+                #"Value" = 2
+                #"Type" = "DWORD"
+            #}
             "Disable Forced System Restarts" = @{
                 "Key" = "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU"
                 "ValueName" = "NoAutoRebootWithLoggedOnUsers"
                 "Value" = 1
                 "Type" = "DWORD"
             }
-            "Disallow Removable Media Drives, DVDs, CDs, and Floppy Drives" = @{
-                "Key" = "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer"
-                "ValueName" = "NoViewOnDrive"
-                "Value" = 12
-                "Type" = "DWORD"
-            }
-            "Restrict Software Installations" = @{
-                "Key" = "HKLM\Software\Policies\Microsoft\Windows\Installer"
-                "ValueName" = "DisableMSI"
-                "Value" = 1
-                "Type" = "DWORD"
-            }
+            #"Disallow Removable Media Drives, DVDs, CDs, and Floppy Drives" = @{
+                #"Key" = "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer"
+                #"ValueName" = "NoViewOnDrive"
+                #"Value" = 12
+                #"Type" = "DWORD"
+            #}
+            #"Restrict Software Installations" = @{
+                #"Key" = "HKLM\Software\Policies\Microsoft\Windows\Installer"
+                #"ValueName" = "DisableMSI"
+                #"Value" = 1
+                #"Type" = "DWORD"
+            #}
             "Disable Guest Account" = @{
                 "Key" = "HKLM\Software\Microsoft\Windows NT\CurrentVersion\Winlogon"
                 "ValueName" = "AllowGuest"
                 "Value" = 0
                 "Type" = "DWORD"
             }
-            "Set Minimum Password Length to Higher Limits" = @{
-                "Key" = "HKLM\Software\Policies\Microsoft Services\AdmPwd"
-                "ValueName" = "MinimumPasswordLength"
-                "Value" = 8
-                "Type" = "DWORD"
-            }
-            "Set Maximum Password Age to Lower Limits" = @{
-                "Key" = "HKLM\Software\Policies\Microsoft Services\AdmPwd"
-                "ValueName" = "MaximumPasswordAge"
-                "Value" = 90
-                "Type" = "DWORD"
-            }
-            "Set Password History to 3 Passwords" = @{
-                "Key" = "HKLM\Software\Policies\Microsoft Services\AdmPwd"
-                "ValueName" = "PasswordHistorySize"
-                "Value" = 3
-                "Type" = "DWORD"
-            }
-            "Add Complexity Requirements" = @{
-                "Key" = "HKLM\Software\Policies\Microsoft Services\AdmPwd"
-                "ValueName" = "PasswordComplexity"
-                "Value" = 1
-                "Type" = "DWORD"
-            }
-            "Set Minimum Password Length to 8 Characters" = @{
-                "Key" = "HKLM\Software\Policies\Microsoft Services\AdmPwd"
-                "ValueName" = "PasswordLength"
-                "Value" = 8
-                "Type" = "DWORD"
-            }
-            "Store Password Using Reversible Encryption" = @{
-                "Key" = "HKLM\Software\Policies\Microsoft Services\AdmPwd"
-                "ValueName" = "ClearTextPassword"
-                "Value" = 0
-                "Type" = "DWORD"
-            }
+            #"Set Minimum Password Length to Higher Limits" = @{
+                #"Key" = "HKLM\Software\Policies\Microsoft Services\AdmPwd"
+                #"ValueName" = "MinimumPasswordLength"
+                #"Value" = 8
+                #"Type" = "DWORD"
+            #}
+            #"Set Maximum Password Age to Lower Limits" = @{
+                #"Key" = "HKLM\Software\Policies\Microsoft Services\AdmPwd"
+                #"ValueName" = "MaximumPasswordAge"
+                #"Value" = 90
+                #"Type" = "DWORD"
+            #}
+            #"Set Password History to 3 Passwords" = @{
+                #"Key" = "HKLM\Software\Policies\Microsoft Services\AdmPwd"
+                #"ValueName" = "PasswordHistorySize"
+                #"Value" = 3
+                #"Type" = "DWORD"
+            #}
+            #"Add Complexity Requirements" = @{
+                #"Key" = "HKLM\Software\Policies\Microsoft Services\AdmPwd"
+                #"ValueName" = "PasswordComplexity"
+                #"Value" = 1
+                #"Type" = "DWORD"
+            #}
+            #"Set Minimum Password Length to 8 Characters" = @{
+                #"Key" = "HKLM\Software\Policies\Microsoft Services\AdmPwd"
+                #"ValueName" = "PasswordLength"
+                #"Value" = 8
+                #"Type" = "DWORD"
+            #}
+            #"Store Password Using Reversible Encryption" = @{
+                #"Key" = "HKLM\Software\Policies\Microsoft Services\AdmPwd"
+                #"ValueName" = "ClearTextPassword"
+                #"Value" = 0
+                #"Type" = "DWORD"
+            #}
             "Disable Anonymous SID Enumeration" = @{
                 "Key" = "HKLM\System\CurrentControlSet\Control\Lsa"
                 "ValueName" = "RestrictAnonymousSAM"
@@ -767,72 +769,97 @@ function Configure-Secure-GPO {
                 "Value" = 1
                 "Type" = "DWORD"
             }
-            "Disable Powershell" = @{
-                "Key" = "HKLM\Software\Policies\Microsoft\Windows\PowerShell"
-                "ValueName" = "EnableScripts"
+            #"Disable Powershell" = @{
+                #"Key" = "HKLM\Software\Policies\Microsoft\Windows\PowerShell"
+                #"ValueName" = "EnableScripts"
+                #"Value" = 0
+                #"Type" = "DWORD"
+            #}
+            #"Enable Domain Profile Windows Defender" = @{
+                #"Key" = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\DomainProfile"
+                #"ValueName" = "EnableFirewall"
+                #"Value" = 1
+                #"Type" = "DWORD"
+            #}
+            #"Enable Public Profile Windows Defender" = @{
+                #"Key" = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\StandardProfile"
+                #"ValueName" = "EnableFirewall"
+                #"Value" = 1
+                #"Type" = "DWORD"
+            #}
+            #"Enable Private Profile Windows Defender" = @{
+                #"Key" = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\PublicProfile"
+                #"ValueName" = "EnableFirewall"
+                #"Value" = 1
+                #"Type" = "DWORD"
+            #}
+            #"Set Domain Profile Block Inbound" = @{
+                #"Key" = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\DomainProfile"
+                #"ValueName" = "DefaultInboundAction"
+                #"Value" = "Block"
+                #"Type" = "String"
+            #}
+            #"Set Domain Profile Allow Outbound" = @{
+                #"Key" = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\DomainProfile"
+                #"ValueName" = "DefaultOutboundAction"
+                #"Value" = "Allow"
+                #"Type" = "String"
+            #}
+            #"Set Standard Profile Block Inbound" = @{
+                #"Key" = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\StandardProfile"
+                #"ValueName" = "DefaultInboundAction"
+                #"Value" = "Block"
+                #"Type" = "String"
+            #}
+            #"Set Standard Profile Allow Outbound" = @{
+                #"Key" = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\StandardProfile"
+                #"ValueName" = "DefaultOutboundAction"
+                #"Value" = "Allow"
+                #"Type" = "String"
+            #}
+            #"Set Public Profile Block Inbound" = @{
+                #"Key" = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\PublicProfile"
+                #"ValueName" = "DefaultInboundAction"
+                #"Value" = "Block"
+                #"Type" = "String"
+            #}
+            #"Set Public Profile Allow Outbound" = @{
+                #"Key" = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\PublicProfile"
+                #"ValueName" = "DefaultOutboundAction"
+                #"Value" = "Allow"
+                #"Type" = "String"
+            #}
+            #"Enable Defender Antivirus Protection" = @{
+                #"Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Real-Time Protection"
+                #"ValueName" = "DisableRealtimeMonitoring"
+                #"Value" = 0
+                #"Type" = "DWORD"
+            #}
+            "Disable WDigest UseLogonCredential" = @{
+                "Key" = "HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control\SecurityProviders\WDigest"
+                "ValueName" = "UseLogonCredential"
                 "Value" = 0
                 "Type" = "DWORD"
             }
-            "Enable Domain Profile Windows Defender" = @{
-                "Key" = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\DomainProfile"
-                "ValueName" = "EnableFirewall"
-                "Value" = 1
-                "Type" = "DWORD"
-            }
-            "Enable Public Profile Windows Defender" = @{
-                "Key" = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\StandardProfile"
-                "ValueName" = "EnableFirewall"
-                "Value" = 1
-                "Type" = "DWORD"
-            }
-            "Enable Private Profile Windows Defender" = @{
-                "Key" = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\PublicProfile"
-                "ValueName" = "EnableFirewall"
-                "Value" = 1
-                "Type" = "DWORD"
-            }
-            "Set Domain Profile Block Inbound" = @{
-                "Key" = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\DomainProfile"
-                "ValueName" = "DefaultInboundAction"
-                "Value" = "Block"
-                "Type" = "String"
-            }
-            "Set Domain Profile Allow Outbound" = @{
-                "Key" = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\DomainProfile"
-                "ValueName" = "DefaultOutboundAction"
-                "Value" = "Allow"
-                "Type" = "String"
-            }
-            "Set Standard Profile Block Inbound" = @{
-                "Key" = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\StandardProfile"
-                "ValueName" = "DefaultInboundAction"
-                "Value" = "Block"
-                "Type" = "String"
-            }
-            "Set Standard Profile Allow Outbound" = @{
-                "Key" = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\StandardProfile"
-                "ValueName" = "DefaultOutboundAction"
-                "Value" = "Allow"
-                "Type" = "String"
-            }
-            "Set Public Profile Block Inbound" = @{
-                "Key" = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\PublicProfile"
-                "ValueName" = "DefaultInboundAction"
-                "Value" = "Block"
-                "Type" = "String"
-            }
-            "Set Public Profile Allow Outbound" = @{
-                "Key" = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\PublicProfile"
-                "ValueName" = "DefaultOutboundAction"
-                "Value" = "Allow"
-                "Type" = "String"
-            }
-            "Enable Defender Antivirus Protection" = @{
-                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Real-Time Protection"
-                "ValueName" = "DisableRealtimeMonitoring"
+            "Disable WDigest Negotiation" = @{
+                "Key" = "HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control\SecurityProviders\WDigest"
+                "ValueName" = "Negotiate"
                 "Value" = 0
                 "Type" = "DWORD"
             }
+            "Enable LSASS protection" = @{
+                "Key" = "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\LSA"
+                "ValueName" = "RunAsPPL"
+                "Value" = 1
+                "Type" = "DWORD"
+            }
+            "Disable Restricted Admin" = @{
+                "Key" = "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\LSA"
+                "ValueName" = "DisableRestrictedAdmin"
+                "Value" = 1
+                "Type" = "DWORD"
+            }
+
         }
 
 # # Configure Windows Defender Antivirus settings via Group Policy to enable real-time monitoring
