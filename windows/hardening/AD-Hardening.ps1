@@ -1198,6 +1198,9 @@ renderXml=false
     }
 }
 
+function Create-Workstations-OU {
+    New-ADOrganizationalUnit -Name "Workstations"
+}
 ###################################### MAIN ######################################
 
 
@@ -1283,13 +1286,13 @@ if ($confirmation.toLower() -eq "y") {
 }
 
 
-# $confirmation = Prompt-Yes-No -Message "Enter the 'Configure Secure GPO' function? (y/n)"
-# if ($confirmation.toLower() -eq "y") {
-#     Write-Host "`n***Configuring Secure GPO***" -ForegroundColor Magenta
-#     Configure-Secure-GPO
-# } else {
-#     Write-Host "Skipping..." -ForegroundColor Red
-# }
+$confirmation = Prompt-Yes-No -Message "Enter the 'Configure Secure GPO' function? (y/n)"
+if ($confirmation.toLower() -eq "y") {
+    Write-Host "`n***Configuring Secure GPO***" -ForegroundColor Magenta
+    Configure-Secure-GPO
+} else {
+    Write-Host "Skipping..." -ForegroundColor Red
+}
 
 
 # Configure Auditing
