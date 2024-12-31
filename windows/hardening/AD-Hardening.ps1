@@ -1,6 +1,8 @@
 Import-Module ActiveDirectory
 Import-Module GroupPolicy
 
+$ProgressPreference = 'SilentlyContinue'
+
 $ccdcRepoWindowsHardeningPath = "https://tinyurl.com/byunccdc/windows/hardening"
 $portsFile = "ports.json"
 $advancedAuditingFile = "advancedAuditing.ps1"
@@ -190,6 +192,44 @@ function Get-Set-Password {
     } catch {
         Write-Host $_.Exception.Message "`n"
         Write-Host "There was an error with your password submission. Try again...`n" -ForegroundColor Yellow
+    }
+}
+
+function Change-Current-User-Password {
+    $currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent()
+    if ($currentUser.AuthenticationType -ne "Local") {
+        Write-Host "User is a domain user."
+        Get-Set-Password -User $env:username
+    } else {
+        Write-Host "User is a local user."
+        while ($true) {
+            try {
+                $pw = Read-Host -AsSecureString -Prompt "New password for $($env:Username):"
+                $conf = Read-Host -AsSecureString -Prompt "Confirm password for $($env:Username):"
+
+                # Convert SecureString to plain text
+                $pwPlainText = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($pw))
+                $confPlainText = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($conf))
+                if ($pwPlainText -eq $confPlainText -and $pwPlainText -ne "") {
+                    Get-LocalUser -Name $env:Username | Set-LocalUser -Password $password
+                    Write-Host "Success!!`n"
+
+                    # Clear the plaintext passwords from memory
+                    $pwPlainText = $null
+                    $confPlainText = $null
+
+                    # Optionally, force a garbage collection to reclaim memory (though this is not immediate)
+                    [System.GC]::Collect()
+                    $pw.Dispose()
+                    $conf.Dispose()
+                    break
+                } else {
+                    Write-Host "Either the passwords didn't match, or you typed nothing" -ForegroundColor Yellow
+                }
+            }
+
+        }
+
     }
 }
 
@@ -505,7 +545,7 @@ function Disable-Unnecessary-Services {
 function Handle-First-Policy-in-GPO {
     try {
     # Install RSAT features
-    Install-WindowsFeature -Name RSAT -IncludeAllSubFeature
+    #Install-WindowsFeature -Name RSAT -IncludeAllSubFeature
 
     # Define GPO and settings
     $gpoName = $GPOName
@@ -1205,6 +1245,15 @@ function Create-Workstations-OU {
 
 
 Initialize-Log
+
+# Change current user's password
+$confirmation = Prompt-Yes-No -Message "Change current user password? (y/n)"
+if ($confirmation.toLower() -eq "y") {
+    Write-Host "`n***Changing current user password***" -ForegroundColor Magenta
+    Change-Current-User-Password
+} else {
+    Write-Host "Skipping..." -ForegroundColor Red
+}
 
 # Upgrade SMB
 $confirmation = Prompt-Yes-No -Message "Upgrade SMB? (y/n)"
