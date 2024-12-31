@@ -225,7 +225,12 @@ function Change-Current-User-Password {
                     break
                 } else {
                     Write-Host "Either the passwords didn't match, or you typed nothing" -ForegroundColor Yellow
+                } catch {
+
+                    Write-Host $_.Exception.Message "`n"
+                    Write-Host "There was an error with your password submission. Try again...`n" -ForegroundColor Yellow
                 }
+
             }
 
         }
