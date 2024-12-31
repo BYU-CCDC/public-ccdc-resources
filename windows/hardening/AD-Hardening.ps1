@@ -1167,13 +1167,13 @@ function Configure-Secure-GPO {
                 "Type" = "DWORD"
                 "Value" = 1
             }
-            "Configure Machine" = @{
+            "Configure Winreg Exact Paths" = @{
                 "Key" = "HKLM\System\CurrentControlSet\Control\SecurePipeServers\Winreg\AllowedExactPaths"
                 "ValueName" = "Machine"
                 "Type" = "MULTI_SZ"
                 "Value" =  ""
             }
-            "Configure Machine" = @{
+            "Configure Winreg Allowed Paths" = @{
                 "Key" = "HKLM\System\CurrentControlSet\Control\SecurePipeServers\Winreg\AllowedPaths"
                 "ValueName" = "Machine"
                 "Type" = "MULTI_SZ"
@@ -1209,13 +1209,13 @@ function Configure-Secure-GPO {
                 "Type" = "DWORD"
                 "Value" = 0
             }
-            "Configure EnableSecuritySignature" = @{
+            "Configure EnableSecuritySignature Workstation" = @{
                 "Key" = "HKLM\System\CurrentControlSet\Services\LanmanWorkstation\Parameters"
                 "ValueName" = "EnableSecuritySignature"
                 "Type" = "DWORD"
                 "Value" = 1
             }
-            "Configure RequireSecuritySignature" = @{
+            "Configure RequireSecuritySignature Workstation" = @{
                 "Key" = "HKLM\System\CurrentControlSet\Services\LanmanWorkstation\Parameters"
                 "ValueName" = "RequireSecuritySignature"
                 "Type" = "DWORD"
