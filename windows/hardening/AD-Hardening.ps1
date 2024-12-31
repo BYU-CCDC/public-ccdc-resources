@@ -1400,6 +1400,22 @@ if ($confirmation.toLower() -eq "y") {
     Write-Host "Skipping..." -ForegroundColor Red
 }
 
+$confirmation = Prompt-Yes-No -Message "Create Workstations OU?"
+if ($confirmation.toLower() -eq "y") {
+    try {
+        Write-Host "***Creating Workstations OU***" -ForegroundColor Magenta
+        Create-Workstations-OU
+        Update-Log "Create Workstations OU" "Executed successfully"
+    } catch {
+        Write-Host $_.Exception.Message -ForegroundColor Yellow
+        Write-Host "Error Occurred..."
+        Update-Log "Create Workstations OU" "Failed with error: $($_.Exception.Message)"
+    }
+} else {
+    Write-Host "Skipping..." -ForegroundColor Red
+}
+
+
 
 Write-Host "`n***Script Completed!!!***" -ForegroundColor Green
 Print-Log
