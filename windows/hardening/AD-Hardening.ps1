@@ -72,22 +72,6 @@ function GetCompetitionUsers {
         Write-Host "Error Occurred..."
     }
 }
-GetCompetitionUsers
-$usersFile = "users.txt"
-
-# Get OS version and current user
-$OSVersion = (Get-WmiObject -class Win32_OperatingSystem).Caption
-$CurrentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
-
-# Load userfile and portdata
-[string[]]$UserArray = Get-Content -Path ".\$usersFile"
-$PortsObject = Get-Content -Path ".\$portsFile" -Raw | ConvertFrom-Json
-
-# Get all computer names in the domain
-$ADcomputers = Get-ADComputer -Filter * | Select-Object -ExpandProperty Name
-
-# Set GPO Name
-$GPOName = "Good-GPO"
 
 # Generate a random password with a mix of characters
 function GeneratePassword {
@@ -280,6 +264,9 @@ function Add-Competition-Users {
             if ($UserArray.indexOf($user) -eq 2) {
                 New-ADGroup -Name "Workstation Admins" -GroupScope Global
                 Add-ADGroupMember -Identity "Workstation Admins" -Members $user
+
+                # Can cause problems if domain functional level isn't above Windows Server 2008 R2
+                Add-ADGroupMember -Identity "Protected Users" -Members $user
 
                 while ($true) {
                     Get-Set-Password -user $user
@@ -667,84 +654,24 @@ function Configure-Secure-GPO {
 
         # Define configurations
         $configurations = @{
-            #"Moderating Access to Control Panel" = @{
-                #"Key" = "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer"
-                #"ValueName" = "NoControlPanel"
-                #"Value" = 1
-                #"Type" = "DWORD"
-            #}
             "Prevent Windows from Storing LAN Manager Hash" = @{
                 "Key" = "HKLM\System\CurrentControlSet\Control\Lsa"
                 "ValueName" = "NoLMHash"
                 "Value" = 1
                 "Type" = "DWORD"
             }
-            #"Control Access to Command Prompt" = @{
-                #"Key" = "HKCU\Software\Policies\Microsoft\Windows\System"
-                #"ValueName" = "DisableCMD"
-                #"Value" = 2
-                #"Type" = "DWORD"
-            #}
             "Disable Forced System Restarts" = @{
                 "Key" = "HKLM\Software\Policies\Microsoft\Windows\WindowsUpdate\AU"
                 "ValueName" = "NoAutoRebootWithLoggedOnUsers"
                 "Value" = 1
                 "Type" = "DWORD"
             }
-            #"Disallow Removable Media Drives, DVDs, CDs, and Floppy Drives" = @{
-                #"Key" = "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer"
-                #"ValueName" = "NoViewOnDrive"
-                #"Value" = 12
-                #"Type" = "DWORD"
-            #}
-            #"Restrict Software Installations" = @{
-                #"Key" = "HKLM\Software\Policies\Microsoft\Windows\Installer"
-                #"ValueName" = "DisableMSI"
-                #"Value" = 1
-                #"Type" = "DWORD"
-            #}
             "Disable Guest Account" = @{
                 "Key" = "HKLM\Software\Microsoft\Windows NT\CurrentVersion\Winlogon"
                 "ValueName" = "AllowGuest"
                 "Value" = 0
                 "Type" = "DWORD"
             }
-            #"Set Minimum Password Length to Higher Limits" = @{
-                #"Key" = "HKLM\Software\Policies\Microsoft Services\AdmPwd"
-                #"ValueName" = "MinimumPasswordLength"
-                #"Value" = 8
-                #"Type" = "DWORD"
-            #}
-            #"Set Maximum Password Age to Lower Limits" = @{
-                #"Key" = "HKLM\Software\Policies\Microsoft Services\AdmPwd"
-                #"ValueName" = "MaximumPasswordAge"
-                #"Value" = 90
-                #"Type" = "DWORD"
-            #}
-            #"Set Password History to 3 Passwords" = @{
-                #"Key" = "HKLM\Software\Policies\Microsoft Services\AdmPwd"
-                #"ValueName" = "PasswordHistorySize"
-                #"Value" = 3
-                #"Type" = "DWORD"
-            #}
-            #"Add Complexity Requirements" = @{
-                #"Key" = "HKLM\Software\Policies\Microsoft Services\AdmPwd"
-                #"ValueName" = "PasswordComplexity"
-                #"Value" = 1
-                #"Type" = "DWORD"
-            #}
-            #"Set Minimum Password Length to 8 Characters" = @{
-                #"Key" = "HKLM\Software\Policies\Microsoft Services\AdmPwd"
-                #"ValueName" = "PasswordLength"
-                #"Value" = 8
-                #"Type" = "DWORD"
-            #}
-            #"Store Password Using Reversible Encryption" = @{
-                #"Key" = "HKLM\Software\Policies\Microsoft Services\AdmPwd"
-                #"ValueName" = "ClearTextPassword"
-                #"Value" = 0
-                #"Type" = "DWORD"
-            #}
             "Disable Anonymous SID Enumeration" = @{
                 "Key" = "HKLM\System\CurrentControlSet\Control\Lsa"
                 "ValueName" = "RestrictAnonymousSAM"
@@ -769,72 +696,6 @@ function Configure-Secure-GPO {
                 "Value" = 1
                 "Type" = "DWORD"
             }
-            #"Disable Powershell" = @{
-                #"Key" = "HKLM\Software\Policies\Microsoft\Windows\PowerShell"
-                #"ValueName" = "EnableScripts"
-                #"Value" = 0
-                #"Type" = "DWORD"
-            #}
-            #"Enable Domain Profile Windows Defender" = @{
-                #"Key" = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\DomainProfile"
-                #"ValueName" = "EnableFirewall"
-                #"Value" = 1
-                #"Type" = "DWORD"
-            #}
-            #"Enable Public Profile Windows Defender" = @{
-                #"Key" = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\StandardProfile"
-                #"ValueName" = "EnableFirewall"
-                #"Value" = 1
-                #"Type" = "DWORD"
-            #}
-            #"Enable Private Profile Windows Defender" = @{
-                #"Key" = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\PublicProfile"
-                #"ValueName" = "EnableFirewall"
-                #"Value" = 1
-                #"Type" = "DWORD"
-            #}
-            #"Set Domain Profile Block Inbound" = @{
-                #"Key" = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\DomainProfile"
-                #"ValueName" = "DefaultInboundAction"
-                #"Value" = "Block"
-                #"Type" = "String"
-            #}
-            #"Set Domain Profile Allow Outbound" = @{
-                #"Key" = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\DomainProfile"
-                #"ValueName" = "DefaultOutboundAction"
-                #"Value" = "Allow"
-                #"Type" = "String"
-            #}
-            #"Set Standard Profile Block Inbound" = @{
-                #"Key" = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\StandardProfile"
-                #"ValueName" = "DefaultInboundAction"
-                #"Value" = "Block"
-                #"Type" = "String"
-            #}
-            #"Set Standard Profile Allow Outbound" = @{
-                #"Key" = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\StandardProfile"
-                #"ValueName" = "DefaultOutboundAction"
-                #"Value" = "Allow"
-                #"Type" = "String"
-            #}
-            #"Set Public Profile Block Inbound" = @{
-                #"Key" = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\PublicProfile"
-                #"ValueName" = "DefaultInboundAction"
-                #"Value" = "Block"
-                #"Type" = "String"
-            #}
-            #"Set Public Profile Allow Outbound" = @{
-                #"Key" = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\PublicProfile"
-                #"ValueName" = "DefaultOutboundAction"
-                #"Value" = "Allow"
-                #"Type" = "String"
-            #}
-            #"Enable Defender Antivirus Protection" = @{
-                #"Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Real-Time Protection"
-                #"ValueName" = "DisableRealtimeMonitoring"
-                #"Value" = 0
-                #"Type" = "DWORD"
-            #}
             "Disable WDigest UseLogonCredential" = @{
                 "Key" = "HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control\SecurityProviders\WDigest"
                 "ValueName" = "UseLogonCredential"
@@ -859,10 +720,275 @@ function Configure-Secure-GPO {
                 "Value" = 1
                 "Type" = "DWORD"
             }
+# # Configure Windows Defender Antivirus settings via Group Policy to enable real-time monitoring
+            "Configure DisableAutoExclusions" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Exclusions"
+                "ValueName" = "DisableAutoExclusions"
+                "Value" = 0
+                "Type" = "DWORD"
+            }
+
+            "Configure MpCloudBlockLevel" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\MpEngine"
+                "ValueName" = "MpCloudBlockLevel"
+                "Value" = 0
+                "Type" = "DWORD"
+            }
+ 
+            "Configure DisableDatagramProcessing" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\NIS"
+                "ValueName" = "DisableDatagramProcessing"
+                "Value" = 1
+                "Type" = "DWORD"
+            }
+ 
+            "Configure DisableProtocolRecognition" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\NIS"
+                "ValueName" = "DisableProtocolRecognition"
+                "Value" = 0
+                "Type" = "WORD"
+            }
+ 
+            "Configure DisableSignatureRetirement" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\NIS\Consumers\IPS"
+                "ValueName" = "DisableSignatureRetirement"
+                "Value" = 0
+                "Type" = "DWORD"
+            }
+ 
+            "Configure LocalSettingOverridePurgeItemsAfterDelay" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Quarantine"
+                "ValueName" = "LocalSettingOverridePurgeItemsAfterDelay"
+                "Value" = 0
+                "Type" = "DWORD"
+            }
+ 
+            "Configure DisableRealtimeMonitoring" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Real-Time Protection"
+                "ValueName" = "DisableRealtimeMonitoring"
+                "Value" = 0
+                "Type" = "DWORD"
+            }
+ 
+            "Configure DisableBehaviorMonitoring" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Real-Time Protection"
+                "ValueName" = "DisableBehaviorMonitoring"
+                "Value" = 0
+                "Type" = "DWORD"
+            }
+ 
+            "Configure DisableIOAVProtection" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Real-Time Protection"
+                "ValueName" = "DisableIOAVProtection"
+                "Value" = 0
+                "Type" = "DWORD"
+            }
+ 
+            "Configure DisableOnAccessProtection" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Real-Time Protection"
+                "ValueName" = "DisableOnAccessProtection"
+                "Value" = 0
+                "Type" = "DWORD"
+            }
+ 
+            "Configure DisableRawWriteNotification" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Real-Time Protection"
+                "ValueName" = "DisableRawWriteNotification"
+                "Value" = 0
+                "Type" = "DWORD"
+            }
+ 
+            "Configure DisableScanOnRealtimeEnable" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Real-Time Protection"
+                "ValueName" = "DisableScanOnRealtimeEnable"
+                "Value" = 0
+                "Type" = "DWORD"
+            }
+ 
+            "Configure DisableScriptScanning" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Real-Time Protection"
+                "ValueName" = "DisableScriptScanning"
+                "Value" = 0
+                "Type" = "DWORD"
+            }
+ 
+            "Configure LocalSettingOverrideDisableBehaviorMonitoring" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Real-Time Protection"
+                "ValueName" = "LocalSettingOverrideDisableBehaviorMonitoring"
+                "Value" = 0
+                "Type" = "DWORD"
+            }
+ 
+            "Configure LocalSettingOverrideDisableIOAVProtection" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Real-Time Protection"
+                "ValueName" = "LocalSettingOverrideDisableIOAVProtection"
+                "Value" = 0
+                "Type" = "DWORD"
+            }
+ 
+            "Configure LocalSettingOverrideDisableOnAccessProtection" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Real-Time Protection"
+                "ValueName" = "LocalSettingOverrideDisableOnAccessProtection"
+                "Value" = 0
+                "Type" = "DWORD"
+            }
+ 
+            "Configure LocalSettingOverrideDisableRealtimeMonitoring" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Real-Time Protection"
+                "ValueName" = "LocalSettingOverrideDisableRealtimeMonitoring"
+                "Value" = 0
+                "Type" = "DWORD"
+            }
+ 
+            "Configure LocalSettingOverrideRealtimeScanDirection" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Real-Time Protection"
+                "ValueName" = "LocalSettingOverrideRealtimeScanDirection"
+                "Value" = 0
+                "Type" = "DWORD"
+            }
+ 
+            "Configure RealtimeScanDirection" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Real-Time Protection"
+                "ValueName" = "RealtimeScanDirection"
+                "Value" = 0
+                "Type" = "DWORD"
+            }
+ 
+            "Configure DisableHeuristics" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Scan"
+                "ValueName" = "DisableHeuristics"
+                "Value" = 0
+                "Type" = "DWORD"
+            }
+ 
+            "Configure DisablePackedExeScanning" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Scan"
+                "ValueName" = "DisablePackedExeScanning"
+                "Value" = 0
+                "Type" = "DWORD"
+            }
+ 
+            "Configure DisableRemovableDriveScanning" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Scan"
+                "ValueName" = "DisableRemovableDriveScanning"
+                "Value" = 0
+                "Type" = "DWORD"
+            }
+ 
+            "Configure ScanParameters" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Scan"
+                "ValueName" = "ScanParameters"
+                "Value" = 1
+                "Type" = "DWORD"
+            }
+ 
+            "Configure QuickScanInterval" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Scan"
+                "ValueName" = "QuickScanInterval"
+                "Value" = 2
+                "Type" = "DWORD"
+            }
+ 
+            "Configure MeteredConnectionUpdates" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Signature Updates"
+                "ValueName" = "MeteredConnectionUpdates"
+                "Value" = 1
+                "Type" = "DWORD"
+            }
+ 
+            "Configure DisableScanOnUpdate" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Signature Updates"
+                "ValueName" = "DisableScanOnUpdate"
+                "Value" = 0
+                "Type" = "DWORD"
+            }
+ 
+            "Configure DisableScheduledSignatureUpdateOnBattery" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Signature Updates"
+                "ValueName" = "DisableScheduledSignatureUpdateOnBattery"
+                "Value" = 0
+                "Type" = "DWORD"
+            }
+ 
+            "Configure DisableUpdateOnStartupWithoutEngine" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Signature Updates"
+                "ValueName" = "DisableUpdateOnStartupWithoutEngine"
+                "Value" = 0
+                "Type" = "DWORD"
+            }
+ 
+            "Configure ForceUpdateFromMU" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Signature Updates"
+                "ValueName" = "ForceUpdateFromMU"
+                "Value" = 1
+                "Type" = "DWORD"
+            }
+ 
+            "Configure RealtimeSignatureDelivery" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Signature Updates"
+                "ValueName" = "RealtimeSignatureDelivery"
+                "Value" = 1
+                "Type" = "DWORD"
+            }
+ 
+            "Configure SignatureDisableNotification" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Signature Updates"
+                "ValueName" = "SignatureDisableNotification"
+                "Value" = 0
+                "Type" = "DWORD"
+            }
+ 
+            "Configure UpdateOnStartUp" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Signature Updates"
+                "ValueName" = "UpdateOnStartUp"
+                "Value" = 1
+                "Type" = "DWORD"
+            }
+ 
+            "Configure DisableBlockAtFirstSeen" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Spynet"
+                "ValueName" = "DisableBlockAtFirstSeen"
+                "Value" = 0
+                "Type" = "DWORD"
+            }
+ 
+            "Configure SpynetReporting" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Spynet"
+                "ValueName" = "SpynetReporting"
+                "Value" = 1
+                "Type" = "DWORD"
+            }
+ 
+            "Configure LocalSettingOverrideSpynetReporting" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Spynet"
+                "ValueName" = "LocalSettingOverrideSpynetReporting"
+                "Value" = 0
+                "Type" = "DWORD"
+            }
+ 
+            "Configure EnableControlledFolderAccess" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Windows Defender Exploit Guard\Controlled Folder Access"
+                "ValueName" = "EnableControlledFolderAccess"
+                "Value" = 1
+                "Type" = "DWORD"
+            }
+
+            "Configure AllowNetworkProtectionOnWinServer" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Windows Defender Exploit Guard\Network Protection"
+                "ValueName" = "AllowNetworkProtectionOnWinServer"
+                "Value" = 1
+                "Type" = "DWORD"
+            }
+ 
+            "Configure EnableNetworkProtection" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Windows Defender Exploit Guard\Network Protection"
+                "ValueName" = "EnableNetworkProtection"
+                "Value" = 2
+                "Type" = "DWORD"
+            }
 
         }
 
-# # Configure Windows Defender Antivirus settings via Group Policy to enable real-time monitoring
 
 
         $successfulConfigurations = 0
@@ -1285,6 +1411,25 @@ if ($confirmation.toLower() -eq "y") {
 } else {
     Write-Host "Skipping..." -ForegroundColor Red
 }
+
+
+GetCompetitionUsers
+$usersFile = "users.txt"
+
+# Get OS version and current user
+$OSVersion = (Get-WmiObject -class Win32_OperatingSystem).Caption
+$CurrentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+
+# Load userfile and portdata
+[string[]]$UserArray = Get-Content -Path ".\$usersFile"
+$PortsObject = Get-Content -Path ".\$portsFile" -Raw | ConvertFrom-Json
+
+# Get all computer names in the domain
+$ADcomputers = Get-ADComputer -Filter * | Select-Object -ExpandProperty Name
+
+# Set GPO Name
+$GPOName = "Good-GPO"
+
 
 # Upgrade SMB
 $confirmation = Prompt-Yes-No -Message "Upgrade SMB? (y/n)"
