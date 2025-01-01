@@ -744,7 +744,7 @@ function Configure-Secure-GPO {
                 "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\NIS"
                 "ValueName" = "DisableProtocolRecognition"
                 "Value" = 0
-                "Type" = "WORD"
+                "Type" = "DWORD"
             }
  
             "Configure DisableSignatureRetirement" = @{
@@ -1287,10 +1287,10 @@ function Configure-Secure-GPO {
             $keyPath = $config["Key"]
 
             # Check if key path exists
-            if (-not (Test-Path "Registry::$keyPath")) {
-                $failedConfigurations += $configName
-                continue
-            }
+            #if (-not (Test-Path "Registry::$keyPath")) {
+            #    $failedConfigurations += $configName
+            #    continue
+            #}
 
             # Set GPO registry value
             Set-GPRegistryValue -Name $GPOName -Key $config["Key"] -ValueName $config["ValueName"] -Value $config["Value"] -Type $config["Type"]
