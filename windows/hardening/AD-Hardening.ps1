@@ -1808,7 +1808,7 @@ if ($confirmation.toLower() -eq "y") {
 $confirmation = Prompt-Yes-No -Message "Enter the 'Enable RDP' function? (y/n)"
 if ($confirmation.toLower() -eq "y") {
     Write-Host "`n***Enabling RDP...***" -ForegroundColor Magenta
-    Enable-RDP
+    Enable-Disable-RDP
 } else {
     Write-Host "Skipping..." -ForegroundColor Red
 }
