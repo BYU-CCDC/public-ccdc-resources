@@ -1,7 +1,7 @@
 #!/bin/bash
 rhel_7="https://download.splunk.com/products/splunk_soar-unpriv/releases/6.3.0/linux/splunk_soar-unpriv-6.3.0.719-d9df3cc1-el7-x86_64.tgz"
 rhel_8="https://download.splunk.com/products/splunk_soar-unpriv/releases/6.3.0/linux/splunk_soar-unpriv-6.3.0.719-d9df3cc1-el8-x86_64.tgz"
-VERSION=$2
+VERSION=$1
 download=""
 
 # Choose version
@@ -14,5 +14,5 @@ fi
 # Install SOAR
 wget -O splunk_soar.tgz "$download"
 tar -xzvf ./splunk_soar.tgz
-sud mkdir /opt/soar
+sudo mkdir /opt/soar
 sudo ./splunk-soar/soar-prepare-system --splunk-soar-home /opt/soar
