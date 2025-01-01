@@ -1318,7 +1318,7 @@ function Download-Install-Setup-Splunk {
     param([string]$Version, [string]$IP)
 
     $splunkBeta = $true #((Prompt-Yes-No -Message "Install Splunk from deltabluejay repo? (y/n)").toLower() -eq 'y')
-    Write-Host $splunkBeta
+    #Write-Host $splunkBeta
     try {
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
         if ($splunkBeta) {
