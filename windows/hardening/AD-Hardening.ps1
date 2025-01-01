@@ -1,6 +1,8 @@
 Import-Module ActiveDirectory
 Import-Module GroupPolicy
 
+$ProgressPreference = 'SilentlyContinue'
+
 $ccdcRepoWindowsHardeningPath = "https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main/windows/hardening"
 $portsFile = "ports.json"
 $advancedAuditingFile = "advancedAuditing.ps1"
@@ -9,13 +11,31 @@ $groupManagementFile = "groupManagement.ps1"
 $mainFunctionsFile = "mainFunctionsList.txt"
 $splunkFile = "../../splunk/splunk.ps1"
 
+# Backup existing firewall rules
+netsh advfirewall export ./firewallbackup.wfw
+
+# Block SMB initially, we'll turn it back on in the firewall section
+# Inbound rules
+netsh advfirewall firewall add rule name="TCP Inbound SMB" dir=in action=block protocol=TCP localport=139
+netsh advfirewall firewall add rule name="UDP Inbound SMB" dir=in action=block protocol=UDP localport=139
+# Outbound rules
+netsh advfirewall firewall add rule name="TCP Outbound SMB" dir=out action=block protocol=TCP localport=139
+netsh advfirewall firewall add rule name="UDP Outbound SMB" dir=out action=block protocol=UDP localport=139
+
+# Inbound rules
+netsh advfirewall firewall add rule name="TCP Inbound SMB" dir=in action=block protocol=TCP localport=445
+netsh advfirewall firewall add rule name="UDP Inbound SMB" dir=in action=block protocol=UDP localport=445
+# Outbound rules
+netsh advfirewall firewall add rule name="TCP Outbound SMB" dir=out action=block protocol=TCP localport=445
+netsh advfirewall firewall add rule name="UDP Outbound SMB" dir=out action=block protocol=UDP localport=445
+
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-$neededFiles = @($portsFile, $advancedAuditingFile, $patchURLFile, $groupManagementFile, $mainFunctionsFile)
+$neededFiles = @($portsFile, $advancedAuditingFile, $patchURLFile, $groupManagementFile, $mainFunctionsFile, $splunkFile)
 foreach ($file in $neededFiles) {
+    $filename = $(Split-Path -Path $file -Leaf)
     try {
-        if (-not (Test-Path "$pwd\$file")) {
-            $wc = New-Object net.webclient
-            $wc.DownloadFile("$ccdcRepoWindowsHardeningPath/$file", "$pwd\$file")
+        if (-not (Test-Path "$pwd\$filename")) {
+            Invoke-WebRequest -Uri "$ccdcRepoWindowsHardeningPath/$file" -OutFile "$pwd\$filename"
         }
     } catch {
         Write-Host $_.Exception.Message -ForegroundColor Yellow
@@ -26,7 +46,6 @@ foreach ($file in $neededFiles) {
 }
 
 Write-Host "All necessary files have been downloaded." -ForegroundColor Green
-Write-Host "Getting Competition Users" -ForegroundColor Magenta
 
 function GetCompetitionUsers {
     try {
@@ -36,8 +55,11 @@ function GetCompetitionUsers {
         # Prompt the user for the second username
         $user2 = Read-Host "Please enter the second username"
 
+        # Prompt the user for the third username
+        $user3 = Read-Host "Please enter the third username"
+
         # Combine the usernames with a newline between them
-        $content = "$user1`n$user2"
+        $content = "$user1`n$user2`n$user3"
 
         # Write the usernames to users.txt in the current directory
         Set-Content -Path ".\users.txt" -Value $content
@@ -49,22 +71,6 @@ function GetCompetitionUsers {
         Write-Host "Error Occurred..."
     }
 }
-GetCompetitionUsers
-$usersFile = "users.txt"
-
-# Get OS version and current user
-$OSVersion = (Get-WmiObject -class Win32_OperatingSystem).Caption
-$CurrentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
-
-# Load userfile and portdata
-[string[]]$UserArray = Get-Content -Path ".\$usersFile"
-$PortsObject = Get-Content -Path ".\$portsFile" -Raw | ConvertFrom-Json
-
-# Get all computer names in the domain
-$ADcomputers = Get-ADComputer -Filter * | Select-Object -ExpandProperty Name
-
-# Set GPO Name
-$GPOName = "Good-GPO"
 
 # Generate a random password with a mix of characters
 function GeneratePassword {
@@ -172,6 +178,50 @@ function Get-Set-Password {
     }
 }
 
+function Change-Current-User-Password {
+    $currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent()
+    if ($currentUser.AuthenticationType -ne "Local") {
+        Write-Host "User is a domain user."
+        while ($true) {
+            Get-Set-Password -User $env:username
+        }
+    } else {
+        Write-Host "User is a local user."
+        while ($true) {
+            try {
+                $pw = Read-Host -AsSecureString -Prompt "New password for $($env:Username):"
+                $conf = Read-Host -AsSecureString -Prompt "Confirm password for $($env:Username):"
+
+                # Convert SecureString to plain text
+                $pwPlainText = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($pw))
+                $confPlainText = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($conf))
+                if ($pwPlainText -eq $confPlainText -and $pwPlainText -ne "") {
+                    Get-LocalUser -Name $env:Username | Set-LocalUser -Password $password
+                    Write-Host "Success!!`n"
+
+                    # Clear the plaintext passwords from memory
+                    $pwPlainText = $null
+                    $confPlainText = $null
+
+                    # Optionally, force a garbage collection to reclaim memory (though this is not immediate)
+                    [System.GC]::Collect()
+                    $pw.Dispose()
+                    $conf.Dispose()
+                    break
+                } else {
+                    Write-Host "Either the passwords didn't match, or you typed nothing" -ForegroundColor Yellow
+                } 
+            } catch {
+                Write-Host $_.Exception.Message "`n"
+                Write-Host "There was an error with your password submission. Try again...`n" -ForegroundColor Yellow
+            }
+
+
+        }
+
+    }
+}
+
 # Add competition-specific users with certain privileges
 function Add-Competition-Users {
     try {
@@ -191,6 +241,9 @@ function Add-Competition-Users {
                 Add-ADGroupMember -Identity "Remote Desktop Users" -Members $user
                 Add-ADGroupMember -Identity "Group Policy Creator Owners" -Members $user
 
+                # Can cause problems if domain functional level isn't above Windows Server 2008 R2
+                Add-ADGroupMember -Identity "Protected Users" -Members $user
+
                 while ($true) {
                     Get-Set-Password -user $user
                 }
@@ -198,6 +251,20 @@ function Add-Competition-Users {
 
             if ($UserArray.indexOf($user) -eq 1) {
                 Add-ADGroupMember -Identity "Remote Desktop Users" -Members $user
+
+                # not added to protected users to allow rdp from non-bound computers (like your laptop)
+
+                while ($true) {
+                    Get-Set-Password -user $user
+                }
+            }
+
+            if ($UserArray.indexOf($user) -eq 2) {
+                New-ADGroup -Name "Workstation Admins" -GroupScope Global
+                Add-ADGroupMember -Identity "Workstation Admins" -Members $user
+
+                # Can cause problems if domain functional level isn't above Windows Server 2008 R2
+                Add-ADGroupMember -Identity "Protected Users" -Members $user
 
                 while ($true) {
                     Get-Set-Password -user $user
@@ -469,7 +536,7 @@ function Disable-Unnecessary-Services {
 function Handle-First-Policy-in-GPO {
     try {
     # Install RSAT features
-    Install-WindowsFeature -Name RSAT -IncludeAllSubFeature
+    #Install-WindowsFeature -Name RSAT -IncludeAllSubFeature
 
     # Define GPO and settings
     $gpoName = $GPOName
@@ -585,22 +652,10 @@ function Configure-Secure-GPO {
 
         # Define configurations
         $configurations = @{
-            "Moderating Access to Control Panel" = @{
-                "Key" = "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer"
-                "ValueName" = "NoControlPanel"
-                "Value" = 1
-                "Type" = "DWORD"
-            }
             "Prevent Windows from Storing LAN Manager Hash" = @{
                 "Key" = "HKLM\System\CurrentControlSet\Control\Lsa"
                 "ValueName" = "NoLMHash"
                 "Value" = 1
-                "Type" = "DWORD"
-            }
-            "Control Access to Command Prompt" = @{
-                "Key" = "HKCU\Software\Policies\Microsoft\Windows\System"
-                "ValueName" = "DisableCMD"
-                "Value" = 2
                 "Type" = "DWORD"
             }
             "Disable Forced System Restarts" = @{
@@ -609,57 +664,9 @@ function Configure-Secure-GPO {
                 "Value" = 1
                 "Type" = "DWORD"
             }
-            "Disallow Removable Media Drives, DVDs, CDs, and Floppy Drives" = @{
-                "Key" = "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer"
-                "ValueName" = "NoViewOnDrive"
-                "Value" = 12
-                "Type" = "DWORD"
-            }
-            "Restrict Software Installations" = @{
-                "Key" = "HKLM\Software\Policies\Microsoft\Windows\Installer"
-                "ValueName" = "DisableMSI"
-                "Value" = 1
-                "Type" = "DWORD"
-            }
             "Disable Guest Account" = @{
                 "Key" = "HKLM\Software\Microsoft\Windows NT\CurrentVersion\Winlogon"
                 "ValueName" = "AllowGuest"
-                "Value" = 0
-                "Type" = "DWORD"
-            }
-            "Set Minimum Password Length to Higher Limits" = @{
-                "Key" = "HKLM\Software\Policies\Microsoft Services\AdmPwd"
-                "ValueName" = "MinimumPasswordLength"
-                "Value" = 8
-                "Type" = "DWORD"
-            }
-            "Set Maximum Password Age to Lower Limits" = @{
-                "Key" = "HKLM\Software\Policies\Microsoft Services\AdmPwd"
-                "ValueName" = "MaximumPasswordAge"
-                "Value" = 90
-                "Type" = "DWORD"
-            }
-            "Set Password History to 3 Passwords" = @{
-                "Key" = "HKLM\Software\Policies\Microsoft Services\AdmPwd"
-                "ValueName" = "PasswordHistorySize"
-                "Value" = 3
-                "Type" = "DWORD"
-            }
-            "Add Complexity Requirements" = @{
-                "Key" = "HKLM\Software\Policies\Microsoft Services\AdmPwd"
-                "ValueName" = "PasswordComplexity"
-                "Value" = 1
-                "Type" = "DWORD"
-            }
-            "Set Minimum Password Length to 8 Characters" = @{
-                "Key" = "HKLM\Software\Policies\Microsoft Services\AdmPwd"
-                "ValueName" = "PasswordLength"
-                "Value" = 8
-                "Type" = "DWORD"
-            }
-            "Store Password Using Reversible Encryption" = @{
-                "Key" = "HKLM\Software\Policies\Microsoft Services\AdmPwd"
-                "ValueName" = "ClearTextPassword"
                 "Value" = 0
                 "Type" = "DWORD"
             }
@@ -687,75 +694,588 @@ function Configure-Secure-GPO {
                 "Value" = 1
                 "Type" = "DWORD"
             }
-            "Disable Powershell" = @{
-                "Key" = "HKLM\Software\Policies\Microsoft\Windows\PowerShell"
-                "ValueName" = "EnableScripts"
+            "Disable WDigest UseLogonCredential" = @{
+                "Key" = "HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control\SecurityProviders\WDigest"
+                "ValueName" = "UseLogonCredential"
                 "Value" = 0
                 "Type" = "DWORD"
             }
-            "Enable Domain Profile Windows Defender" = @{
-                "Key" = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\DomainProfile"
-                "ValueName" = "EnableFirewall"
+            "Disable WDigest Negotiation" = @{
+                "Key" = "HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control\SecurityProviders\WDigest"
+                "ValueName" = "Negotiate"
+                "Value" = 0
+                "Type" = "DWORD"
+            }
+            "Enable LSASS protection" = @{
+                "Key" = "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\LSA"
+                "ValueName" = "RunAsPPL"
                 "Value" = 1
                 "Type" = "DWORD"
             }
-            "Enable Public Profile Windows Defender" = @{
-                "Key" = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\StandardProfile"
-                "ValueName" = "EnableFirewall"
+            "Disable Restricted Admin" = @{
+                "Key" = "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\LSA"
+                "ValueName" = "DisableRestrictedAdmin"
                 "Value" = 1
                 "Type" = "DWORD"
             }
-            "Enable Private Profile Windows Defender" = @{
-                "Key" = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\PublicProfile"
-                "ValueName" = "EnableFirewall"
+# # Configure Windows Defender Antivirus settings via Group Policy to enable real-time monitoring
+            "Configure DisableAutoExclusions" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Exclusions"
+                "ValueName" = "DisableAutoExclusions"
+                "Value" = 0
+                "Type" = "DWORD"
+            }
+
+            "Configure MpCloudBlockLevel" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\MpEngine"
+                "ValueName" = "MpCloudBlockLevel"
+                "Value" = 0
+                "Type" = "DWORD"
+            }
+ 
+            "Configure DisableDatagramProcessing" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\NIS"
+                "ValueName" = "DisableDatagramProcessing"
                 "Value" = 1
                 "Type" = "DWORD"
             }
-            "Set Domain Profile Block Inbound" = @{
-                "Key" = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\DomainProfile"
-                "ValueName" = "DefaultInboundAction"
-                "Value" = "Block"
-                "Type" = "String"
+ 
+            "Configure DisableProtocolRecognition" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\NIS"
+                "ValueName" = "DisableProtocolRecognition"
+                "Value" = 0
+                "Type" = "DWORD"
             }
-            "Set Domain Profile Allow Outbound" = @{
-                "Key" = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\DomainProfile"
-                "ValueName" = "DefaultOutboundAction"
-                "Value" = "Allow"
-                "Type" = "String"
+ 
+            "Configure DisableSignatureRetirement" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\NIS\Consumers\IPS"
+                "ValueName" = "DisableSignatureRetirement"
+                "Value" = 0
+                "Type" = "DWORD"
             }
-            "Set Standard Profile Block Inbound" = @{
-                "Key" = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\StandardProfile"
-                "ValueName" = "DefaultInboundAction"
-                "Value" = "Block"
-                "Type" = "String"
+ 
+            "Configure LocalSettingOverridePurgeItemsAfterDelay" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Quarantine"
+                "ValueName" = "LocalSettingOverridePurgeItemsAfterDelay"
+                "Value" = 0
+                "Type" = "DWORD"
             }
-            "Set Standard Profile Allow Outbound" = @{
-                "Key" = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\StandardProfile"
-                "ValueName" = "DefaultOutboundAction"
-                "Value" = "Allow"
-                "Type" = "String"
-            }
-            "Set Public Profile Block Inbound" = @{
-                "Key" = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\PublicProfile"
-                "ValueName" = "DefaultInboundAction"
-                "Value" = "Block"
-                "Type" = "String"
-            }
-            "Set Public Profile Allow Outbound" = @{
-                "Key" = "HKLM:\Software\Policies\Microsoft\WindowsFirewall\PublicProfile"
-                "ValueName" = "DefaultOutboundAction"
-                "Value" = "Allow"
-                "Type" = "String"
-            }
-            "Enable Defender Antivirus Protection" = @{
+ 
+            "Configure DisableRealtimeMonitoring" = @{
                 "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Real-Time Protection"
                 "ValueName" = "DisableRealtimeMonitoring"
                 "Value" = 0
                 "Type" = "DWORD"
             }
+ 
+            "Configure DisableBehaviorMonitoring" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Real-Time Protection"
+                "ValueName" = "DisableBehaviorMonitoring"
+                "Value" = 0
+                "Type" = "DWORD"
+            }
+ 
+            "Configure DisableIOAVProtection" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Real-Time Protection"
+                "ValueName" = "DisableIOAVProtection"
+                "Value" = 0
+                "Type" = "DWORD"
+            }
+ 
+            "Configure DisableOnAccessProtection" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Real-Time Protection"
+                "ValueName" = "DisableOnAccessProtection"
+                "Value" = 0
+                "Type" = "DWORD"
+            }
+ 
+            "Configure DisableRawWriteNotification" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Real-Time Protection"
+                "ValueName" = "DisableRawWriteNotification"
+                "Value" = 0
+                "Type" = "DWORD"
+            }
+ 
+            "Configure DisableScanOnRealtimeEnable" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Real-Time Protection"
+                "ValueName" = "DisableScanOnRealtimeEnable"
+                "Value" = 0
+                "Type" = "DWORD"
+            }
+ 
+            "Configure DisableScriptScanning" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Real-Time Protection"
+                "ValueName" = "DisableScriptScanning"
+                "Value" = 0
+                "Type" = "DWORD"
+            }
+ 
+            "Configure LocalSettingOverrideDisableBehaviorMonitoring" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Real-Time Protection"
+                "ValueName" = "LocalSettingOverrideDisableBehaviorMonitoring"
+                "Value" = 0
+                "Type" = "DWORD"
+            }
+ 
+            "Configure LocalSettingOverrideDisableIOAVProtection" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Real-Time Protection"
+                "ValueName" = "LocalSettingOverrideDisableIOAVProtection"
+                "Value" = 0
+                "Type" = "DWORD"
+            }
+ 
+            "Configure LocalSettingOverrideDisableOnAccessProtection" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Real-Time Protection"
+                "ValueName" = "LocalSettingOverrideDisableOnAccessProtection"
+                "Value" = 0
+                "Type" = "DWORD"
+            }
+ 
+            "Configure LocalSettingOverrideDisableRealtimeMonitoring" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Real-Time Protection"
+                "ValueName" = "LocalSettingOverrideDisableRealtimeMonitoring"
+                "Value" = 0
+                "Type" = "DWORD"
+            }
+ 
+            "Configure LocalSettingOverrideRealtimeScanDirection" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Real-Time Protection"
+                "ValueName" = "LocalSettingOverrideRealtimeScanDirection"
+                "Value" = 0
+                "Type" = "DWORD"
+            }
+ 
+            "Configure RealtimeScanDirection" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Real-Time Protection"
+                "ValueName" = "RealtimeScanDirection"
+                "Value" = 0
+                "Type" = "DWORD"
+            }
+ 
+            "Configure DisableHeuristics" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Scan"
+                "ValueName" = "DisableHeuristics"
+                "Value" = 0
+                "Type" = "DWORD"
+            }
+ 
+            "Configure DisablePackedExeScanning" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Scan"
+                "ValueName" = "DisablePackedExeScanning"
+                "Value" = 0
+                "Type" = "DWORD"
+            }
+ 
+            "Configure DisableRemovableDriveScanning" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Scan"
+                "ValueName" = "DisableRemovableDriveScanning"
+                "Value" = 0
+                "Type" = "DWORD"
+            }
+ 
+            "Configure ScanParameters" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Scan"
+                "ValueName" = "ScanParameters"
+                "Value" = 1
+                "Type" = "DWORD"
+            }
+ 
+            "Configure QuickScanInterval" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Scan"
+                "ValueName" = "QuickScanInterval"
+                "Value" = 2
+                "Type" = "DWORD"
+            }
+ 
+            "Configure MeteredConnectionUpdates" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Signature Updates"
+                "ValueName" = "MeteredConnectionUpdates"
+                "Value" = 1
+                "Type" = "DWORD"
+            }
+ 
+            "Configure DisableScanOnUpdate" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Signature Updates"
+                "ValueName" = "DisableScanOnUpdate"
+                "Value" = 0
+                "Type" = "DWORD"
+            }
+ 
+            "Configure DisableScheduledSignatureUpdateOnBattery" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Signature Updates"
+                "ValueName" = "DisableScheduledSignatureUpdateOnBattery"
+                "Value" = 0
+                "Type" = "DWORD"
+            }
+ 
+            "Configure DisableUpdateOnStartupWithoutEngine" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Signature Updates"
+                "ValueName" = "DisableUpdateOnStartupWithoutEngine"
+                "Value" = 0
+                "Type" = "DWORD"
+            }
+ 
+            "Configure ForceUpdateFromMU" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Signature Updates"
+                "ValueName" = "ForceUpdateFromMU"
+                "Value" = 1
+                "Type" = "DWORD"
+            }
+ 
+            "Configure RealtimeSignatureDelivery" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Signature Updates"
+                "ValueName" = "RealtimeSignatureDelivery"
+                "Value" = 1
+                "Type" = "DWORD"
+            }
+ 
+            "Configure SignatureDisableNotification" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Signature Updates"
+                "ValueName" = "SignatureDisableNotification"
+                "Value" = 0
+                "Type" = "DWORD"
+            }
+ 
+            "Configure UpdateOnStartUp" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Signature Updates"
+                "ValueName" = "UpdateOnStartUp"
+                "Value" = 1
+                "Type" = "DWORD"
+            }
+ 
+            "Configure DisableBlockAtFirstSeen" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Spynet"
+                "ValueName" = "DisableBlockAtFirstSeen"
+                "Value" = 0
+                "Type" = "DWORD"
+            }
+ 
+            "Configure SpynetReporting" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Spynet"
+                "ValueName" = "SpynetReporting"
+                "Value" = 1
+                "Type" = "DWORD"
+            }
+ 
+            "Configure LocalSettingOverrideSpynetReporting" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Spynet"
+                "ValueName" = "LocalSettingOverrideSpynetReporting"
+                "Value" = 0
+                "Type" = "DWORD"
+            }
+ 
+            "Configure EnableControlledFolderAccess" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Windows Defender Exploit Guard\Controlled Folder Access"
+                "ValueName" = "EnableControlledFolderAccess"
+                "Value" = 1
+                "Type" = "DWORD"
+            }
+
+            "Configure AllowNetworkProtectionOnWinServer" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Windows Defender Exploit Guard\Network Protection"
+                "ValueName" = "AllowNetworkProtectionOnWinServer"
+                "Value" = 1
+                "Type" = "DWORD"
+            }
+ 
+            "Configure EnableNetworkProtection" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows Defender\Windows Defender Exploit Guard\Network Protection"
+                "ValueName" = "EnableNetworkProtection"
+                "Value" = 2
+                "Type" = "DWORD"
+            }
+        #other best practice keys
+            "Configure SecurityLevel" = @{
+                "Key" = "HKLM\Software\Microsoft\Windows NT\CurrentVersion\Setup\RecoveryConsole"
+                "ValueName" = "SecurityLevel"
+                "Type" = "DWORD"
+                "Value" = 0
+            }
+            "Configure SetCommand" = @{
+                "Key" = "HKLM\Software\Microsoft\Windows NT\CurrentVersion\Setup\RecoveryConsole"
+                "ValueName" = "SetCommand"
+                "Type" = "DWORD"
+                "Value" = 0
+            }
+            "Configure AllocateCDRoms" = @{
+                "Key" = "HKLM\Software\Microsoft\Windows NT\CurrentVersion\Winlogon"
+                "ValueName" = "AllocateCDRoms"
+                "Type" = "String"
+                "Value" = "1"
+            }
+            "Configure AllocateFloppies" = @{
+                "Key" = "HKLM\Software\Microsoft\Windows NT\CurrentVersion\Winlogon"
+                "ValueName" = "AllocateFloppies"
+                "Type" = "String"
+                "Value" = "1"
+            }
+            "Configure CachedLogonsCount" = @{
+                "Key" = "HKLM\Software\Microsoft\Windows NT\CurrentVersion\Winlogon"
+                "ValueName" = "CachedLogonsCount"
+                "Type" = "String"
+                "Value" = "0"
+            }
+            "Configure ForceUnlockLogon" = @{
+                "Key" = "HKLM\Software\Microsoft\Windows NT\CurrentVersion\Winlogon"
+                "ValueName" = "ForceUnlockLogon"
+                "Type" = "DWORD"
+                "Value" = 1
+            }
+            "Configure ConsentPromptBehaviorAdmin" = @{
+                "Key" = "HKLM\Software\Microsoft\Windows\CurrentVersion\Policies\System"
+                "ValueName" = "ConsentPromptBehaviorAdmin"
+                "Type" = "DWORD"
+                "Value" = 1
+            }
+            "Configure ConsentPromptBehaviorUser" = @{
+                "Key" = "HKLM\Software\Microsoft\Windows\CurrentVersion\Policies\System"
+                "ValueName" = "ConsentPromptBehaviorUser"
+                "Type" = "DWORD"
+                "Value" = 1
+            }
+            "Configure DisableCAD" = @{
+                "Key" = "HKLM\Software\Microsoft\Windows\CurrentVersion\Policies\System"
+                "ValueName" = "DisableCAD"
+                "Type" = "DWORD"
+                "Value" = 0
+            }
+            "Configure EnableLUA" = @{
+                "Key" = "HKLM\Software\Microsoft\Windows\CurrentVersion\Policies\System"
+                "ValueName" = "EnableLUA"
+                "Type" = "DWORD"
+                "Value" = 1
+            }
+            "Configure FilterAdministratorToken" = @{
+                "Key" = "HKLM\Software\Microsoft\Windows\CurrentVersion\Policies\System"
+                "ValueName" = "FilterAdministratorToken"
+                "Type" = "DWORD"
+                "Value" = 1
+            }
+            "Configure NoConnectedUser" = @{
+                "Key" = "HKLM\Software\Microsoft\Windows\CurrentVersion\Policies\System"
+                "ValueName" = "NoConnectedUser"
+                "Type" = "DWORD"
+                "Value" = 1
+            }
+            "Configure PromptOnSecureDesktop" = @{
+                "Key" = "HKLM\Software\Microsoft\Windows\CurrentVersion\Policies\System"
+                "ValueName" = "PromptOnSecureDesktop"
+                "Type" = "DWORD"
+                "Value" = 1
+            }
+            "Configure ForceKeyProtection" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Cryptography"
+                "ValueName" = "ForceKeyProtection"
+                "Type" = "DWORD"
+                "Value" = 2
+            }
+            "Configure AuthenticodeEnabled" = @{
+                "Key" = "HKLM\Software\Policies\Microsoft\Windows\Safer\CodeIdentifiers"
+                "ValueName" = "AuthenticodeEnabled"
+                "Type" = "DWORD"
+                "Value" = 1
+            }
+            "Configure AuditBaseObjects" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Control\Lsa"
+                "ValueName" = "AuditBaseObjects"
+                "Type" = "DWORD"
+                "Value" = 0
+            }
+            "Configure DisableDomainCreds" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Control\Lsa"
+                "ValueName" = "DisableDomainCreds"
+                "Type" = "DWORD"
+                "Value" = 1
+            }
+            "Configure EveryoneIncludesAnonymous" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Control\Lsa"
+                "ValueName" = "EveryoneIncludesAnonymous"
+                "Type" = "DWORD"
+                "Value" = 0
+            }
+            "Configure Enabled" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Control\Lsa\FIPSAlgorithmPolicy"
+                "ValueName" = "Enabled"
+                "Type" = "DWORD"
+                "Value" = 1
+            }
+            "Configure FullPrivilegeAuditing" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Control\Lsa"
+                "ValueName" = "FullPrivilegeAuditing"
+                "Type" = "Binary"
+                "Value" = 0
+            }
+            "Configure LimitBlankPasswordUse" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Control\Lsa"
+                "ValueName" = "LimitBlankPasswordUse"
+                "Type" = "DWORD"
+                "Value" = 1
+            }
+            "Configure NTLMMinClientSec" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Control\Lsa\MSV1_0"
+                "ValueName" = "NTLMMinClientSec"
+                "Type" = "DWORD"
+                "Value" = 537395200
+            }
+            "Configure NTLMMinServerSec" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Control\Lsa\MSV1_0"
+                "ValueName" = "NTLMMinServerSec"
+                "Type" = "DWORD"
+                "Value" = 537395200
+            }
+            "Configure NoLMHash" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Control\Lsa"
+                "ValueName" = "NoLMHash"
+                "Type" = "DWORD"
+                "Value" = 1
+            }
+            "Configure RestrictAnonymous" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Control\Lsa"
+                "ValueName" = "RestrictAnonymous"
+                "Type" = "DWORD"
+                "Value" = 1
+            }
+            "Configure RestrictAnonymousSAM" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Control\Lsa"
+                "ValueName" = "RestrictAnonymousSAM"
+                "Type" = "DWORD"
+                "Value" = 1
+            }
+            "Configure RestrictRemoteSAM" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Control\Lsa"
+                "ValueName" = "RestrictRemoteSAM"
+                "Type" = "String"
+                "Value" = "O:BAG:BAD:(A;;RC;;;BA)"
+            }
+            "Configure SCENoApplyLegacyAuditPolicy" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Control\Lsa"
+                "ValueName" = "SCENoApplyLegacyAuditPolicy"
+                "Type" = "DWORD"
+                "Value" = 1
+            }
+            "Configure SubmitControl" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Control\Lsa"
+                "ValueName" = "SubmitControl"
+                "Type" = "DWORD"
+                "Value" = 0
+            }
+            "Configure AddPrinterDrivers" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Control\Print\Providers\LanMan Print Services\Servers"
+                "ValueName" = "AddPrinterDrivers"
+                "Type" = "DWORD"
+                "Value" = 1
+            }
+            "Configure Winreg Exact Paths" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Control\SecurePipeServers\Winreg\AllowedExactPaths"
+                "ValueName" = "Machine"
+                "Type" = "MultiString"
+                "Value" =  ""
+            }
+            "Configure Winreg Allowed Paths" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Control\SecurePipeServers\Winreg\AllowedPaths"
+                "ValueName" = "Machine"
+                "Type" = "MultiString"
+                "Value" = ""
+            }
+            "Configure ProtectionMode" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Control\Session Manager"
+                "ValueName" = "ProtectionMode"
+                "Type" = "DWORD"
+                "Value" = 1
+            }
+            "Configure EnableSecuritySignature" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Services\LanManServer\Parameters"
+                "ValueName" = "EnableSecuritySignature"
+                "Type" = "DWORD"
+                "Value" = 1
+            }
+            "Configure RequireSecuritySignature" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Services\LanManServer\Parameters"
+                "ValueName" = "RequireSecuritySignature"
+                "Type" = "DWORD"
+                "Value" = 1
+            }
+            "Configure RestrictNullSessAccess" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Services\LanManServer\Parameters"
+                "ValueName" = "RestrictNullSessAccess"
+                "Type" = "DWORD"
+                "Value" = 1
+            }
+            "Configure EnablePlainTextPassword" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Services\LanmanWorkstation\Parameters"
+                "ValueName" = "EnablePlainTextPassword"
+                "Type" = "DWORD"
+                "Value" = 0
+            }
+            "Configure EnableSecuritySignature Workstation" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Services\LanmanWorkstation\Parameters"
+                "ValueName" = "EnableSecuritySignature"
+                "Type" = "DWORD"
+                "Value" = 1
+            }
+            "Configure RequireSecuritySignature Workstation" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Services\LanmanWorkstation\Parameters"
+                "ValueName" = "RequireSecuritySignature"
+                "Type" = "DWORD"
+                "Value" = 1
+            }
+            "Configure LDAPClientIntegrity" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Services\LDAP"
+                "ValueName" = "LDAPClientIntegrity"
+                "Type" = "DWORD"
+                "Value" = 2
+            }
+            "Configure DisablePasswordChange" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Services\Netlogon\Parameters"
+                "ValueName" = "DisablePasswordChange"
+                "Type" = "DWORD"
+                "Value" = 0
+            }
+            "Configure RefusePasswordChange" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Services\Netlogon\Parameters"
+                "ValueName" = "RefusePasswordChange"
+                "Type" = "DWORD"
+                "Value" = 0
+            }
+            "Configure RequireSignOrSeal" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Services\Netlogon\Parameters"
+                "ValueName" = "RequireSignOrSeal"
+                "Type" = "DWORD"
+                "Value" = 1
+            }
+            "Configure RequireStrongKey" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Services\Netlogon\Parameters"
+                "ValueName" = "RequireStrongKey"
+                "Type" = "DWORD"
+                "Value" = 1
+            }
+            "Configure SealSecureChannel" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Services\Netlogon\Parameters"
+                "ValueName" = "SealSecureChannel"
+                "Type" = "DWORD"
+                "Value" = 1
+            }
+            "Configure SignSecureChannel" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Services\Netlogon\Parameters"
+                "ValueName" = "SignSecureChannel"
+                "Type" = "DWORD"
+                "Value" = 1
+            }
+            "Configure LdapEnforceChannelBinding" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Services\NTDS\Parameters"
+                "ValueName" = "LdapEnforceChannelBinding"
+                "Type" = "DWORD"
+                "Value" = 2
+            }
+            "Configure LDAPServerIntegrity" = @{
+                "Key" = "HKLM\System\CurrentControlSet\Services\NTDS\Parameters"
+                "ValueName" = "LDAPServerIntegrity"
+                "Type" = "DWORD"
+                "Value" = 2
+            }
+
         }
 
-# # Configure Windows Defender Antivirus settings via Group Policy to enable real-time monitoring
 
 
         $successfulConfigurations = 0
@@ -767,10 +1287,10 @@ function Configure-Secure-GPO {
             $keyPath = $config["Key"]
 
             # Check if key path exists
-            if (-not (Test-Path "Registry::$keyPath")) {
-                $failedConfigurations += $configName
-                continue
-            }
+            #if (-not (Test-Path "Registry::$keyPath")) {
+            #    $failedConfigurations += $configName
+            #    continue
+            #}
 
             # Set GPO registry value
             Set-GPRegistryValue -Name $GPOName -Key $config["Key"] -ValueName $config["ValueName"] -Value $config["Value"] -Type $config["Type"]
@@ -795,36 +1315,31 @@ function Configure-Secure-GPO {
 }
 
 function Download-Install-Setup-Splunk {
-    param([string]$IP)
+    param([string]$Version, [string]$IP)
+
+    $splunkBeta = $true #((Prompt-Yes-No -Message "Install Splunk from deltabluejay repo? (y/n)").toLower() -eq 'y')
+    #Write-Host $splunkBeta
     try {
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-        $downloadURL = "https://download.splunk.com/products/universalforwarder/releases/9.0.1/windows/splunkforwarder-9.0.1-82c987350fde-x64-release.msi"
+        if ($splunkBeta) {
+            #$downloadURL = "https://raw.githubusercontent.com/deltabluejay/public-ccdc-resources/refs/heads/dev/splunk/splunk.ps1"
+            $downloadURL = "https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main/splunk/splunk.ps1"
+        }
+        if (-not $splunkBeta) {
+            $downloadURL = "https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main/splunk/splunk.ps1"
+        }
+
+        Invoke-WebRequest -Uri $downloadURL -OutFile ./splunk.ps1
+
         $splunkServer = "$($IP):9997" # Replace with your Splunk server IP and receiving port
 
-        $securedValue = Read-Host -AsSecureString "Please enter a password for the new splunk user (splunkf)"
-        $bstr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($securedValue)
-        $password = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr)
-        # Download the Splunk Forwarder
-        $path = "$env:TEMP\splunkforwarder.msi"
+        # Install splunk using downloaded script
+        if ((Get-ChildItem ./splunk.ps1).Length -lt 6000) {
+            ./splunk.ps1 $Version $SplunkServer
+        } else {
+            ./splunk.ps1 $Version $SplunkServer "dc"
+        }
 
-        Write-Host "Grabbing the installer file. Downloading it to $path" -ForegroundColor Cyan
-        $wc = New-Object net.webclient
-        $wc.Downloadfile($downloadURL, $path)
-
-        Write-Host "Installing Splunk Forwarder with username" -ForegroundColor Cyan -NoNewline
-        Write-Host " splunkf" -ForegroundColor Green -NoNewline
-        Write-Host " and the" -ForegroundColor Cyan -NoNewline
-        Write-Host " password" -ForegroundColor Green -NoNewline
-        Write-Host " you provided above" -ForegroundColor Cyan
-        # Install Splunk Forwarder
-        Start-Process -Wait msiexec -ArgumentList "/i $path SPLUNKUSERNAME=splunkf SPLUNKPASSWORD=$password RECEIVING_INDEXER=$splunkServer WINEVENTLOG_SEC_ENABLE=1 WINEVENTLOG_SYS_ENABLE=1 WINEVENTLOG_APP_ENABLE=1 AGREETOLICENSE=Yes /quiet"
-
-        # Start Splunk forwarder service
-        Start-Service SplunkForwarder
-
-        # Clean up the downloaded MSI file
-        Remove-Item $path
-        Update-Log "Configure Splunk" "Executed successfully"
     } catch {
         Write-Host $_.Exception.Message -ForegroundColor Yellow
         Write-Host "Error Occurred..."
@@ -1177,10 +1692,60 @@ renderXml=false
     }
 }
 
+function Create-Workstations-OU {
+    New-ADOrganizationalUnit -Name "Workstations"
+}
+
+Function Enable-Disable-RDP {
+    
+    $confirmation = Prompt-Yes-No -Message "Should RDP be enabled?"
+    if ($confirmation.toLower() -eq "y") {
+        Write-Host "Enabling RDP"
+        Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server" -Name "fDenyTSConnections" -Value 0
+
+        $confirmation = Prompt-Yes-No -Message "Will you be RDP-ing from computers not on the domain? (y/n)"
+        if ($confirmation.toLower() -eq "y") { $nlaValue = 0 } else { $nlaValue = 1 }
+
+        Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" -Name "UserAuthentication" -Value $nlaValue
+
+    } else {
+        Write-Host "Disabling RDP"
+        Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server" -Name "fDenyTSConnections" -Value 1
+    }
+
+}
 ###################################### MAIN ######################################
 
 
 Initialize-Log
+
+# Change current user's password
+$confirmation = Prompt-Yes-No -Message "Change current user password? (y/n)"
+if ($confirmation.toLower() -eq "y") {
+    Write-Host "`n***Changing current user password***" -ForegroundColor Magenta
+    Change-Current-User-Password
+} else {
+    Write-Host "Skipping..." -ForegroundColor Red
+}
+
+Write-Host "Getting Competition Users" -ForegroundColor Magenta
+GetCompetitionUsers
+$usersFile = "users.txt"
+
+# Get OS version and current user
+$OSVersion = (Get-WmiObject -class Win32_OperatingSystem).Caption
+$CurrentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+
+# Load userfile and portdata
+[string[]]$UserArray = Get-Content -Path ".\$usersFile"
+$PortsObject = Get-Content -Path ".\$portsFile" -Raw | ConvertFrom-Json
+
+# Get all computer names in the domain
+$ADcomputers = Get-ADComputer -Filter * | Select-Object -ExpandProperty Name
+
+# Set GPO Name
+$GPOName = "Good-GPO"
+
 
 # Upgrade SMB
 $confirmation = Prompt-Yes-No -Message "Upgrade SMB? (y/n)"
@@ -1231,6 +1796,15 @@ if ($confirmation.toLower() -eq "y") {
     Write-Host "Skipping..." -ForegroundColor Red
 }
 
+# Enable RDP
+#$confirmation = Prompt-Yes-No -Message "Enter the 'Enable RDP' function? (y/n)"
+#if ($confirmation.toLower() -eq "y") {
+#    Write-Host "`n***Enabling RDP...***" -ForegroundColor Magenta
+#    Enable-Disable-RDP
+#} else {
+#    Write-Host "Skipping..." -ForegroundColor Red
+#}
+
 
 # Configure Firewall
 $confirmation = Prompt-Yes-No -Message "Enter the 'Configure Firewall' function? (y/n)"
@@ -1262,13 +1836,13 @@ if ($confirmation.toLower() -eq "y") {
 }
 
 
-# $confirmation = Prompt-Yes-No -Message "Enter the 'Configure Secure GPO' function? (y/n)"
-# if ($confirmation.toLower() -eq "y") {
-#     Write-Host "`n***Configuring Secure GPO***" -ForegroundColor Magenta
-#     Configure-Secure-GPO
-# } else {
-#     Write-Host "Skipping..." -ForegroundColor Red
-# }
+$confirmation = Prompt-Yes-No -Message "Enter the 'Configure Secure GPO' function? (y/n)"
+if ($confirmation.toLower() -eq "y") {
+    Write-Host "`n***Configuring Secure GPO***" -ForegroundColor Magenta
+    Configure-Secure-GPO
+} else {
+    Write-Host "Skipping..." -ForegroundColor Red
+}
 
 
 # Configure Auditing
@@ -1279,13 +1853,40 @@ if ($confirmation.toLower() -eq "y") {
     Write-Host "Skipping..." -ForegroundColor Red
 }
 
+# Create Workstations OU (gives you something to do while splunk is installing)
+$confirmation = Prompt-Yes-No -Message "Create Workstations OU? (y/n)"
+if ($confirmation.toLower() -eq "y") {
+    try {
+        Write-Host "***Creating Workstations OU***" -ForegroundColor Magenta
+        Create-Workstations-OU
+        Update-Log "Create Workstations OU" "Executed successfully"
+    } catch {
+        Write-Host $_.Exception.Message -ForegroundColor Yellow
+        Write-Host "Error Occurred..."
+        Update-Log "Create Workstations OU" "Failed with error: $($_.Exception.Message)"
+    }
+} else {
+    Write-Host "Skipping..." -ForegroundColor Red
+}
+
+Write-Host "It is adviseable to configure other desired gpo attributes while the next steps are running."
+Write-Host @"
+Consider, after starting the splunk install:
+    -Removing the debug process permission
+    -Adding the audit directory access configuration
+    -Preventing Domain Admins from logging into workstations
+    -Adding Workstation Admins to workstation Administrators groups
+    -Moving workstations into the Workstations OU
+    -Applying group policy changes
+"@
 
 # Configure Splunk
 $confirmation = Prompt-Yes-No -Message "Enter the 'Configure Splunk' function? (y/n)"
 if ($confirmation.toLower() -eq "y") {
     Write-Host "`n***Configuring Splunk...***" -ForegroundColor Magenta
     $SplunkIP = Read-Host "`nInput IP address of Splunk Server"
-    Download-Install-Setup-Splunk -IP $SplunkIP
+    $SplunkVersion = Read-Host "`nInput OS Version (7, 8, 10, 11, 2012, 2016, 2019, 2022): "
+    Download-Install-Setup-Splunk -Version $SplunkVersion -IP $SplunkIP
 } else {
     Write-Host "Skipping..." -ForegroundColor Red
 }
@@ -1374,6 +1975,8 @@ if ($confirmation.toLower() -eq "y") {
 } else {
     Write-Host "Skipping..." -ForegroundColor Red
 }
+
+
 
 
 Write-Host "`n***Script Completed!!!***" -ForegroundColor Green
