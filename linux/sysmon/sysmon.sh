@@ -1,5 +1,14 @@
 #!/bin/bash
 # Usage: ./sysmon.sh <distro> <version>
+#
+# Supported OS versions:
+# - Ubuntu 18-23
+# - Debian 9-12
+# - Fedora 33-34, 36-38
+# - RHEL 7-9
+# - CentOS 7-8
+# - SLES 12, 15
+# - OpenSUSE (Leap) 15
 
 ###################### GLOBALS ######################
 DISTRO=$1
@@ -127,7 +136,7 @@ function install_from_repo {
                 wget --no-check-certificate -q https://packages.microsoft.com/config/ubuntu/$(lsb_release -rs)/packages-microsoft-prod.deb -O packages-microsoft-prod.deb
                 sudo dpkg -i packages-microsoft-prod.deb
                 sudo apt-get update
-                sudo apt-get install sysmonforlinux
+                sudo apt-get install -y sysmonforlinux
             else
                 error "Unsupported Ubuntu version"
                 print_options
@@ -148,9 +157,9 @@ function install_from_repo {
                     sudo dpkg -i packages-microsoft-prod.deb
                 fi
                 sudo apt-get update
-                sudo apt-get install apt-transport-https
+                sudo apt-get install -y apt-transport-https
                 sudo apt-get update
-                sudo apt-get install sysmonforlinux
+                sudo apt-get install -y sysmonforlinux
             else
                 error "Unsupported Debian version"
                 print_options
@@ -165,7 +174,7 @@ function install_from_repo {
                 else
                     sudo rpm -Uvh https://packages.microsoft.com/config/fedora/$VERSION/packages-microsoft-prod.rpm
                 fi
-                sudo dnf install sysmonforlinux
+                sudo dnf install -y sysmonforlinux
             else
                 error "Unsupported Fedora version"
                 print_options
@@ -177,10 +186,10 @@ function install_from_repo {
                 if [ $VERSION -lt 8 ]; then
                     sudo rpm --import https://packages.microsoft.com/keys/microsoft.asc
                     sudo wget --no-check-certificate -q -O /etc/yum.repos.d/microsoft-prod.repo https://packages.microsoft.com/config/rhel/7/prod.repo
-                    sudo yum install sysmonforlinux
+                    sudo yum install -y sysmonforlinux
                 else
                     sudo rpm -Uvh https://packages.microsoft.com/config/rhel/$VERSION/packages-microsoft-prod.rpm
-                    sudo dnf install sysmonforlinux
+                    sudo dnf install -y sysmonforlinux
                 fi
             else
                 error "Unsupported RHEL version"
@@ -191,7 +200,7 @@ function install_from_repo {
             if [ $VERSION -ge 7 ]; then
                 print_banner "CentOS $VERSION"
                 sudo rpm -Uvh https://packages.microsoft.com/config/centos/$VERSION/packages-microsoft-prod.rpm
-                sudo yum install sysmonforlinux
+                sudo yum install -y sysmonforlinux
             else
                 error "Unsupported CentOS version"
                 print_options
@@ -201,7 +210,7 @@ function install_from_repo {
             if [ $VERSION -eq 12 ] || [ $VERSION -eq 15 ]; then
                 print_banner "SLES $VERSION"
                 sudo rpm -Uvh https://packages.microsoft.com/config/sles/$VERSION/packages-microsoft-prod.rpm
-                sudo zypper install sysmonforlinux
+                sudo zypper install -y sysmonforlinux
             else
                 error "Unsupported SLES version"
                 print_options
@@ -210,12 +219,12 @@ function install_from_repo {
         "opensuse")
             if [ $VERSION -eq 15 ]; then
                 print_banner "OpenSUSE $VERSION"
-                sudo zypper install libicu
+                sudo zypper install -y libicu
                 sudo rpm --import https://packages.microsoft.com/keys/microsoft.asc
                 wget --no-check-certificate -q https://packages.microsoft.com/config/opensuse/15/prod.repo
                 sudo mv prod.repo /etc/zypp/repos.d/microsoft-prod.repo
                 sudo chown root:root /etc/zypp/repos.d/microsoft-prod.repo
-                sudo zypper install sysmonforlinux
+                sudo zypper install -y sysmonforlinux
             else
                 error "Unsupported OpenSUSE version"
                 print_options
@@ -479,8 +488,8 @@ function install_from_package {
     # Install the packages
     case $package_type in
         "deb")
-            sudo apt-get install -f "./sysinternals.$package_type"
-            sudo apt-get install -f "./sysmon.$package_type"
+            sudo apt-get install -y -f "./sysinternals.$package_type"
+            sudo apt-get install -y -f "./sysmon.$package_type"
             ;;
         "rpm")
             sudo which dnf &> /dev/null
@@ -507,7 +516,11 @@ function install_from_package {
 }
 
 function configure {
-    sudo wget $GITHUB_URL/linux/sysmon/sysmon-config.xml -O /opt/ccdc/sysmon-config.xml
+    wget $GITHUB_URL/linux/sysmon/sysmon-config.xml -O sysmon-config.xml
+    sudo chown root:root sysmon-config.xml
+    sudo chmod 600 sysmon-config.xml
+    sudo mkdir -p /opt/ccdc/
+    sudo mv sysmon-config.xml /opt/ccdc/sysmon-config.xml
     sudo sysmon -accepteula -i /opt/ccdc/sysmon-config.xml
 }
 #####################################################

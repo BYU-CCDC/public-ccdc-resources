@@ -2,7 +2,7 @@
 ###################### GLOBALS ######################
 DEBUG_LOG='/var/log/ccdc/splunk.log'
 GITHUB_URL="https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main"
-INDEXES=( 'system' 'web' 'network' 'windows' 'misc' 'snoopy' )
+INDEXES=( 'system' 'web' 'network' 'windows' 'misc' 'snoopy' 'sysmon' )
 PM=""
 IP=""
 INDEXER=false
@@ -12,6 +12,8 @@ SPLUNK_HOME="/opt/splunkforwarder"
 SPLUNK_USERNAME="splunk"
 SPLUNK_PASSWORD=""
 SPLUNK_ONLY=false
+ADDITIONAL_LOGGING_ONLY=false
+SYSTEMD_SYSTEM=false
 
 # Indexer
 indexer_deb="https://download.splunk.com/products/splunk/releases/9.2.4/linux/splunk-9.2.4-c103a21bb11d-linux-2.6-amd64.deb"
@@ -67,6 +69,7 @@ function download {
     url=$1
     output=$2
     
+    # TODO: figure out how to fix the progress bar
     if ! wget -O "$output" --no-check-certificate "$url"; then
         # error "Failed to download with wget. Trying wget with older TLS version..."
         # if ! wget -O "$output" --secure-protocol=TLSv1 --no-check-certificate "$url"; then
@@ -90,6 +93,7 @@ function print_usage {
   -p    Package type (defaults to auto; see below)
   -u    Print Splunk package URLs
   -S    Install Splunk only (no additional logging)
+  -L    Install additional logging sources only (no Splunk)
   -g    Change the GitHub URL for downloading files (for debug or local hosting)
   -a    Add a new monitor (use only after installation)"
     echo
@@ -149,7 +153,7 @@ function install_dependencies {
     if [ "$PM" == "" ]; then
         info "No package manager detected."
     else
-        sudo "$PM" install -y wget curl unzip acl
+        sudo "$PM" install -y wget curl acl
     fi
 
     if ! command -v wget &>/dev/null; then
@@ -157,13 +161,9 @@ function install_dependencies {
         exit 1
     fi
 
+    # Needed because curl can bypass some wget TLS/SSL errors
     if ! command -v curl &>/dev/null; then
         error "Please install curl before using this script"
-        exit 1
-    fi
-
-    if ! command -v unzip &>/dev/null; then
-        error "Please install unzip before using this script"
         exit 1
     fi
 
@@ -186,6 +186,7 @@ function check_prereqs {
     fi
 
     # user should not be root or run `sudo ./splunk.sh` since doing so makes the splunk install be owned by root
+    # TODO: test if this actually matters anymore
     if [ "$EUID" == 0 ]; then
         error "Please run script without sudo prefix/not as root"
         exit 1
@@ -369,6 +370,7 @@ function create_splunk_user {
         
         # Add splunk user as forwarder/indexer admin
         info "Adding splunk user to user-seed.conf"
+        # TODO: give can_delete permissions
         sudo sh -c "printf '[user_info]\nUSERNAME = splunk\nPASSWORD = $password' > $SPLUNK_HOME/etc/system/local/user-seed.conf"
         # info "Please remember these credentials for when Splunk asks for them later during the configuration process"
     fi
@@ -380,18 +382,45 @@ function create_splunk_user {
     sudo chown -R splunk:splunk $SPLUNK_HOME
 }
 
+function install_app {
+    download "$1" /tmp/app.spl
+    sudo chown splunk:splunk "/tmp/app.spl"
+    sudo -H -u splunk $SPLUNK_HOME/bin/splunk install app "/tmp/app.spl"
+    sudo rm /tmp/app.spl
+}
+
 function install_ccdc_add_on {
     print_banner "Installing CCDC Splunk add-on"
-    download "$GITHUB_URL"/splunk/cdc-add-on.spl ccdc-add-on.spl
-    sudo chown splunk:splunk ccdc-add-on.spl
-    sudo -H -u splunk $SPLUNK_HOME/bin/splunk install app ccdc-add-on.spl
+    install_app "$GITHUB_URL/splunk/ccdc-add-on.spl"
+}
+
+function install_sysmon_add_on {
+    print_banner "Installing Sysmon Splunk add-on"
+    install_app "$GITHUB_URL/splunk/linux/splunk-add-on-for-sysmon-for-linux_100.tgz"
+
+    # Sysmon monitor is included with add-on, but we need to change the index
+    info "Setting monitor index to sysmon"
+    local dir="$SPLUNK_HOME/etc/apps/Splunk_TA_sysmon-for-linux/local/"
+    sudo mkdir $dir
+    sudo chown -R splunk:splunk $dir
+    download "$GITHUB_URL/splunk/linux/sysmon-inputs.conf" inputs.conf
+    sudo chown splunk:splunk inputs.conf
+    sudo mv inputs.conf "$dir"
 }
 
 function install_ccdc_app {
-    print_banner "Installing CCDC Splunk app (for indexer)"
-    download "$GITHUB_URL"/splunk/ccdc-app.spl ccdc-app.spl
-    sudo chown splunk:splunk ccdc-app.spl
-    sudo -H -u splunk $SPLUNK_HOME/bin/splunk install app ccdc-app.spl
+    print_banner "Installing CCDC Splunk app"
+    install_app "$GITHUB_URL/splunk/ccdc-app.spl"
+}
+
+function install_windows_soc_app {
+    print_banner "Installing Windows SOC Splunk app"
+    install_app "$GITHUB_URL/splunk/windows-security-operations-center_20.tgz"
+}
+
+function install_sysmon_security_monitoring_app {
+    print_banner "Installing Sysmon Security Monitoring Splunk app"
+    install_app "$GITHUB_URL/splunk/sysmon-security-monitoring-app-for-splunk_4013.tgz"
 }
 
 function setup_indexer {
@@ -405,8 +434,11 @@ function setup_indexer {
         sudo -H -u splunk $SPLUNK_HOME/bin/splunk add index "$i"
     done
 
-    info "Installing custom app"
+    info "Installing indexer apps"
+    sudo rm /tmp/app.spl &>/dev/null
     install_ccdc_app
+    install_windows_soc_app
+    install_sysmon_security_monitoring_app
 
     # info "Installing Searches"
     # download $GITHUB_URL/splunk/indexer/savedsearches.conf savedsearches.conf
@@ -776,6 +808,8 @@ function install_auditd {
     download "$GITHUB_URL/splunk/linux/auditd.sh" auditd.sh
     chmod +x auditd.sh
     ./auditd.sh
+    sudo setfacl -R -m u:splunk:rx /var/log/audit
+    # TODO: add check for successful Splunk login to all Splunk commands
     add_monitor "/var/log/audit/audit.log" "system"
 }
 
@@ -824,6 +858,7 @@ function install_snoopy {
             echo
             info "Set Snoopy output to $SNOOPY_LOG."
             # Restart snoopy
+            # TODO: these commands aren't consistent across all systems
             sudo /usr/local/sbin/snoopy-disable
             sudo /usr/local/sbin/snoopy-enable
             sudo -H -u splunk $SPLUNK_HOME/bin/splunk add monitor "$SNOOPY_LOG" -index "snoopy" -sourcetype "snoopy"
@@ -841,8 +876,12 @@ function install_sysmon {
     print_banner "Installing Sysmon"
     download "$GITHUB_URL/linux/sysmon/sysmon.sh" sysmon.sh
     chmod +x sysmon.sh
-    ./sysmon.sh
-    # TODO: add monitor for sysmon logs
+    if ./sysmon.sh; then
+        info "Sysmon installed successfully"
+        install_sysmon_add_on
+    else
+        error "Sysmon installation failed"
+    fi
 }
 #####################################################
 
@@ -854,28 +893,32 @@ function main {
     check_prereqs
     autodetect_os
     install_dependencies
-    setup_splunk
 
-    setup_monitors
-    # add_additional_logs
+    if [ "$ADDITIONAL_LOGGING_ONLY" == false ]; then
+        setup_splunk
 
-    sudo -H -u splunk $SPLUNK_HOME/bin/splunk stop
-    if command -v systemctl &> /dev/null; then
-        info "Enabling systemd service"
-        sudo $SPLUNK_HOME/bin/splunk enable boot-start -systemd-managed 1 -user splunk
-        if [ "$INDEXER" == true ]; then
-            sudo systemctl enable Splunkd
-            sudo systemctl start Splunkd
+        setup_monitors
+        # add_additional_logs
+
+        print_banner "Starting Splunk"
+        sudo -H -u splunk $SPLUNK_HOME/bin/splunk stop
+        if command -v systemctl &> /dev/null; then
+            info "Enabling systemd service"
+            sudo $SPLUNK_HOME/bin/splunk enable boot-start -systemd-managed 1 -user splunk
+            if [ "$INDEXER" == true ]; then
+                sudo systemctl enable Splunkd
+                sudo systemctl start Splunkd
+            else
+                sudo systemctl enable SplunkForwarder
+                sudo systemctl start SplunkForwarder
+            fi
         else
-            sudo systemctl enable SplunkForwarder
-            sudo systemctl start SplunkForwarder
+            info "Not a systemd machine; using splunk start"
+            sudo -H -u splunk $SPLUNK_HOME/bin/splunk start
         fi
-    else
-        info "Not a systemd machine; using splunk start"
-        sudo -H -u splunk $SPLUNK_HOME/bin/splunk start
-    fi
 
-    echo
+        echo
+    fi
 
     if [ "$SPLUNK_ONLY" == false ]; then
         print_banner "Installing additional logging sources"
@@ -906,7 +949,7 @@ function main {
     echo
 }
 
-while getopts "hp:f:ig:uSa:" opt; do
+while getopts "hp:f:ig:uSa:L" opt; do
     case $opt in
         h)
             print_usage
@@ -951,8 +994,11 @@ while getopts "hp:f:ig:uSa:" opt; do
         S)
             SPLUNK_ONLY=true
             ;;
+        L)
+            ADDITIONAL_LOGGING_ONLY=true
+            ;;
         a)
-            # this assumes it is a forwarder installation
+            # Pass -i before this argument if on the indexer
             while true; do
                 info "Indexes: ${INDEXES[*]}"
                 index=$(get_input_string "Select an index: " | tr -d ' ')
