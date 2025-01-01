@@ -6,12 +6,13 @@ $usersFile = "users.txt"
 $advancedAuditingFile = "advancedAuditing.ps1"
 $patchURLFile = "patchURLs.json"
 
-$neededFiles = @($portsFile, $usersFile, $advancedAuditingFile, $patchURLFile)
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+$neededFiles = @($portsFile, $advancedAuditingFile, $patchURLFile, $groupManagementFile, $mainFunctionsFile, $splunkFile)
 foreach ($file in $neededFiles) {
+    $filename = $(Split-Path -Path $file -Leaf)
     try {
-        if (-not (Test-Path "$pwd\$file")) {
-            $wc = New-Object net.webclient
-            $wc.DownloadFile("$ccdcRepoWindowsHardeningPath/$file", "$pwd\$file")
+        if (-not (Test-Path "$pwd\$filename")) {
+            Invoke-WebRequest -Uri "$ccdcRepoWindowsHardeningPath/$file" -OutFile "$pwd\$filename"
         }
     } catch {
         Write-Host $_.Exception.Message -ForegroundColor Yellow
@@ -20,6 +21,7 @@ foreach ($file in $neededFiles) {
         exit
     }
 }
+
 
 # Get OS version and current user
 $OSVersion = (Get-WmiObject -class Win32_OperatingSystem).Caption
