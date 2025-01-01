@@ -56,6 +56,12 @@ function download {
         [string]$url,
         [string]$path
     )
+    
+    # Remove the file if it exists
+    if (Test-Path $path) {
+        Remove-Item $path -Force
+    }
+
     $wc = New-Object net.webclient
     $wc.Downloadfile($url, $path)
 }
@@ -128,6 +134,21 @@ function install_splunk {
         error "Splunk installation failed"
         exit 1
     }
+}
+
+function install_sysmon {
+    print "Downloading Sysmon..."
+    $sysmon_zip_path = $(Get-Location).path + "\Sysmon.zip"
+    download "$GITHUB_URL/windows/hardening/sysmon/Sysmon.zip" $sysmon_zip_path
+    $sysmon_config_path = $(Get-Location).path + "\sysmonconfig-export.xml"
+    download "$GITHUB_URL/windows/hardening/sysmon/sysmonconfig-export.xml" $sysmon_config_path
+
+    print "Extracting Sysmon..."
+    $sysmon_extract_path = $(Get-Location).path + "\Sysmon"
+    Expand-Archive -Path $sysmon_zip_path -DestinationPath $sysmon_extract_path -Force
+
+    print "Installing Sysmon configuration..."
+    Start-Process -FilePath "$sysmon_extract_path\Sysmon.exe" -ArgumentList "-accepteula -i $sysmon_config_path" -Wait -NoNewWindow
 }
 
 function install_custom_inputs {
@@ -215,6 +236,7 @@ if ($ip -eq "indexer" -or $ip -eq "i") {
 }
 
 install_splunk
+install_sysmon
 
 if ($version -eq "7" -or $version -eq "8") {
     # Add-on isn't supported on these versions of Splunk
