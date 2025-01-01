@@ -1321,8 +1321,12 @@ function Download-Install-Setup-Splunk {
     try {
         if (-not (Test-Path -Path ./splunk.ps1)) {
             [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-            if ($splunkBeta) $downloadURL = "https://raw.githubusercontent.com/deltabluejay/public-ccdc-resources/refs/heads/dev/splunk/splunk.ps1"
-            if (-not $splunkBeta) $downloadURL = "https://tinyurl.com/byunccdc/splunk/splunk.ps1"
+            if ($splunkBeta) {
+                $downloadURL = "https://raw.githubusercontent.com/deltabluejay/public-ccdc-resources/refs/heads/dev/splunk/splunk.ps1"
+            }
+            if (-not $splunkBeta) {
+                $downloadURL = "https://tinyurl.com/byunccdc/splunk/splunk.ps1"
+            }
 
             Invoke-WebRequest -Uri $downloadURL -OutFile ./splunk.ps1
         }
@@ -1331,8 +1335,12 @@ function Download-Install-Setup-Splunk {
 
         while ($true) {
             # Install splunk using downloaded script
-            if (-not $splunkBeta) ./splunk.ps1 $Version $SplunkServer
-            if ($splunkBeta) ./splunk.ps1 $Version $SplunkServer "dc"
+            if (-not $splunkBeta) {
+                ./splunk.ps1 $Version $SplunkServer
+            }
+            if ($splunkBeta) {
+                ./splunk.ps1 $Version $SplunkServer "dc"
+            }
             if ($LastExitCode -ne 0) {
                 $confirmation = Prompt-Yes-No -Message "Splunk failed to install. Retry? (y/n)"
                 if ($confirmation.toLower() -eq 'n') {
