@@ -22,6 +22,30 @@ foreach ($file in $neededFiles) {
     }
 }
 
+function GetCompetitionUsers {
+    try {
+        # Prompt the user for the first username
+        $user1 = Read-Host "Please enter the first username"
+
+        # Prompt the user for the second username
+        $user2 = Read-Host "Please enter the second username"
+
+        # Combine the usernames with a newline between them
+        $content = "$user1`n$user2`n$user3"
+
+        # Write the usernames to users.txt in the current directory
+        Set-Content -Path ".\users.txt" -Value $content
+
+        # Notify the user that the file has been created
+        Write-Host "The file users.txt has been created with the provided usernames." -ForegroundColor Green
+    } catch {
+        Write-Host $_.Exception.Message -ForegroundColor Yellow
+        Write-Host "Error Occurred..."
+    }
+}
+Write-Host "Getting Competition Users" -ForegroundColor Magenta
+GetCompetitionUsers
+$usersFile = "users.txt"
 
 # Get OS version and current user
 $OSVersion = (Get-WmiObject -class Win32_OperatingSystem).Caption
