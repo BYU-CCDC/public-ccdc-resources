@@ -9,3 +9,5 @@ Credit to Splunk for Splunk Add-on for Sysmon for Linux. Minor changes were made
 Credit to Bojan Zdrnja for Windows Security Operations Center app. Minor changes were made to fit competition purposes. https://splunkbase.splunk.com/app/647
 
 Credit to Manas Bellani for Sysmon Security Monitoring App for Splunk. Minor changes were made to fit competition purposes. https://splunkbase.splunk.com/app/6253
+
+Credit to Yves LAM for Linux Audit Log Hex Value Decoder app. https://splunkbase.splunk.com/app/7179

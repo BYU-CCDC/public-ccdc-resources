@@ -58,6 +58,7 @@ for distro in hrefs:
                 r = requests.get(s_packages_url)
                 s_packages = get_hrefs(r.text)
                 if 'sysinternalsebpf/' in s_packages or 'sysmonforlinux/' in s_packages:
+                    extra_path = True
                     r = requests.get(s_packages_url + 'sysinternalsebpf/')
                     sysinternals_packages = get_hrefs(r.text)
                     sysinternals_packages = [package for package in sysinternals_packages if package.startswith('sysinternalsebpf')]
@@ -65,17 +66,24 @@ for distro in hrefs:
                     sysmon_packages = get_hrefs(r.text)
                     sysmon_packages = [package for package in sysmon_packages if package.startswith('sysmonforlinux')]
                 else:
+                    extra_path = False
                     sysinternals_packages = [package for package in s_packages if package.startswith('sysinternalsebpf')]
                     sysmon_packages = [package for package in s_packages if package.startswith('sysmonforlinux')]
                 if len(sysinternals_packages):
                     best = find_best(sysinternals_packages)
                     name = [package for package in sysinternals_packages if best in package][0]
                     downloads[f"{distro.rstrip('/')}-{version.rstrip('/')}"] = {}
-                    downloads[f"{distro.rstrip('/')}-{version.rstrip('/')}"]['sysinternals'] = s_packages_url + 'sysinternalsebpf/' + name
+                    if extra_path:
+                        downloads[f"{distro.rstrip('/')}-{version.rstrip('/')}"]['sysinternals'] = s_packages_url + 'sysinternalsebpf/' + name
+                    else:
+                        downloads[f"{distro.rstrip('/')}-{version.rstrip('/')}"]['sysinternals'] = s_packages_url + name
                 if len(sysmon_packages):
                     best = find_best(sysmon_packages)
                     name = [package for package in sysmon_packages if best in package][0]
-                    downloads[f"{distro.rstrip('/')}-{version.rstrip('/')}"]['sysmon'] = s_packages_url + 'sysmonforlinux/' + name
+                    if extra_path:
+                        downloads[f"{distro.rstrip('/')}-{version.rstrip('/')}"]['sysmon'] = s_packages_url + 'sysmonforlinux/' + name
+                    else:
+                        downloads[f"{distro.rstrip('/')}-{version.rstrip('/')}"]['sysmon'] = s_packages_url + name
 
 print()
 # print(downloads)

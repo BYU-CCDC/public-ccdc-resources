@@ -2,7 +2,7 @@
 ###################### GLOBALS ######################
 DEBUG_LOG='/var/log/ccdc/splunk.log'
 GITHUB_URL="https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main"
-INDEXES=( 'system' 'web' 'network' 'windows' 'misc' 'snoopy' 'sysmon' )
+INDEXES=( 'system' 'web' 'network' 'windows' 'misc' 'snoopy' )
 PM=""
 IP=""
 INDEXER=false
@@ -43,6 +43,7 @@ function print_banner {
     echo
 }
 
+# TODO: add color?
 function info {
     echo "[*] $1"
 }
@@ -130,6 +131,7 @@ function autodetect_os {
     if [ $apt == 0 ]; then
         info "apt/apt-get detected (Debian-based OS)"
         info "Updating package list"
+        # TODO: pkill unattended-upgrades
         sudo apt-get update
         PM="apt-get"
     elif [ $dnf == 0 ]; then
@@ -385,7 +387,7 @@ function create_splunk_user {
 function install_app {
     download "$1" /tmp/app.spl
     sudo chown splunk:splunk "/tmp/app.spl"
-    sudo -H -u splunk $SPLUNK_HOME/bin/splunk install app "/tmp/app.spl"
+    sudo -H -u splunk $SPLUNK_HOME/bin/splunk install app "/tmp/app.spl" -update 1
     sudo rm /tmp/app.spl
 }
 
@@ -423,6 +425,11 @@ function install_sysmon_security_monitoring_app {
     install_app "$GITHUB_URL/splunk/sysmon-security-monitoring-app-for-splunk_4013.tgz"
 }
 
+function install_audit_parse_app {
+    print_banner "Installing Audit Hex Value Decoder app"
+    install_app "$GITHUB_URL/splunk/linux-audit-log-hex-value-decoder_100.tgz"
+}
+
 function setup_indexer {
     print_banner "Configuring Indexer"
 
@@ -434,11 +441,15 @@ function setup_indexer {
         sudo -H -u splunk $SPLUNK_HOME/bin/splunk add index "$i"
     done
 
+    info "Giving splunk user can_delete role"
+    sudo -H -u splunk $SPLUNK_HOME/bin/splunk edit user splunk -role admin -role can_delete
+
     info "Installing indexer apps"
     sudo rm /tmp/app.spl &>/dev/null
     install_ccdc_app
     install_windows_soc_app
     install_sysmon_security_monitoring_app
+    install_audit_parse_app
 
     # info "Installing Searches"
     # download $GITHUB_URL/splunk/indexer/savedsearches.conf savedsearches.conf
@@ -479,6 +490,8 @@ function setup_splunk {
     res=-1
     while [ $res -ne 0 ]; do
         if [ "$SPLUNK_PASSWORD" == "" ]; then
+            # TODO: verify this twice
+            # TODO: also try passing -auth to every splunk command
             SPLUNK_PASSWORD=$(get_silent_input_string "Enter the password for splunk user: ")
         fi
         sudo -H -u splunk $SPLUNK_HOME/bin/splunk login -auth "$SPLUNK_USERNAME:$SPLUNK_PASSWORD"
@@ -941,6 +954,7 @@ function main {
     fi
 
     print_banner "End of script"
+    # TODO: print status of installation of all components
     info "You can add additional monitors with this script."
     echo "   Usage: ./splunk.sh -a <LOG_PATH>"
     # info "Add future additional scripted inputs with 'sudo -H -u splunk $SPLUNK_HOME/bin/splunk add exec $SPLUNK_HOME/etc/apps/ccdc-add-on/bin/<SCRIPT> -interval <SECONDS> -index <INDEX>'"
@@ -949,6 +963,7 @@ function main {
     echo
 }
 
+# TODO: add a reinstall option
 while getopts "hp:f:ig:uSa:L" opt; do
     case $opt in
         h)

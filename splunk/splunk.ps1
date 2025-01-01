@@ -174,7 +174,7 @@ function install_windows_ta {
     print "Installing Splunk Add-on for Microsoft Windows..."
     $path = $(Get-Location).path + "\splunk-add-on-for-microsoft-windows_901.tgz"
     download "$GITHUB_URL/splunk/windows/splunk-add-on-for-microsoft-windows_901.tgz" $path
-    & "$SPLUNKDIR\bin\splunk.exe" install app $path
+    & "$SPLUNKDIR\bin\splunk.exe" install app $path -update 1
 
     print "Enabling inputs for the Windows TA..."
     New-Item -Path "$SPLUNKDIR\etc\apps\Splunk_TA_windows\local\" -ItemType Directory -Force
@@ -194,7 +194,7 @@ function install_sysmon_ta {
     print "Installing Splunk Add-on for Sysmon..."
     $path = $(Get-Location).path + "\splunk-add-on-for-sysmon_402.tgz"
     download "$GITHUB_URL/splunk/windows/splunk-add-on-for-sysmon_402.tgz" $path
-    & "$SPLUNKDIR\bin\splunk.exe" install app $path
+    & "$SPLUNKDIR\bin\splunk.exe" install app $path -update 1
 
     print "Enabling inputs for the Sysmon TA..."
     New-Item -Path "$SPLUNKDIR\etc\apps\Splunk_TA_microsoft_sysmon\local\" -ItemType Directory -Force
