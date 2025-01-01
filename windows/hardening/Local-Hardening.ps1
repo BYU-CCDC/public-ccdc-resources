@@ -31,7 +31,7 @@ function GetCompetitionUsers {
         $user2 = Read-Host "Please enter the second username"
 
         # Combine the usernames with a newline between them
-        $content = "$user1`n$user2`n$user3"
+        $content = "$user1`n$user2"
 
         # Write the usernames to users.txt in the current directory
         Set-Content -Path ".\users.txt" -Value $content
