@@ -397,40 +397,35 @@ function Disable-Unnecessary-Services {
         Write-Host "Error Occurred..."
     }
 }
-
 function Download-Install-Setup-Splunk {
-    param([string]$IP)
+    param([string]$Version, [string]$IP)
+
+    $splunkBeta = ((Prompt-Yes-No -Message "Install Splunk from deltabluejay repo? (y/n)").toLower() -eq 'y')
+    Write-Host $splunkBeta
     try {
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-        $downloadURL = "https://download.splunk.com/products/universalforwarder/releases/9.0.1/windows/splunkforwarder-9.0.1-82c987350fde-x64-release.msi"
+        if ($splunkBeta) {
+            $downloadURL = "https://raw.githubusercontent.com/deltabluejay/public-ccdc-resources/refs/heads/dev/splunk/splunk.ps1"
+        }
+        if (-not $splunkBeta) {
+            $downloadURL = "https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main/splunk/splunk.ps1"
+        }
+
+        Invoke-WebRequest -Uri $downloadURL -OutFile ./splunk.ps1
+
         $splunkServer = "$($IP):9997" # Replace with your Splunk server IP and receiving port
 
-        $securedValue = Read-Host -AsSecureString "Please enter a password for the new splunk user (splunkf)"
-        $bstr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($securedValue)
-        $password = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr)
-        # Download the Splunk Forwarder
-        $path = "$env:TEMP\splunkforwarder.msi"
+        # Install splunk using downloaded script
+        if ((Get-ChildItem ./splunk.ps1).Length -lt 6000) {
+            ./splunk.ps1 $Version $SplunkServer
+        } else {
+            ./splunk.ps1 $Version $SplunkServer "dc"
+        }
 
-        Write-Host "Grabbing the installer file. Downloading it to $path" -ForegroundColor Cyan
-        $wc = New-Object net.webclient
-        $wc.Downloadfile($downloadURL, $path)
-
-        Write-Host "Installing Splunk Forwarder with username" -ForegroundColor Cyan -NoNewline
-        Write-Host " splunkf" -ForegroundColor Green -NoNewline
-        Write-Host " and the" -ForegroundColor Cyan -NoNewline
-        Write-Host " password" -ForegroundColor Green -NoNewline
-        Write-Host " you provided above" -ForegroundColor Cyan
-        # Install Splunk Forwarder
-        Start-Process -Wait msiexec -ArgumentList "/i $path SPLUNKUSERNAME=splunkf SPLUNKPASSWORD=$password RECEIVING_INDEXER=$splunkServer WINEVENTLOG_SEC_ENABLE=1 WINEVENTLOG_SYS_ENABLE=1 WINEVENTLOG_APP_ENABLE=1 AGREETOLICENSE=Yes /quiet"
-
-        # Start Splunk forwarder service
-        Start-Service SplunkForwarder
-
-        # Clean up the downloaded MSI file
-        Remove-Item $path
     } catch {
         Write-Host $_.Exception.Message -ForegroundColor Yellow
         Write-Host "Error Occurred..."
+        Update-Log "Configure Splunk" "Failed with error: $($_.Exception.Message)"
     }
 }
 
@@ -1048,7 +1043,8 @@ $confirmation = Prompt-Yes-No -Message "Enter the 'Configure Splunk' function? (
 if ($confirmation.toLower() -eq "y") {
     Write-Host "`n***Configuring Splunk***" -ForegroundColor Magenta
     $SplunkIP = Read-Host "`nInput IP address of Splunk Server"
-    Download-Install-Setup-Splunk -IP $SplunkIP
+    $SplunkVersion = Read-Host "`nInput OS Version (7, 8, 10, 11, 2012, 2016, 2019, 2022): "
+    Download-Install-Setup-Splunk -Version $SplunkVersion -IP $SplunkIP
 } else {
     Write-Host "Skipping..." -ForegroundColor Red
 }

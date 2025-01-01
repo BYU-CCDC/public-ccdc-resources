@@ -1332,20 +1332,11 @@ function Download-Install-Setup-Splunk {
 
         $splunkServer = "$($IP):9997" # Replace with your Splunk server IP and receiving port
 
-        while ($true) {
-            # Install splunk using downloaded script
-            if (-not $splunkBeta) {
-                ./splunk.ps1 $Version $SplunkServer
-            }
-            if ($splunkBeta) {
-                ./splunk.ps1 $Version $SplunkServer "dc"
-            }
-            if ($LastExitCode -ne 0) {
-                $confirmation = Prompt-Yes-No -Message "Splunk failed to install. Retry? (y/n)"
-                if ($confirmation.toLower() -eq 'n') {
-                    break
-                }
-            }
+        # Install splunk using downloaded script
+        if ((Get-ChildItem ./splunk.ps1).Length -lt 6000) {
+            ./splunk.ps1 $Version $SplunkServer
+        } else {
+            ./splunk.ps1 $Version $SplunkServer "dc"
         }
 
     } catch {
@@ -1805,13 +1796,13 @@ if ($confirmation.toLower() -eq "y") {
 }
 
 # Enable RDP
-$confirmation = Prompt-Yes-No -Message "Enter the 'Enable RDP' function? (y/n)"
-if ($confirmation.toLower() -eq "y") {
-    Write-Host "`n***Enabling RDP...***" -ForegroundColor Magenta
-    Enable-Disable-RDP
-} else {
-    Write-Host "Skipping..." -ForegroundColor Red
-}
+#$confirmation = Prompt-Yes-No -Message "Enter the 'Enable RDP' function? (y/n)"
+#if ($confirmation.toLower() -eq "y") {
+#    Write-Host "`n***Enabling RDP...***" -ForegroundColor Magenta
+#    Enable-Disable-RDP
+#} else {
+#    Write-Host "Skipping..." -ForegroundColor Red
+#}
 
 
 # Configure Firewall
