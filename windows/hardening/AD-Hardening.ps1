@@ -984,7 +984,7 @@ function Configure-Secure-GPO {
                 "Value" = 2
                 "Type" = "DWORD"
             }
-            #other best practice keys
+        #other best practice keys
             "Configure SecurityLevel" = @{
                 "Key" = "HKLM\Software\Microsoft\Windows NT\CurrentVersion\Setup\RecoveryConsole"
                 "ValueName" = "SecurityLevel"
@@ -1315,8 +1315,7 @@ function Configure-Secure-GPO {
 }
 
 function Download-Install-Setup-Splunk {
-    param([string]$Version)
-    param([string]$IP)
+    param([string]$Version, [string]$IP)
     try {
         if (-not (Test-Path -Path ./splunk.ps1)) {
             [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
@@ -1327,8 +1326,16 @@ function Download-Install-Setup-Splunk {
 
         $splunkServer = "$($IP):9997" # Replace with your Splunk server IP and receiving port
 
-        # Install splunk using downloaded script
-        ./splunk.ps1 $Version $SplunkServer
+        while ($true) {
+            # Install splunk using downloaded script
+            ./splunk.ps1 $Version $SplunkServer
+            if ($LastExitCode -ne 0) {
+                $confirmation = Prompt-Yes-No -Message "Splunk failed to install. Retry? (y/n)"
+                if ($confirmation.toLower() -eq 'n') {
+                    break
+                }
+            }
+        }
 
     } catch {
         Write-Host $_.Exception.Message -ForegroundColor Yellow
@@ -1685,6 +1692,25 @@ renderXml=false
 function Create-Workstations-OU {
     New-ADOrganizationalUnit -Name "Workstations"
 }
+
+Function Enable-Disable-RDP {
+    
+    $confirmation = Prompt-Yes-No -Message "Should RDP be enabled?"
+    if ($confirmation.toLower() -eq "y") {
+        Write-Host "Enabling RDP"
+        Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server" -Name "fDenyTSConnections" -Value 0
+
+        $confirmation = Prompt-Yes-No -Message "Will you be RDP-ing from computers not on the domain? (y/n)"
+        if ($confirmation.toLower() -eq "y") { $nlaValue = 0 } else { $nlaValue = 1 }
+
+        Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" -Name "UserAuthentication" -Value $nlaValue
+
+    } else {
+        Write-Host "Disabling RDP"
+        Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server" -Name "fDenyTSConnections" -Value 1
+    }
+
+}
 ###################################### MAIN ######################################
 
 
@@ -1767,6 +1793,15 @@ if ($confirmation.toLower() -eq "y") {
     Write-Host "Skipping..." -ForegroundColor Red
 }
 
+# Enable RDP
+$confirmation = Prompt-Yes-No -Message "Enter the 'Enable RDP' function? (y/n)"
+if ($confirmation.toLower() -eq "y") {
+    Write-Host "`n***Enabling RDP...***" -ForegroundColor Magenta
+    Enable-RDP
+} else {
+    Write-Host "Skipping..." -ForegroundColor Red
+}
+
 
 # Configure Firewall
 $confirmation = Prompt-Yes-No -Message "Enter the 'Configure Firewall' function? (y/n)"
@@ -1835,6 +1870,7 @@ Write-Host "It is adviseable to configure other desired gpo attributes while the
 Write-Host @"
 Consider, after starting the splunk install:
     -Removing the debug process permission
+    -Adding the audit directory access configuration
     -Preventing Domain Admins from logging into workstations
     -Adding Workstation Admins to workstation Administrators groups
     -Moving workstations into the Workstations OU
