@@ -82,6 +82,8 @@
 		<!--DATA: UtcTime, ProcessGuid, ProcessID, Image, FileVersion, Description, Product, Company, CommandLine, CurrentDirectory, User, LogonGuid, LogonId, TerminalSessionId, IntegrityLevel, Hashes, ParentProcessGuid, ParentProcessId, ParentImage, ParentCommandLine, RuleName-->
 	<RuleGroup name="" groupRelation="or">
 		<ProcessCreate onmatch="exclude">
+			<!--SECTION: Splunk-->
+			<Image condition="begin with">C:\Program Files\SplunkUniversalForwarder\bin\splunk-</Image> <!--Splunk binaries-->
 			<!--SECTION: Microsoft Windows-->
 			<CommandLine condition="begin with"> "C:\Windows\system32\wermgr.exe" "-queuereporting_svc" </CommandLine> <!--Windows:Windows error reporting/telemetry-->
 			<CommandLine condition="begin with">C:\Windows\system32\DllHost.exe /Processid</CommandLine> <!--Windows-->
@@ -245,6 +247,9 @@
 
 	<RuleGroup name="" groupRelation="or">
 		<FileCreateTime onmatch="exclude">
+			<!--SECTION: Splunk-->
+			<Image condition="begin with">C:\Program Files\SplunkUniversalForwarder\-</Image> <!--Splunk-->
+			
 			<Image condition="image">OneDrive.exe</Image> <!--OneDrive constantly changes file times-->
 			<Image condition="image">C:\Windows\system32\backgroundTaskHost.exe</Image>
 			<Image condition="contains">setup</Image> <!--Ignore setups-->
@@ -365,6 +370,8 @@
 
 	<RuleGroup name="" groupRelation="or">
 		<NetworkConnect onmatch="exclude">
+			<!--SECTION: Splunk-->
+			<Image condition="begin with">C:\Program Files\SplunkUniversalForwarder\bin\splunk</Image> <!--Splunk-->
 			<!--SECTION: Microsoft-->
 			<Image condition="begin with">C:\ProgramData\Microsoft\Windows Defender\Platform\</Image>
 			<Image condition="end with">AppData\Local\Microsoft\Teams\current\Teams.exe</Image> <!--Microsoft: Teams-->
@@ -542,6 +549,8 @@
 
 	<RuleGroup name="" groupRelation="or">
 		<FileCreate onmatch="exclude">
+			<!--SECTION: Splunk-->
+			<Image condition="begin with">C:\Program Files\SplunkUniversalForwarder\-</Image> <!--Splunk-->
 			<!--SECTION: Microsoft-->
 			<Image condition="is">C:\Program Files (x86)\EMET 5.5\EMET_Service.exe</Image> <!--Microsoft:EMET: Writes to C:\Windows\AppPatch\-->
 			<!--SECTION: Microsoft:Office:Click2Run-->

@@ -5,7 +5,7 @@ from bs4 import BeautifulSoup
 import re
 import sys
 
-version = '9.2.3'
+version = '9.2.4'
 if version == 'latest':
     indexer_url = 'https://www.splunk.com/en_us/download/splunk-enterprise.html'
     uf_url = 'https://www.splunk.com/en_us/download/universal-forwarder.html'
@@ -137,7 +137,7 @@ def format_template(template, item, desired_version, indexer=False):
 
 markdown_template = '''\
 # Splunk Download URLs
-Version: $VERSION
+Version: [$VERSION](https://docs.splunk.com/Documentation/Splunk/$VERSION/Installation/Systemrequirements)
 
 ## Indexer
 Windows x64 (64 bit) msi:
@@ -238,9 +238,9 @@ AIX PPC .tgz:
 
 bash_template = '''\
 # Indexer
-deb="$INDEXER_DEB"
-rpm="$INDEXER_RPM"
-tgz="$INDEXER_TGZ"
+indexer_deb="$INDEXER_DEB"
+indexer_rpm="$INDEXER_RPM"
+indexer_tgz="$INDEXER_TGZ"
 
 # Forwarder
 deb="$DEB"
@@ -268,11 +268,12 @@ if __name__ == '__main__':
     print('Bash:')
     print(bash_template)
 
-    if version == 'latest':
-        filename = 'README.md'
-    else:
-        filename = f'README-{version}.md'
+    filename = 'README.md'
+    # if version == 'latest':
+    #     filename = 'README.md'
+    # else:
+    #     filename = f'README-{version}.md'
     overwrite = input(f'Overwrite {filename}? (y/N): ')
     if overwrite == 'y':
-        with open(f'{filename}.md', 'w') as f:
+        with open(f'{filename}', 'w') as f:
             f.write(markdown_template)

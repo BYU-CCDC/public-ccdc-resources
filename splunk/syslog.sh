@@ -8,5 +8,5 @@ if \$fromhost-ip == '$firewall_ip' and \$msg contains 'AccessControlRuleAction' 
 if \$fromhost-ip == '$firewall_ip' then /var/log/fw_system.log" | sudo tee -a /etc/rsyslog.conf
 sudo service rsyslog restart
 sudo service rsyslog status
-sudo /opt/splunk/bin/splunk add monitor /var/log/fw_network.log -index network
-sudo /opt/splunk/bin/splunk add monitor /var/log/fw_system.log -index system
+sudo -u splunk /opt/splunk/bin/splunk add monitor /var/log/fw_network.log -index network -hostname "CISCO_FTD"
+sudo -u splunk /opt/splunk/bin/splunk add monitor /var/log/fw_system.log -index system -hostname "CISCO_FTD"
