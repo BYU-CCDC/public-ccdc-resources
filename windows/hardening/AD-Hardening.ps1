@@ -1316,10 +1316,13 @@ function Configure-Secure-GPO {
 
 function Download-Install-Setup-Splunk {
     param([string]$Version, [string]$IP)
+
+    $splunkBeta = ((Prompt-Yes-No -Message "Install Splunk from deltabluejay repo? (y/n)").toLower() -eq 'y')
     try {
         if (-not (Test-Path -Path ./splunk.ps1)) {
             [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-            $downloadURL = "https://tinyurl.com/byunccdc/splunk/splunk.ps1"
+            if ($splunkBeta) $downloadURL = "https://raw.githubusercontent.com/deltabluejay/public-ccdc-resources/refs/heads/dev/splunk/splunk.ps1"
+            if (-not $splunkBeta) $downloadURL = "https://tinyurl.com/byunccdc/splunk/splunk.ps1"
 
             Invoke-WebRequest -Uri $downloadURL -OutFile ./splunk.ps1
         }
@@ -1328,7 +1331,8 @@ function Download-Install-Setup-Splunk {
 
         while ($true) {
             # Install splunk using downloaded script
-            ./splunk.ps1 $Version $SplunkServer
+            if (-not $splunkBeta) ./splunk.ps1 $Version $SplunkServer
+            if ($splunkBeta) ./splunk.ps1 $Version $SplunkServer "dc"
             if ($LastExitCode -ne 0) {
                 $confirmation = Prompt-Yes-No -Message "Splunk failed to install. Retry? (y/n)"
                 if ($confirmation.toLower() -eq 'n') {
