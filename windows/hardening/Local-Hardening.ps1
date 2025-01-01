@@ -1,6 +1,6 @@
 #Start-Transcript "$env:Temp"
 
-$ccdcRepoWindowsHardeningPath = "https://github.com/BYU-CCDC/public-ccdc-resources/tree/main/windows/hardening/"
+$ccdcRepoWindowsHardeningPath = "https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main/windows/hardening"
 $portsFile = "ports.json"
 $usersFile = "users.txt"
 $advancedAuditingFile = "advancedAuditing.ps1"
