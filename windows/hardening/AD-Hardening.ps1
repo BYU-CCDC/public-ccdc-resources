@@ -1318,18 +1318,17 @@ function Download-Install-Setup-Splunk {
     param([string]$Version, [string]$IP)
 
     $splunkBeta = ((Prompt-Yes-No -Message "Install Splunk from deltabluejay repo? (y/n)").toLower() -eq 'y')
+    Write-Host $splunkBeta
     try {
-        if (-not (Test-Path -Path ./splunk.ps1)) {
-            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-            if ($splunkBeta) {
-                $downloadURL = "https://raw.githubusercontent.com/deltabluejay/public-ccdc-resources/refs/heads/dev/splunk/splunk.ps1"
-            }
-            if (-not $splunkBeta) {
-                $downloadURL = "https://tinyurl.com/byunccdc/splunk/splunk.ps1"
-            }
-
-            Invoke-WebRequest -Uri $downloadURL -OutFile ./splunk.ps1
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        if ($splunkBeta) {
+            $downloadURL = "https://raw.githubusercontent.com/deltabluejay/public-ccdc-resources/refs/heads/dev/splunk/splunk.ps1"
         }
+        if (-not $splunkBeta) {
+            $downloadURL = "https://tinyurl.com/byunccdc/splunk/splunk.ps1"
+        }
+
+        Invoke-WebRequest -Uri $downloadURL -OutFile ./splunk.ps1
 
         $splunkServer = "$($IP):9997" # Replace with your Splunk server IP and receiving port
 
