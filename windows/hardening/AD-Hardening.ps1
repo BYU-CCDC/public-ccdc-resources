@@ -3,7 +3,7 @@ Import-Module GroupPolicy
 
 $ProgressPreference = 'SilentlyContinue'
 
-$ccdcRepoWindowsHardeningPath = "https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main"
+$ccdcRepoWindowsHardeningPath = "https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main/windows/hardening"
 $portsFile = "ports.json"
 $advancedAuditingFile = "advancedAuditing.ps1"
 $patchURLFile = "patchURLs.json"
