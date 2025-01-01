@@ -3,7 +3,7 @@ Import-Module GroupPolicy
 
 $ProgressPreference = 'SilentlyContinue'
 
-$ccdcRepoWindowsHardeningPath = "https://tinyurl.com/byunccdc/windows/hardening"
+$ccdcRepoWindowsHardeningPath = "https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main"
 $portsFile = "ports.json"
 $advancedAuditingFile = "advancedAuditing.ps1"
 $patchURLFile = "patchURLs.json"
@@ -1325,7 +1325,7 @@ function Download-Install-Setup-Splunk {
             $downloadURL = "https://raw.githubusercontent.com/deltabluejay/public-ccdc-resources/refs/heads/dev/splunk/splunk.ps1"
         }
         if (-not $splunkBeta) {
-            $downloadURL = "https://tinyurl.com/byunccdc/splunk/splunk.ps1"
+            $downloadURL = "https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main/splunk/splunk.ps1"
         }
 
         Invoke-WebRequest -Uri $downloadURL -OutFile ./splunk.ps1
