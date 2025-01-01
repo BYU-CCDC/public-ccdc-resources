@@ -7,7 +7,7 @@ $advancedAuditingFile = "advancedAuditing.ps1"
 $patchURLFile = "patchURLs.json"
 
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-$neededFiles = @($portsFile, $advancedAuditingFile, $patchURLFile, $usersFile)
+$neededFiles = @($portsFile, $advancedAuditingFile, $patchURLFile)
 foreach ($file in $neededFiles) {
     $filename = $(Split-Path -Path $file -Leaf)
     try {
