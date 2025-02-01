@@ -14,6 +14,10 @@ $splunkFile = "../../splunk/splunk.ps1"
 # Backup existing firewall rules
 netsh advfirewall export ./firewallbackup.wfw
 
+# Backup AD DNS Zones
+dnscmd localhost /zoneexport $env:USERDNSDOMAIN backup\$env:USERDNSDOMAIN
+dnscmd localhost /zoneexport _msdcs.$env:USERDNSDOMAIN backup\_msdcs.$env:USERDNSDOMAIN
+
 # Block SMB initially, we'll turn it back on in the firewall section
 # Inbound rules
 netsh advfirewall firewall add rule name="TCP Inbound SMB" dir=in action=block protocol=TCP localport=139
@@ -224,6 +228,11 @@ function Change-Current-User-Password {
 
 # Add competition-specific users with certain privileges
 function Add-Competition-Users {
+    $protectedUsers = Get-ADGroup -Filter 'Name -like "Protected Users"'
+    if (!$protectedUsers) {
+        Write-Host "Creating Protected Users group without protections. Your admin users may be vulnerable!"
+        New-ADGroup -Name "Protected Users" -GroupScope Global
+    }
     try {
         foreach ($user in $UserArray) {
             $splat = @{
