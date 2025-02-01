@@ -15,8 +15,8 @@ $splunkFile = "../../splunk/splunk.ps1"
 netsh advfirewall export ./firewallbackup.wfw
 
 # Backup AD DNS Zones
-dnscmd localhost /zoneexport $env:USERDNSDOMAIN backup\$USERDNSDOMAIN
-dnscmd localhost /zoneexport _msdcs.$env:USERDNSDOMAIN backup\_msdcs.$USERDNSDOMAIN
+dnscmd localhost /zoneexport $env:USERDNSDOMAIN backup\$env:USERDNSDOMAIN
+dnscmd localhost /zoneexport _msdcs.$env:USERDNSDOMAIN backup\_msdcs.$env:USERDNSDOMAIN
 
 # Block SMB initially, we'll turn it back on in the firewall section
 # Inbound rules
