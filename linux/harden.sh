@@ -3,7 +3,7 @@
 
 ###################### GLOBALS ######################
 LOG='/var/log/ccdc/harden.log'
-GITHUB_URL="https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/refs/heads/dev"
+GITHUB_URL="https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/refs/heads/main"
 pm=""
 sudo_group=""
 ccdc_users=( "ccdcuser1" "ccdcuser2" )
@@ -195,13 +195,14 @@ function change_passwords {
         exclusions=$(exclude_users "${exclusions[@]}")
     fi
 
-    if sudo [ -e "/etc/centos-release" ] ; then
-        # CentOS starts numbering at 500
-        targets=$(get_users '$3 >= 500 && $1 != "nobody" {print $1}' "${exclusions[*]}")
-    else
-        # Otherwise 1000
-        targets=$(get_users '$3 >= 1000 && $1 != "nobody" {print $1}' "${exclusions[*]}")
-    fi
+    # if sudo [ -e "/etc/centos-release" ] ; then
+    #     # CentOS starts numbering at 500
+    #     targets=$(get_users '$3 >= 500 && $1 != "nobody" {print $1}' "${exclusions[*]}")
+    # else
+    #     # Otherwise 1000
+    #     targets=$(get_users '$3 >= 1000 && $1 != "nobody" {print $1}' "${exclusions[*]}")
+    # fi
+    targets=$(get_users '$1 != "nobody" {print $1}' "${exclusions[*]}")
 
     echo "[*] Enter the new password to be used for all users."
     while true; do
@@ -255,7 +256,7 @@ function disable_users {
     if [ "$option" == "y" ]; then
         exclusions=$(exclude_users "${exclusions[@]}")
     fi
-    targets=$(get_users '/\/bash$|\/sh$/{print $1}' "${exclusions[*]}")
+    targets=$(get_users '/\/bash$|\/sh$|\/ash$|\/zsh$/{print $1}' "${exclusions[*]}")
 
     echo
 
@@ -303,10 +304,10 @@ function disable_other_firewalls {
     # fi
 
     # Some systems may also have iptables as backend
-    if sudo command -v iptables &>/dev/null; then
-        echo "[*] clearing iptables rules"
-        sudo iptables -F
-    fi
+    # if sudo command -v iptables &>/dev/null; then
+    #     echo "[*] clearing iptables rules"
+    #     sudo iptables -F
+    # fi
 }
 
 function setup_ufw {
@@ -318,6 +319,8 @@ function setup_ufw {
         echo -e "[*] Package ufw installed successfully\n"
         echo "[*] Which ports should be opened for incoming traffic?"
         echo "      WARNING: Do NOT forget to add 22/SSH if needed- please don't accidentally lock yourself out of the system!"
+        sudo ufw --force disable
+        sudo ufw --force reset
         ports=$(get_input_list)
         for port in $ports; do
             sudo ufw allow "$port"
@@ -480,18 +483,8 @@ function setup_splunk {
     indexer_ip=$(get_input_string "What is the Splunk forward server ip? ")
 
     wget $GITHUB_URL/splunk/splunk.sh --no-check-certificate
-    sudo chmod +x splunk.sh
-    case "$pm" in
-        apt )
-            ./splunk.sh deb "$indexer_ip"
-        ;;
-        dnf|yum|zypper )
-            ./splunk.sh rpm "$indexer_ip"
-        ;;
-        * )
-            ./splunk.sh tgz "$indexer_ip"
-        ;;
-    esac
+    chmod +x splunk.sh
+    ./splunk.sh -f $indexer_ip
 }
 #####################################################
 
