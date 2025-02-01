@@ -3,7 +3,7 @@
 
 ###################### GLOBALS ######################
 LOG='/var/log/ccdc/harden.log'
-GITHUB_URL="https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/refs/heads/dev"
+GITHUB_URL="https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/refs/heads/main"
 pm=""
 sudo_group=""
 ccdc_users=( "ccdcuser1" "ccdcuser2" )
@@ -304,10 +304,10 @@ function disable_other_firewalls {
     # fi
 
     # Some systems may also have iptables as backend
-    if sudo command -v iptables &>/dev/null; then
-        echo "[*] clearing iptables rules"
-        sudo iptables -F
-    fi
+    # if sudo command -v iptables &>/dev/null; then
+    #     echo "[*] clearing iptables rules"
+    #     sudo iptables -F
+    # fi
 }
 
 function setup_ufw {
@@ -320,7 +320,7 @@ function setup_ufw {
         echo "[*] Which ports should be opened for incoming traffic?"
         echo "      WARNING: Do NOT forget to add 22/SSH if needed- please don't accidentally lock yourself out of the system!"
         sudo ufw --force disable
-        sudo ufw reset
+        sudo ufw --force reset
         ports=$(get_input_list)
         for port in $ports; do
             sudo ufw allow "$port"

@@ -230,7 +230,7 @@ function download_and_install_package {
         if command -v zypper &>/dev/null; then
             sudo zypper --no-gpg-checks install -y ./splunk.rpm
         else
-            sudo yum install ./splunk.rpm -y
+            sudo yum install --nogpgcheck ./splunk.rpm -y
         fi
     elif [[ "$1" == *.tgz ]]; then
         download "$1" splunk.tgz
@@ -437,8 +437,8 @@ function install_palo_alto_apps {
     download "https://github.com/PaloAltoNetworks/Splunk-Apps/archive/refs/tags/v8.1.3.zip" /tmp/palo.zip
     unzip /tmp/palo.zip -d /tmp/palo-apps/
 
-    mv /tmp/palo-apps/Splunk-Apps-8.1.3/Splunk_TA_paloalto/ $SPLUNK_HOME/etc/apps/
-    mv /tmp/palo-apps/Splunk-Apps-8.1.3/SplunkforPaloAltoNetworks/ $SPLUNK_HOME/etc/apps/
+    sudo mv /tmp/palo-apps/Splunk-Apps-8.1.3/Splunk_TA_paloalto/ $SPLUNK_HOME/etc/apps/
+    sudo mv /tmp/palo-apps/Splunk-Apps-8.1.3/SplunkforPaloAltoNetworks/ $SPLUNK_HOME/etc/apps/
     
     sudo chown -R splunk:splunk "$SPLUNK_HOME/etc/apps/Splunk_TA_paloalto/"
     sudo chown -R splunk:splunk "$SPLUNK_HOME/etc/apps/SplunkforPaloAltoNetworks/"
