@@ -224,6 +224,11 @@ function Change-Current-User-Password {
 
 # Add competition-specific users with certain privileges
 function Add-Competition-Users {
+    $protectedUsers = Get-ADGroup -Filter 'Name -like "Protected Users"'
+    if (!$protectedUsers) {
+        Write-Host "Creating Protected Users group without protections. Your admin users may be vulnerable!"
+        New-ADGroup -Name "Protected Users" -GroupScope Global
+    }
     try {
         foreach ($user in $UserArray) {
             $splat = @{
