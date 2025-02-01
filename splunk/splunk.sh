@@ -8,12 +8,14 @@ IP=""
 INDEXER=false
 PACKAGE="auto"
 SPLUNK_HOME="/opt/splunkforwarder"
-# Special variables recognized by Splunk CLI for authentication
-SPLUNK_USERNAME="splunk"
-SPLUNK_PASSWORD=""
 SPLUNK_ONLY=false
 ADDITIONAL_LOGGING_ONLY=false
 SYSTEMD_SYSTEM=false
+
+# Special variables recognized by Splunk CLI for authentication
+SPLUNK_OWNER="splunk"
+SPLUNK_USERNAME="splunk"
+SPLUNK_PASSWORD=""
 
 # Indexer
 indexer_deb="https://download.splunk.com/products/splunk/releases/9.2.4/linux/splunk-9.2.4-c103a21bb11d-linux-2.6-amd64.deb"
@@ -430,12 +432,28 @@ function install_audit_parse_app {
     install_app "$GITHUB_URL/splunk/linux-audit-log-hex-value-decoder_100.tgz"
 }
 
+function install_palo_alto_apps {
+    print_banner "Installing Palo Alto apps"
+    download "https://github.com/PaloAltoNetworks/Splunk-Apps/archive/refs/tags/v8.1.3.zip" /tmp/palo.zip
+    unzip /tmp/palo.zip -d /tmp/palo-apps/
+
+    mv /tmp/palo-apps/Splunk-Apps-8.1.3/Splunk_TA_paloalto/ $SPLUNK_HOME/etc/apps/
+    mv /tmp/palo-apps/Splunk-Apps-8.1.3/SplunkforPaloAltoNetworks/ $SPLUNK_HOME/etc/apps/
+    
+    sudo chown -R splunk:splunk "$SPLUNK_HOME/etc/apps/Splunk_TA_paloalto/"
+    sudo chown -R splunk:splunk "$SPLUNK_HOME/etc/apps/SplunkforPaloAltoNetworks/"
+
+    sudo rm /tmp/palo.zip
+    sudo rm -rf /tmp/palo-apps/
+}
+
 function setup_indexer {
     print_banner "Configuring Indexer"
 
     info "Adding listening port 9997"
     sudo -H -u splunk $SPLUNK_HOME/bin/splunk enable listen 9997
-
+    # sudo -H -u splunk $SPLUNK_HOME/bin/splunk enable deploy-server
+    
     info "Adding Indexes"
     for i in "${INDEXES[@]}"; do
         sudo -H -u splunk $SPLUNK_HOME/bin/splunk add index "$i"
@@ -450,14 +468,7 @@ function setup_indexer {
     install_windows_soc_app
     install_sysmon_security_monitoring_app
     install_audit_parse_app
-
-    # info "Installing Searches"
-    # download $GITHUB_URL/splunk/indexer/savedsearches.conf savedsearches.conf
-    # sudo mkdir -p $SPLUNK_HOME/etc/users/splunk/search/local/
-    # if sudo cp $SPLUNK_HOME/etc/users/splunk/search/local/savedsearches.conf $SPLUNK_HOME/etc/users/splunk/search/local/savedsearches.bk &>/dev/null; then
-        # info "Successfully backed up old savedsearches.conf as savedsearches.bk"
-    # fi
-    # sudo mv ./savedsearches.conf $SPLUNK_HOME/etc/users/splunk/search/local/savedsearches.conf
+    install_palo_alto_apps
 }
 
 # Installs splunk
@@ -814,6 +825,8 @@ function setup_monitors {
 function setup_forward_server {
     print_banner "Adding Forward Server"
     sudo -H -u splunk $SPLUNK_HOME/bin/splunk add forward-server "$1":9997
+    # sudo -H -u splunk $SPLUNK_HOME/bin/splunk enable deploy-client
+    # sudo -H -u splunk $SPLUNK_HOME/bin/splunk set deploy-poll "$1":8089
 }
 
 function install_auditd {
