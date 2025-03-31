@@ -1705,7 +1705,7 @@ function Create-Workstations-OU {
     New-ADOrganizationalUnit -Name "Workstations"
 }
 
-Function Enable-Disable-RDP {
+function Enable-Disable-RDP {
     
     $confirmation = Prompt-Yes-No -Message "Should RDP be enabled?"
     if ($confirmation.toLower() -eq "y") {
@@ -1722,6 +1722,57 @@ Function Enable-Disable-RDP {
         Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server" -Name "fDenyTSConnections" -Value 1
     }
 
+}
+
+function Identify-and-Fix-ASREP-Roastable-Accounts{
+    $roastableAccounts = Get-ADUser -Filter 'DoesNotRequirePreAuth -eq $true' -Properties DoesNotRequirePreAuth
+    Write-Host "ASREP Roastable Accounts:"
+    $roastableAccounts
+
+    $confirmation = Prompt-Yes-No -Message "Should we fix ASREP roastable accounts?"
+    if ($confirmation.toLower() -eq "y") {
+        Write-Host "Fixing ASREP roastable accounts"
+        
+        foreach ($account in $roastableAccounts) {
+            # Define the username of the user
+            $UserName = $account.Name
+            $User = Get-ADUser -Identity $UserName -ErrorAction Stop
+            $updatedValue = $User.userAccountControl -band -4194305
+            Set-ADUser -Identity $User -Replace @{userAccountControl=$updatedValue}  
+
+            Write-Output "ASREP roastable account fixed for user: $UserName"
+        }
+    } else {
+        Write-Host "Skipping..."
+    }
+}
+
+function Identify-and-Fix-Kerberoastable-Accounts{   
+
+    #Identify Kerberoastable Accounts
+    $kerberoastableAccounts = Get-ADUser -Filter {ServicePrincipalName -ne "$null"} -Property servicePrincipalName | Select-Object Name, servicePrincipalName
+    Write-Host "Kerberoastable Accounts:"
+    $kerberoastableAccounts
+
+    $confirmation = Prompt-Yes-No -Message "Should we fix kerberoastable accounts?"
+    if ($confirmation.toLower() -eq "y") {
+        Write-Host "Fixing kerberoastable accounts"
+        
+        foreach ($account in $kerberoastableAccounts) {
+            # Define the username of the user
+            $UserName = $account.Name
+            $User = Get-ADUser -Identity $UserName -ErrorAction Stop
+
+            # Set the msDS-SupportedEncryptionTypes to enforce AES128 and AES256 (Value: 24)
+            Set-ADUser -Identity $User -Replace @{"msDS-SupportedEncryptionTypes"=24}
+
+            Write-Output "AES128 and AES256 encryption enforced for user: $UserName"
+            $updatedValue = $User.userAccountControl -band -4194305
+            Set-ADUser -Identity $User -Replace @{userAccountControl=$updatedValue}        
+        }
+    } else {
+        Write-Host "Skipping..."
+    }
 }
 ###################################### MAIN ######################################
 
