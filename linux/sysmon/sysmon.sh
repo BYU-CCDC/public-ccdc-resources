@@ -14,6 +14,7 @@
 DISTRO=$1
 VERSION=$2
 GITHUB_URL="https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main"
+LOCAL=false
 
 centos_7_sysmon="https://packages.microsoft.com/centos/7/prod/Packages/s/sysmonforlinux-1.3.3-0.el8.x86_64.rpm"
 centos_7_sysinternals="https://packages.microsoft.com/centos/7/prod/Packages/s/sysinternalsebpf-1.4.0-0.el8.x86_64.rpm"
@@ -100,6 +101,33 @@ function error {
     echo "[X] $1"
 }
 
+function download {
+    url=$1
+    output=$2
+
+    if [[ $LOCAL == true && "$URL" == "$GITHUB_URL"* ]]; then
+        # Assume the URL is a local file path
+        if [[ ! -f "$url" ]]; then
+            error "Local file not found: $url"
+            return 1
+        fi
+        cp "$url" "$output"
+        info "Copied from local Github to $output"
+        return 0
+    fi
+    
+    # TODO: figure out how to fix the progress bar
+    if ! wget -O "$output" --no-check-certificate "$url"; then
+        # error "Failed to download with wget. Trying wget with older TLS version..."
+        # if ! wget -O "$output" --secure-protocol=TLSv1 --no-check-certificate "$url"; then
+            error "Failed to download with wget. Trying with curl..."
+            if ! curl -L -o "$output" -k "$url"; then
+                error "Failed to download with curl."
+            fi
+        # fi
+    fi
+}
+
 function print_os_options {
     echo "Supported distros and versions: 
     -> ubuntu (18, 20, 21, 22, 23)
@@ -129,6 +157,7 @@ function ask_for_os_info {
 }
 
 function install_from_repo {
+    # TODO: update this to use download function
     case $DISTRO in
         "ubuntu")
             if [ $VERSION -ge 18 ]; then
@@ -482,8 +511,8 @@ function install_from_package {
     esac
 
     # Download the sysinternals and sysmon packages
-    wget $sysmon -O "sysmon.$package_type"
-    wget $sysinternals -O "sysinternals.$package_type"
+    download $sysmon "sysmon.$package_type"
+    download $sysinternals "sysinternals.$package_type"
     
     # Install the packages
     case $package_type in
@@ -516,7 +545,7 @@ function install_from_package {
 }
 
 function configure {
-    wget $GITHUB_URL/linux/sysmon/sysmon-config.xml -O sysmon-config.xml
+    download $GITHUB_URL/linux/sysmon/sysmon-config.xml sysmon-config.xml
     sudo chown root:root sysmon-config.xml
     sudo chmod 600 sysmon-config.xml
     sudo mkdir -p /opt/ccdc/
@@ -526,6 +555,30 @@ function configure {
 #####################################################
 
 ######################## MAIN #######################
+while getopts "hg:l:" opt; do
+    case $opt in
+        h)
+            print_options
+            exit 0
+            ;;
+        g)
+            GITHUB_URL=$OPTARG
+            ;;
+        l)
+            LOCAL=true
+            GITHUB_URL="$(realpath "$OPTARG")"  # Use local path for GITHUB_URL
+        \?)
+            error "Invalid option: $OPTARG"
+            print_usage
+            exit 1
+            ;;
+        :)
+            error "Option -$OPTARG requires an argument (-h for help)"
+            exit 1
+            ;;
+    esac
+done
+
 ask_for_os_info
 install_from_package
 configure

@@ -26,6 +26,7 @@ PACKAGE="auto"
 SPLUNK_HOME="/opt/splunkforwarder"
 SPLUNK_ONLY=false
 ADDITIONAL_LOGGING_ONLY=false
+LOCAL=false
 SYSTEMD_SYSTEM=false
 
 # Special variables recognized by Splunk CLI for authentication
@@ -51,6 +52,8 @@ old_tgz="https://download.splunk.com/products/universalforwarder/releases/9.0.9/
 #####################################################
 
 ##################### FUNCTIONS #####################
+# TODO: add return codes to stuff based on whether it errors or not
+
 function print_banner {
     echo
     echo "#######################################"
@@ -87,6 +90,17 @@ function faketty () {
 function download {
     url=$1
     output=$2
+
+    if [[ $LOCAL == true && "$URL" == "$GITHUB_URL"* ]]; then
+        # Assume the URL is a local file path
+        if [[ ! -f "$url" ]]; then
+            error "Local file not found: $url"
+            return 1
+        fi
+        cp "$url" "$output"
+        info "Copied from local Github to $output"
+        return 0
+    fi
     
     # TODO: figure out how to fix the progress bar
     if ! wget -O "$output" --no-check-certificate "$url"; then
@@ -939,7 +953,14 @@ function install_sysmon {
     print_banner "Installing Sysmon"
     download "$GITHUB_URL/linux/sysmon/sysmon.sh" sysmon.sh
     chmod +x sysmon.sh
-    if ./sysmon.sh; then
+    
+    if [[ $LOCAL == true ]]; then
+        ./sysmon.sh -l "$GITHUB_URL"
+    else
+        ./sysmon.sh -g "$GITHUB_URL"
+    fi
+
+    if $? -eq 0; then
         info "Sysmon installed successfully"
         install_sysmon_add_on
     else
@@ -1014,7 +1035,7 @@ function main {
 }
 
 # TODO: add a reinstall option
-while getopts "hp:f:ig:uSa:L" opt; do
+while getopts "hp:f:ig:uSa:Ll:" opt; do
     case $opt in
         h)
             print_usage
@@ -1062,6 +1083,10 @@ while getopts "hp:f:ig:uSa:L" opt; do
         L)
             ADDITIONAL_LOGGING_ONLY=true
             ;;
+        l)
+            LOCAL=true
+            GITHUB_URL="$(realpath "$OPTARG")"  # Use local path for GITHUB_URL
+            ;;
         a)
             # Pass -i before this argument if on the indexer
             while true; do
@@ -1088,7 +1113,7 @@ while getopts "hp:f:ig:uSa:L" opt; do
         :)
             error "Option -$OPTARG requires an argument (-h for help)"
             exit 1
-        ;;
+            ;;
     esac
 done
 
