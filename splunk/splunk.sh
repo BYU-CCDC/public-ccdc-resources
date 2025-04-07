@@ -34,17 +34,17 @@ SPLUNK_USERNAME="splunk"
 SPLUNK_PASSWORD=""
 
 # Indexer
-indexer_deb="https://download.splunk.com/products/splunk/releases/9.2.4/linux/splunk-9.2.4-c103a21bb11d-linux-2.6-amd64.deb"
-indexer_rpm="https://download.splunk.com/products/splunk/releases/9.2.4/linux/splunk-9.2.4-c103a21bb11d.x86_64.rpm"
-indexer_tgz="https://download.splunk.com/products/splunk/releases/9.2.4/linux/splunk-9.2.4-c103a21bb11d-Linux-x86_64.tgz"
+indexer_deb="https://download.splunk.com/products/splunk/releases/9.2.5/linux/splunk-9.2.5-7bfc9a4ed6ba-linux-2.6-amd64.deb"
+indexer_rpm="https://download.splunk.com/products/splunk/releases/9.2.5/linux/splunk-9.2.5-7bfc9a4ed6ba.x86_64.rpm"
+indexer_tgz="https://download.splunk.com/products/splunk/releases/9.2.5/linux/splunk-9.2.5-7bfc9a4ed6ba-Linux-x86_64.tgz"
 
 # Forwarder
-deb="https://download.splunk.com/products/universalforwarder/releases/9.2.4/linux/splunkforwarder-9.2.4-c103a21bb11d-linux-2.6-amd64.deb"
-rpm="https://download.splunk.com/products/universalforwarder/releases/9.2.4/linux/splunkforwarder-9.2.4-c103a21bb11d.x86_64.rpm"
-tgz="https://download.splunk.com/products/universalforwarder/releases/9.2.4/linux/splunkforwarder-9.2.4-c103a21bb11d-Linux-x86_64.tgz"
-arm_deb="https://download.splunk.com/products/universalforwarder/releases/9.2.4/linux/splunkforwarder-9.2.4-c103a21bb11d-Linux-armv8.deb"
-arm_rpm="https://download.splunk.com/products/universalforwarder/releases/9.2.4/linux/splunkforwarder-9.2.4-c103a21bb11d.aarch64.rpm"
-arm_tgz="https://download.splunk.com/products/universalforwarder/releases/9.2.4/linux/splunkforwarder-9.2.4-c103a21bb11d-Linux-armv8.tgz"
+deb="https://download.splunk.com/products/universalforwarder/releases/9.2.5/linux/splunkforwarder-9.2.5-7bfc9a4ed6ba-linux-2.6-amd64.deb"
+rpm="https://download.splunk.com/products/universalforwarder/releases/9.2.5/linux/splunkforwarder-9.2.5-7bfc9a4ed6ba.x86_64.rpm"
+tgz="https://download.splunk.com/products/universalforwarder/releases/9.2.5/linux/splunkforwarder-9.2.5-7bfc9a4ed6ba-Linux-x86_64.tgz"
+arm_deb="https://download.splunk.com/products/universalforwarder/releases/9.2.5/linux/splunkforwarder-9.2.5-7bfc9a4ed6ba-Linux-armv8.deb"
+arm_rpm="https://download.splunk.com/products/universalforwarder/releases/9.2.5/linux/splunkforwarder-9.2.5-7bfc9a4ed6ba.aarch64.rpm"
+arm_tgz="https://download.splunk.com/products/universalforwarder/releases/9.2.5/linux/splunkforwarder-9.2.5-7bfc9a4ed6ba-Linux-armv8.tgz"
 old_deb="https://download.splunk.com/products/universalforwarder/releases/9.0.9/linux/splunkforwarder-9.0.9-6315942c563f-linux-2.6-amd64.deb"
 old_rpm="https://download.splunk.com/products/universalforwarder/releases/9.0.9/linux/splunkforwarder-9.0.9-6315942c563f.x86_64.rpm"
 old_tgz="https://download.splunk.com/products/universalforwarder/releases/9.0.9/linux/splunkforwarder-9.0.9-6315942c563f-Linux-x86_64.tgz"
@@ -174,6 +174,11 @@ function install_dependencies {
         info "No package manager detected."
     else
         sudo "$PM" install -y wget curl acl
+        if [ "$PM" == "apt-get" ]; then
+            sudo "$PM" install -y debsums
+        else
+            sudo "$PM" install -y rpm
+        fi
     fi
 
     if ! command -v wget &>/dev/null; then
@@ -351,6 +356,19 @@ function create_splunk_user {
     else
         info "Creating splunk user"
         sudo useradd splunk -d $SPLUNK_HOME
+        # Allow package verification
+        if sudo [ -e /etc/sudoers.d ]; then
+            SUDOERS_FILE="/etc/sudoers.d/splunk"
+            if [[ "$PM" == "apt-get" ]]; then
+                echo "splunk ALL=(ALL) NOPASSWD: $(which debsums) -as" | sudo tee "$SUDOERS_FILE" > /dev/null
+            else
+                echo "splunk ALL=(ALL) NOPASSWD: $(which rpm) -Va" | sudo tee "$SUDOERS_FILE" > /dev/null
+            fi
+            sudo chown root:root
+            sudo chmod 440 "$SUDOERS_FILE"
+        else
+            error "Warning: /etc/sudoers.d does not exist. Splunk user will not have the sudo privileges needed for package verification."
+        fi
     fi
 
     if ! getent group "splunk" > /dev/null; then
@@ -773,8 +791,11 @@ function add_mysql_logs {
 # Adds scripted inputs
 function add_scripts {
     print_banner "Adding scripted inputs"
+    # TOOD: add this to the add-on inputs.conf instead
     info "Adding user sessions script"
     add_script $SPLUNK_HOME/etc/apps/ccdc-add-on/bin/sessions.sh "system" "180" "ccdc-sessions"
+    info "Adding package integrity verification"
+    add_script $SPLUNK_HOME/etc/apps/ccdc-add-on/bin/package-check.sh "system" "600" "ccdc-package-integrity"
 }
 
 # Adds monitors for the Splunk indexer service itself
