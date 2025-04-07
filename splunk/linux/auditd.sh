@@ -2,9 +2,37 @@
 ###################### GLOBALS ######################
 pm=""
 GITHUB_URL="https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main"
+LOCAL=false
 #####################################################
 
 ##################### FUNCTIONS #####################
+function download {
+    url=$1
+    output=$2
+
+    if [[ "$LOCAL" == "true" && "$url" == "$GITHUB_URL"* ]]; then
+        # Assume the URL is a local file path
+        if [[ ! -f "$url" ]]; then
+            error "Local file not found: $url"
+            return 1
+        fi
+        cp "$url" "$output"
+        info "Copied from local Github to $output"
+        return 0
+    fi
+    
+    # TODO: figure out how to fix the progress bar
+    if ! wget -O "$output" --no-check-certificate "$url"; then
+        # error "Failed to download with wget. Trying wget with older TLS version..."
+        # if ! wget -O "$output" --secure-protocol=TLSv1 --no-check-certificate "$url"; then
+            error "Failed to download with wget. Trying with curl..."
+            if ! curl -L -o "$output" -k "$url"; then
+                error "Failed to download with curl."
+            fi
+        # fi
+    fi
+}
+
 function detect_package_manager {
     if command -v apt &>/dev/null; then
         echo "[*] apt detected (Debian-based OS)"
@@ -51,10 +79,10 @@ function add_audit_rules {
     CUSTOM_RULE_FILE='/etc/audit/rules.d/ccdc.rules'
 
     # Download custom rule file
-    sudo wget $GITHUB_URL/splunk/linux/ccdc.rules
-    sudo mv ./ccdc.rules $CUSTOM_RULE_FILE
-    sudo chown root:root $CUSTOM_RULE_FILE
+    download $GITHUB_URL/splunk/linux/ccdc.rules ./ccdc.rules
+    sudo chown root:root ./ccdc.rules
     sudo chmod 600 $CUSTOM_RULE_FILE
+    sudo mv ./ccdc.rules $CUSTOM_RULE_FILE
 
     # Add home directory rules
     echo '' | sudo tee -a $CUSTOM_RULE_FILE
@@ -77,6 +105,31 @@ function add_audit_rules {
 #####################################################
 
 ####################### START #######################
+while getopts "hg:l:" opt; do
+    case $opt in
+        h)
+            print_options
+            exit 0
+            ;;
+        g)
+            GITHUB_URL=$OPTARG
+            ;;
+        l)
+            LOCAL=true
+            GITHUB_URL="$(realpath "$OPTARG")"  # Use local path for GITHUB_URL
+            ;;
+        \?)
+            error "Invalid option: $OPTARG"
+            print_usage
+            exit 1
+            ;;
+        :)
+            error "Option -$OPTARG requires an argument (-h for help)"
+            exit 1
+            ;;
+    esac
+done
+
 detect_package_manager
 install_auditd
 add_audit_rules

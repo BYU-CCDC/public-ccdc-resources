@@ -105,7 +105,7 @@ function download {
     url=$1
     output=$2
 
-    if [[ $LOCAL == true && "$URL" == "$GITHUB_URL"* ]]; then
+    if [[ "$LOCAL" == "true" && "$url" == "$GITHUB_URL"* ]]; then
         # Assume the URL is a local file path
         if [[ ! -f "$url" ]]; then
             error "Local file not found: $url"
@@ -140,6 +140,7 @@ function print_os_options {
 }
 
 function print_options {
+    # TODO: update this
     echo "Usage: ./sysmon.sh <distro> <version>"
     print_os_options
     echo
@@ -567,6 +568,7 @@ while getopts "hg:l:" opt; do
         l)
             LOCAL=true
             GITHUB_URL="$(realpath "$OPTARG")"  # Use local path for GITHUB_URL
+            ;;
         \?)
             error "Invalid option: $OPTARG"
             print_usage

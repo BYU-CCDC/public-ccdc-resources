@@ -23,6 +23,7 @@ PM=""
 IP=""
 INDEXER=false
 PACKAGE="auto"
+LOCAL_PACKAGE=""
 SPLUNK_HOME="/opt/splunkforwarder"
 SPLUNK_ONLY=false
 ADDITIONAL_LOGGING_ONLY=false
@@ -91,7 +92,7 @@ function download {
     url=$1
     output=$2
 
-    if [[ $LOCAL == true && "$URL" == "$GITHUB_URL"* ]]; then
+    if [[ "$LOCAL" == "true" && "$url" == "$GITHUB_URL"* ]]; then
         # Assume the URL is a local file path
         if [[ ! -f "$url" ]]; then
             error "Local file not found: $url"
@@ -116,19 +117,21 @@ function download {
 
 function print_usage {
     echo "Usage:"
-    echo "  ./splunk.sh -f <INDEXER IP> [flags]"
-    echo "  ./splunk.sh -a <LOG_PATH>"
+    echo "  ./splunk.sh -f <INDEXER IP> [flags]         # Install the forwarder"
+    echo "  ./splunk.sh -i [flags]                      # Install the indexer"
+    echo "  ./splunk.sh -a <LOG_PATH>                   # Add a new monitor"
     echo
     echo "Flags:
-  -h    Show this help message
-  -f    IP of the splunk indexer (required unless -i is used)
-  -i    Install the indexer instead of the forwarder
-  -p    Package type (defaults to auto; see below)
-  -u    Print Splunk package URLs
-  -S    Install Splunk only (no additional logging)
-  -L    Install additional logging sources only (no Splunk)
-  -g    Change the GitHub URL for downloading files (for debug or local hosting)
-  -a    Add a new monitor (use only after installation)"
+  -h            Show this help message
+  -f <ip>       Install the forwarder (-f is required unless -i or -a are used)
+  -i            Install the indexer
+  -p <type>     Package type (defaults to auto- see below)
+  -u            Print Splunk package URLs
+  -S            Install Splunk only (no additional logging)
+  -L            Install additional logging sources only (no Splunk)
+  -l <path>     Install from a locally cloned GitHub repository (provide filesystem path to repo)
+  -g <url>      Change the GitHub URL for downloading files (for local network hosting)
+  -a <path>     Add a new monitor (use only after installation)"
     echo
     echo "Available packages:
   auto (default; autodetects best package format based on package manager)
@@ -140,12 +143,14 @@ function print_usage {
     arm_debian (deb for ARM machines)
     arm_rpm (rpm for ARM machines)
     arm_tgz (tgz for ARM machines)
+    old_deb (compatibility package- try if you're getting glibc errors)
+    old_rpm (compatibility package- try if you're getting glibc errors)
+    old_tgz (compatibility package- try if you're getting glibc errors)
   Indexer:
     indexer_deb (Debian-based distros)
     indexer_rpm (RHEL-based distros)
     indexer_tgz (generic .tgz file)
-    
-Hint: if you're getting glibc errors, try one of the old packages (old_deb, old_rpm, old_tgz)"
+"
 }
 
 function autodetect_os {
@@ -258,17 +263,23 @@ function check_prereqs {
 
 function download_and_install_package {
     if [[ "$1" == *.deb ]]; then
-        download "$1" splunk.deb
+        if [[ -z "$LOCAL_PACKAGE" ]]; then
+            download "$1" splunk.deb
+        fi
         sudo dpkg -i ./splunk.deb
     elif [[ "$1" == *.rpm ]]; then
-        download "$1" splunk.rpm
+        if [[ -z "$LOCAL_PACKAGE" ]]; then
+            download "$1" splunk.rpm
+        fi
         if command -v zypper &>/dev/null; then
             sudo zypper --no-gpg-checks install -y ./splunk.rpm
         else
             sudo yum install --nogpgcheck ./splunk.rpm -y
         fi
     elif [[ "$1" == *.tgz ]]; then
-        download "$1" splunk.tgz
+        if [[ -z "$LOCAL_PACKAGE" ]]; then
+            download "$1" splunk.tgz
+        fi
         info "Extracting to $SPLUNK_HOME"
         sudo tar -xvf splunk.tgz -C /opt/ &> /dev/null
         # TODO: make sure it actually extracts to $SPLUNK_HOME
@@ -882,9 +893,49 @@ function setup_forward_server {
 
 function install_auditd {
     print_banner "Installing auditd"
-    download "$GITHUB_URL/splunk/linux/auditd.sh" auditd.sh
-    chmod +x auditd.sh
-    ./auditd.sh
+
+    # Install auditd
+    info "Installing auditd package"
+    sudo $pm install -y auditd
+    if command -v systemctl &> /dev/null; then
+        sudo systemctl enable auditd
+        sudo systemctl start auditd
+    elif command -v service &> /dev/null; then
+        sudo service auditd start
+    fi
+
+    # Add custom rules
+    info "Adding custom audit rules"
+    if ! sudo [ -d "/etc/audit/rules.d/" ]; then
+        error "Could not locate audit rules directory"
+        return 1
+    fi
+    CUSTOM_RULE_FILE='/etc/audit/rules.d/ccdc.rules'
+
+    # Download custom rule file
+    download $GITHUB_URL/splunk/linux/ccdc.rules ./ccdc.rules
+    sudo chown root:root ./ccdc.rules
+    sudo chmod 600 $CUSTOM_RULE_FILE
+    sudo mv ./ccdc.rules $CUSTOM_RULE_FILE
+
+    # Add home directory rules
+    echo '' | sudo tee -a $CUSTOM_RULE_FILE
+    for dir in /home/*; do
+        if [ -d "$dir" ]; then
+            echo "-w ${dir}/.ssh/ -p w -k CCDC_modify_ssh_user" | sudo tee -a $CUSTOM_RULE_FILE
+
+            if [ -f "$dir/.bashrc" ]; then
+                echo "-w ${dir}/.bashrc -p w -k CCDC_modify_bashrc_user" | sudo tee -a $CUSTOM_RULE_FILE
+            fi
+        fi
+    done
+
+    sudo augenrules --load
+    sudo service auditd reload
+
+    info "Applied rules:"
+    sudo auditctl -l
+
     sudo setfacl -R -m u:splunk:rx /var/log/audit
     # TODO: add check for successful Splunk login to all Splunk commands
     add_monitor "/var/log/audit/audit.log" "system"
@@ -953,8 +1004,8 @@ function install_sysmon {
     print_banner "Installing Sysmon"
     download "$GITHUB_URL/linux/sysmon/sysmon.sh" sysmon.sh
     chmod +x sysmon.sh
-    
-    if [[ $LOCAL == true ]]; then
+
+    if [[ "$LOCAL" == true ]]; then
         ./sysmon.sh -l "$GITHUB_URL"
     else
         ./sysmon.sh -g "$GITHUB_URL"
@@ -1035,7 +1086,7 @@ function main {
 }
 
 # TODO: add a reinstall option
-while getopts "hp:f:ig:uSa:Ll:" opt; do
+while getopts "hp:P:f:ig:uSa:Ll:" opt; do
     case $opt in
         h)
             print_usage
@@ -1066,6 +1117,9 @@ while getopts "hp:f:ig:uSa:Ll:" opt; do
             ;;
         p)
             PACKAGE=$OPTARG
+            ;;
+        P)
+            LOCAL_PACKAGE=$OPTARG
             ;;
         f)
             IP=$OPTARG
