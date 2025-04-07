@@ -1743,7 +1743,7 @@ function Identify-and-Fix-ASREP-Roastable-Accounts{
             Write-Output "ASREP roastable account fixed for user: $UserName"
         }
     } else {
-        Write-Host "Skipping..."
+        Write-Host "Skipping..." -ForegroundColor Red
     }
 }
 
@@ -1778,7 +1778,7 @@ function Identify-and-Fix-Kerberoastable-Accounts{
             }
         }
     } else {
-        Write-Host "Skipping..."
+        Write-Host "Skipping..." -ForegroundColor Red
     }
 }
 ###################################### MAIN ######################################
