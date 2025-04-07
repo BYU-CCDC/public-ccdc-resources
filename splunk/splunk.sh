@@ -1011,7 +1011,7 @@ function install_sysmon {
         ./sysmon.sh -g "$GITHUB_URL"
     fi
 
-    if $? -eq 0; then
+    if [[ $? -eq 0 ]]; then
         info "Sysmon installed successfully"
         install_sysmon_add_on
     else
