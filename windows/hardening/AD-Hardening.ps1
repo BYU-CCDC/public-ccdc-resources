@@ -2010,6 +2010,24 @@ if ($confirmation.toLower() -eq "y") {
     Write-Host "Skipping..." -ForegroundColor Red
 }
 
+## Identify and Fix ASREP Roastable Accounts
+$confirmation = Prompt-Yes-No -Message "Identify and Fix ASREP Roastable Accounts? (y/n)"
+if ($confirmation.toLower() -eq "y") {
+    Write-Host "`n***Identifying and Fixing ASREP Roastable Accounts...***" -ForegroundColor Magenta
+    Identify-and-Fix-ASREP-Roastable-Accounts
+} else {
+    Write-Host "Skipping..." -ForegroundColor Red
+}
+
+## Identify and Fix Kerberoastable Accounts
+$confirmation = Prompt-Yes-No -Message "Identify and Fix Kerberoastable Accounts? (y/n)"
+if ($confirmation.toLower() -eq "y") {
+    Write-Host "`n***Identifying and Fixing Kerberoastable Accounts...***" -ForegroundColor Magenta
+    Identify-and-Fix-Kerberoastable-Accounts
+} else {
+    Write-Host "Skipping..." -ForegroundColor Red
+}
+
 # Run Windows Updates
 $confirmation = Prompt-Yes-No -Message "Enter the 'Run Windows Updates' function? THIS WILL TAKE A WHILE... (y/n)"
 if ($confirmation.toLower() -eq "y") {
