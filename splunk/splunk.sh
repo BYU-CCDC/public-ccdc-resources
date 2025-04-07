@@ -1114,7 +1114,7 @@ function main {
 }
 
 # TODO: add a reinstall option
-while getopts "hp:P:f:ig:uSa:Ll:" opt; do
+while getopts "hp:P:f:i:g:uSa:Ll:" opt; do
     case $opt in
         h)
             print_usage
@@ -1155,6 +1155,7 @@ while getopts "hp:P:f:ig:uSa:Ll:" opt; do
         i)
             INDEXER=true
             SPLUNK_HOME="/opt/splunk"
+            IP=$OPTARG
             ;;
         g)
             GITHUB_URL=$OPTARG
