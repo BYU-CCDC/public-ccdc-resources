@@ -285,7 +285,7 @@ function download_and_install_package {
         # TODO: make sure it actually extracts to $SPLUNK_HOME
         sudo chown -R splunk:splunk $SPLUNK_HOME
     else
-        echo "Unknown package type. Please install Splunk manually to $SPLUNK_HOME, then run this script again to configure it."
+        error "Unknown package type. Please install Splunk manually to $SPLUNK_HOME, then run this script again to configure it."
         exit
     fi
 }
@@ -1018,6 +1018,33 @@ function install_sysmon {
         error "Sysmon installation failed"
     fi
 }
+
+function install_ossec {
+    print_banner "Installing OSSEC"
+    download "$GITHUB_URL/linux/ossec.sh" ossec.sh
+    chmod +x ossec.sh
+
+    cmd="./ossec.sh "
+    if [[ "$LOCAL" == true ]]; then
+        cmd+="-l $GITHUB_URL "
+    else
+        cmd+="-g $GITHUB_URL "
+    fi
+
+    if [[ "$INDEXER" == true ]]; then
+        cmd+="-i $IP"
+    else
+        cmd+="-f $IP"
+    fi
+
+    eval $cmd
+
+    if [[ $? -eq 0 ]]; then
+        info "OSSEC installed successfully"
+    else
+        error "OSSEC installation failed"
+    fi
+}
 #####################################################
 
 ######################## MAIN #######################
@@ -1071,6 +1098,7 @@ function main {
             fi
         fi
         install_sysmon
+        install_ossec
     else
         info "Skipping installation of additional logging sources"
     fi

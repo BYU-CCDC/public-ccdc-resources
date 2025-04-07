@@ -38,6 +38,7 @@ SERVER=false
 OSSEC_DIR="/var/ossec"
 GITHUB_URL="https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main"
 LOCAL=false
+PM=""
 #####################################################
 
 ##################### FUNCTIONS #####################
@@ -72,6 +73,16 @@ function autodetect_os {
         error "Could not detect package manager / OS"
         exit 1
     fi
+}
+
+function print_banner {
+    echo
+    echo "#######################################"
+    echo "#"
+    echo "#   $1"
+    echo "#"
+    echo "#######################################"
+    echo
 }
 
 # TODO: add color?
@@ -110,95 +121,141 @@ function download {
     fi
 }
 
+function setup_ossec_server {
+    # Generate server key signing certificate
+    info "Generating server keys..."
+    sudo openssl req -x509 -newkey rsa:4096 \
+        -keyout $OSSEC_DIR/etc/sslmanager.key \
+        -out $OSSEC_DIR/etc/sslmanager.cert \
+        -days 365 \
+        -subj "/C=US/ST=./L=./O=BYU-CCDC/OU=./CN=./emailAddress=." \
+        -nodes > /dev/null
+    sudo chown root:ossec $OSSEC_DIR/etc/sslmanager.cert
+    sudo chown root:ossec $OSSEC_DIR/etc/sslmanager.key
+
+    # Backup old configuration files
+    sudo mv $OSSEC_DIR/etc/ossec.conf $OSSEC_DIR/etc/ossec.conf.bak 2>/dev/null
+    sudo mv $OSSEC_DIR/etc/ossec-agent.conf $OSSEC_DIR/etc/ossec-agent.conf.bak 2>/dev/null
+    sudo mv $OSSEC_DIR/etc/shared/agent.conf  $OSSEC_DIR/etc/shared/agent.conf.bak 2>/dev/null
+    sudo mv $OSSEC_DIR/etc/shared/ossec-agent.conf $OSSEC_DIR/etc/shared/ossec-agent.conf.bak 2>/dev/null
+
+    # Download custom server config
+    info "Downloading custom OSSEC server configuration..."
+    SERVER_CONF="$OSSEC_DIR/etc/ossec.conf"
+    download $GITHUB_URL/splunk/linux/ossec.conf ./ossec.conf
+    sudo mv ossec.conf $SERVER_CONF
+    sudo chown root:ossec $SERVER_CONF
+    sudo chmod 660 $SERVER_CONF
+
+    # Download custom shared client config
+    info "Downloading custom shared OSSEC client configuration..."
+    SHARED_CONF="$OSSEC_DIR/etc/shared/agent.conf"
+    download $GITHUB_URL/splunk/linux/ossec-agent-shared.conf ./agent.conf
+    sed -i "s/{SERVER_IP}/$IP/" agent.conf
+    sudo mv agent.conf $SHARED_CONF
+    sudo chown root:ossec $SHARED_CONF
+    sudo chmod 660 $SHARED_CONF
+
+    # Start OSSEC
+    info "Starting OSSEC server..."
+    sudo systemctl start ossec
+
+    # Start ossec-authd for automatic agent registration
+    sudo $OSSEC_DIR/bin/ossec-authd -p 1515 -n
+}
+
 function install_ossec {
-    sudo $pm install inotify-tools inotify-tools-devel
-    # Server installation
+    print_banner "Installing OSSEC"
+
+    # Check if it's already installed
+    if sudo [ -e "$OSSEC_DIR" ]; then
+        info "OSSEC directory already exists at $OSSEC_DIR. Skipping installation."
+        return 0
+    fi
+
+    # Install dependencies
+    sudo $PM install -y inotify-tools
+    if [[ "$PM" != "apt-get" ]]; then
+        sudo $PM install -y inotify-tools-devel
+    fi
+
+    # Install appropriate package
     if [ $SERVER == true ]; then
-        # Install OSSEC
-        sudo $pm install ossec-hids-server
-
-        # Download custom config
-        sudo rm $OSSEC_DIR/etc/ossec.conf 2>/dev/null
-        sudo rm $OSSEC_DIR/etc/ossec-agent.conf 2>/dev/null
-        download $GITHUB_URL/splunk/linux/ossec.conf $OSSEC_DIR/etc/ossec.conf
-        sudo chown root:ossec $OSSEC_DIR/etc/ossec.conf
-        sudo chmod 660 $OSSEC_DIR/etc/ossec.conf
-
-        # Generate server key signing certificate
-        sudo openssl req -x509 -newkey rsa:4096 \
-            -keyout $OSSEC_DIR/etc/sslmanager.key \
-            -out $OSSEC_DIR/etc/sslmanager.cert \
-            -days 365 \
-            -subj "/C=US/ST=./L=./O=BYU-CCDC/OU=./CN=./emailAddress=." \
-            -nodes
-        sudo chown root:ossec $OSSEC_DIR/etc/sslmanager.cert
-        sudo chown root:ossec $OSSEC_DIR/etc/sslmanager.key
-
-        # Start OSSEC
-        sudo systemctl start ossec
-
-        # Start ossec-authd for automatic agent registration
-        sudo $OSSEC_DIR/bin/ossec-authd -p 1515 -n
-    
-    # Client installation
+        # Server installation
+        info "Starting OSSEC server installation..."
+        sudo $PM install -y ossec-hids-server
     else
-        # Install OSSEC
-        sudo $pm install ossec-hids-agent
+        # Client installation
+        info "Starting OSSEC client installation..."
+        sudo $PM install -y ossec-hids-agent
+    fi
 
+    # Check if installation was successful
+    if [ $? -ne 0 ]; then
+        error "Failed to install OSSEC"
+        exit 1
+    elif sudo [ ! -d "$OSSEC_DIR" ]; then
+        error "OSSEC directory not found"
+        exit 1
+    else
+        info "OSSEC installation completed successfully"
+    fi
+
+    # Configure OSSEC
+    info "Configuring OSSEC..."
+    if [ $SERVER == true ]; then
+        setup_ossec_server
+    else
+        # Backup old configuration files
+        sudo mv $OSSEC_DIR/etc/ossec.conf $OSSEC_DIR/etc/ossec.conf.bak 2>/dev/null
+        sudo mv $OSSEC_DIR/etc/ossec-agent.conf  $OSSEC_DIR/etc/ossec-agent.conf.bak 2>/dev/null
+        sudo mv $OSSEC_DIR/etc/shared/agent.conf  $OSSEC_DIR/etc/shared/agent.conf.bak 2>/dev/null
+        sudo mv $OSSEC_DIR/etc/shared/ossec-agent.conf $OSSEC_DIR/etc/shared/ossec-agent.conf.bak 2>/dev/null
+        
         # Download custom config
-        sudo rm $OSSEC_DIR/etc/ossec.conf 2>/dev/null
-        sudo rm $OSSEC_DIR/etc/ossec-agent.conf 2>/dev/null
-        download $GITHUB_URL/splunk/linux/ossec-agent.conf ./ossec-agent.conf
-
+        info "Downloading OSSEC client configuration..."
+        CLIENT_CONFIG="$OSSEC_DIR/etc/ossec.conf"
+        # sudo sed -i "s/<server-ip>[\d\.]+</server-ip>/<server-ip>$IP</server-ip>/" $OSSEC_DIR/etc/ossec.conf
+        download $GITHUB_URL/splunk/linux/ossec-agent-local.conf ./ossec-agent.conf
         # Replace dynamic values
         sed -i "s/{SERVER_IP}/$IP/" ossec-agent.conf
-
-        if [[ -f "/var/log/syslog" ]]; then
-            # If /var/log/syslog exists, use it for syslog location
-            sed -i "s/{SYSLOG_LOCATION}/\/var\/log\/syslog/" ossec-agent.conf
-        elif [[ -f "/var/log/messages" ]]; then
-            # If /var/log/messages exists, use it for syslog location
-            sed -i "s/{SYSLOG_LOCATION}/\/var\/log\/messages/" ossec-agent.conf
-        else
-            error "Neither /var/log/syslog nor /var/log/messages found. Please set the syslog location manually."
-        fi
-
-        if [[ -f "/var/log/auth.log" ]]; then
-            # If /var/log/auth.log exists, use it for auth log location
-            sed -i "s/{AUTHLOG_LOCATION}/\/var\/log\/auth.log/" ossec-agent.conf
-        elif [[ -f "/var/log/secure" ]]; then
-            # If /var/log/secure exists, use it for auth log location
-            sed -i "s/{AUTHLOG_LOCATION}/\/var\/log\/secure/" ossec-agent.conf
-        else
-            error "Neither /var/log/auth.log nor /var/log/secure found. Please set the auth log location manually."
-        fi
-
-        mv ossec-agent.conf $OSSEC_DIR/etc/ossec.conf
-        sudo chown root:ossec $OSSEC_DIR/etc/ossec.conf
-        sudo chmod 660 $OSSEC_DIR/etc/ossec.conf
+        sudo mv ossec-agent.conf $CLIENT_CONFIG
+        sudo chown root:ossec $CLIENT_CONFIG
+        sudo chmod 660 $CLIENT_CONFIG
 
         # Register agent
         sudo $OSSEC_DIR/bin/agent-auth -m $IP -p 1515
 
         # Start OSSEC
+        info "Starting OSSEC client..."
         sudo systemctl start ossec-hids
     fi
 }
 
+function setup_ossec {
+    install_ossec
+}
+#####################################################
+
+######################## MAIN #######################
 function main {
     # Add Atomicorp repo
     wget -q -O - https://updates.atomicorp.com/installers/atomic | sudo bash
     autodetect_os
-    install_ossec
+    setup_ossec
+
+    print_banner "End of script"
+    info "Don't forget to open the necessary ports in your firewall!"
 }
 
-while getopts "f:ig:l:" opt; do
+while getopts "f:i:g:l:" opt; do
     case $opt in
         f)
             IP=$OPTARG
             ;;
         i)
             SERVER=true
+            IP="$OPTARG"
             ;;
         g)
             GITHUB_URL=$OPTARG
@@ -220,3 +277,4 @@ while getopts "f:ig:l:" opt; do
 done
 
 main
+#####################################################
