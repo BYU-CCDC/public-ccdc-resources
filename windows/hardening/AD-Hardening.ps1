@@ -1729,7 +1729,7 @@ function Identify-and-Fix-ASREP-Roastable-Accounts{
     Write-Host "ASREP Roastable Accounts:"
     $roastableAccounts
 
-    $confirmation = Prompt-Yes-No -Message "Should we fix ASREP roastable accounts?"
+    $confirmation = Prompt-Yes-No -Message "Should we fix ASREP roastable accounts?(y/n)"
     if ($confirmation.toLower() -eq "y") {
         Write-Host "Fixing ASREP roastable accounts"
         
@@ -1754,7 +1754,7 @@ function Identify-and-Fix-Kerberoastable-Accounts{
     Write-Host "Kerberoastable Accounts:"
     $kerberoastableAccounts
 
-    $confirmation = Prompt-Yes-No -Message "Should we fix kerberoastable accounts?"
+    $confirmation = Prompt-Yes-No -Message "Should we fix kerberoastable accounts? (y/n)"
     if ($confirmation.toLower() -eq "y") {
         Write-Host "Fixing kerberoastable accounts"
         
@@ -1768,7 +1768,14 @@ function Identify-and-Fix-Kerberoastable-Accounts{
 
             Write-Output "AES128 and AES256 encryption enforced for user: $UserName"
             $updatedValue = $User.userAccountControl -band -4194305
-            Set-ADUser -Identity $User -Replace @{userAccountControl=$updatedValue}        
+            Set-ADUser -Identity $User -Replace @{userAccountControl=$updatedValue}   
+            
+            # Reset the password twice to flush insecure passwords from the domain controller cache
+            $i=0
+            while ($i -lt 2) {
+                Get-Set-Password -user $User
+                $i++
+            }
         }
     } else {
         Write-Host "Skipping..."
