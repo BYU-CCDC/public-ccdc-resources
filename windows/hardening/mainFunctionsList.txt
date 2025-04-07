@@ -14,5 +14,7 @@ Upgrade SMB
 Patch DCSync
 Patch Mimikatz
 Group Management
+Identify and Fix ASREP Roasting
+Identify and Fix Kerberoasting
 Run Windows Updates
 Set Execution Policy
