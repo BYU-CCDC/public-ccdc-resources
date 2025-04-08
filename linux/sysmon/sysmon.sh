@@ -11,9 +11,10 @@
 # - OpenSUSE (Leap) 15
 
 ###################### GLOBALS ######################
-DISTRO=$1
-VERSION=$2
+DISTRO=""
+VERSION=""
 GITHUB_URL="https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main"
+LOCAL=false
 
 centos_7_sysmon="https://packages.microsoft.com/centos/7/prod/Packages/s/sysmonforlinux-1.3.3-0.el8.x86_64.rpm"
 centos_7_sysinternals="https://packages.microsoft.com/centos/7/prod/Packages/s/sysinternalsebpf-1.4.0-0.el8.x86_64.rpm"
@@ -21,9 +22,9 @@ centos_8_sysmon="https://packages.microsoft.com/centos/8/prod/Packages/s/sysmonf
 centos_8_sysinternals="https://packages.microsoft.com/centos/8/prod/Packages/s/sysinternalsebpf-1.0.2-1.x86_64.rpm"
 debian_10_sysmon="https://packages.microsoft.com/debian/10/prod/pool/main/s/sysmonforlinux/sysmonforlinux_1.1.0-0_amd64.deb"
 debian_10_sysinternals="https://packages.microsoft.com/debian/10/prod/pool/main/s/sysinternalsebpf/sysinternalsebpf_1.1.0-0_amd64.deb"
-debian_11_sysmon="https://packages.microsoft.com/debian/11/prod/pool/main/s/sysmonforlinux/sysmonforlinux_1.3.3_amd64.deb"
+debian_11_sysmon="https://packages.microsoft.com/debian/11/prod/pool/main/s/sysmonforlinux/sysmonforlinux_1.3.5_amd64.deb"
 debian_11_sysinternals="https://packages.microsoft.com/debian/11/prod/pool/main/s/sysinternalsebpf/sysinternalsebpf_1.4.0_amd64.deb"
-debian_12_sysmon="https://packages.microsoft.com/debian/12/prod/pool/main/s/sysmonforlinux/sysmonforlinux_1.3.3_amd64.deb"
+debian_12_sysmon="https://packages.microsoft.com/debian/12/prod/pool/main/s/sysmonforlinux/sysmonforlinux_1.3.5_amd64.deb"
 debian_12_sysinternals="https://packages.microsoft.com/debian/12/prod/pool/main/s/sysinternalsebpf/sysinternalsebpf_1.4.0_amd64.deb"
 debian_9_sysmon="https://packages.microsoft.com/debian/9/prod/pool/main/s/sysmonforlinux/sysmonforlinux_1.0.2-1_amd64.deb"
 debian_9_sysinternals="https://packages.microsoft.com/debian/9/prod/pool/main/s/sysinternalsebpf/sysinternalsebpf_1.0.2-1_amd64.deb"
@@ -37,52 +38,56 @@ fedora_37_sysmon="https://packages.microsoft.com/fedora/37/prod/Packages/s/sysmo
 fedora_37_sysinternals="https://packages.microsoft.com/fedora/37/prod/Packages/s/sysinternalsebpf-1.3.0-0.el8.x86_64.rpm"
 fedora_38_sysmon="https://packages.microsoft.com/fedora/38/prod/Packages/s/sysmonforlinux-1.3.3-0.el8.x86_64.rpm"
 fedora_38_sysinternals="https://packages.microsoft.com/fedora/38/prod/Packages/s/sysinternalsebpf-1.4.0-0.el8.x86_64.rpm"
-opensuse_15_sysmon="https://packages.microsoft.com/opensuse/15/prod/Packages/s/sysmonforlinux-1.3.3-0.el8.x86_64.rpm"
+fedora_40_sysmon="https://packages.microsoft.com/fedora/40/prod/Packages/s/sysmonforlinux-1.3.5-0.el8.x86_64.rpm"
+fedora_40_sysinternals="https://packages.microsoft.com/fedora/40/prod/Packages/s/sysinternalsebpf-1.4.0-0.el8.x86_64.rpm"
+opensuse_15_sysmon="https://packages.microsoft.com/opensuse/15/prod/Packages/s/sysmonforlinux-1.3.5-0.el8.x86_64.rpm"
 opensuse_15_sysinternals="https://packages.microsoft.com/opensuse/15/prod/Packages/s/sysinternalsebpf-1.4.0-0.el8.x86_64.rpm"
-rhel_7_0_sysmon="https://packages.microsoft.com/rhel/7.0/prod/Packages/s/sysmonforlinux-1.3.3-0.el8.x86_64.rpm"
+rhel_7_0_sysmon="https://packages.microsoft.com/rhel/7.0/prod/Packages/s/sysmonforlinux-1.3.5-0.el8.x86_64.rpm"
 rhel_7_0_sysinternals="https://packages.microsoft.com/rhel/7.0/prod/Packages/s/sysinternalsebpf-1.4.0-0.el8.x86_64.rpm"
-rhel_7_1_sysmon="https://packages.microsoft.com/rhel/7.1/prod/Packages/s/sysmonforlinux-1.3.3-0.el8.x86_64.rpm"
+rhel_7_1_sysmon="https://packages.microsoft.com/rhel/7.1/prod/Packages/s/sysmonforlinux-1.3.5-0.el8.x86_64.rpm"
 rhel_7_1_sysinternals="https://packages.microsoft.com/rhel/7.1/prod/Packages/s/sysinternalsebpf-1.4.0-0.el8.x86_64.rpm"
-rhel_7_2_sysmon="https://packages.microsoft.com/rhel/7.2/prod/Packages/s/sysmonforlinux-1.3.3-0.el8.x86_64.rpm"
+rhel_7_2_sysmon="https://packages.microsoft.com/rhel/7.2/prod/Packages/s/sysmonforlinux-1.3.5-0.el8.x86_64.rpm"
 rhel_7_2_sysinternals="https://packages.microsoft.com/rhel/7.2/prod/Packages/s/sysinternalsebpf-1.4.0-0.el8.x86_64.rpm"
-rhel_7_3_sysmon="https://packages.microsoft.com/rhel/7.3/prod/Packages/s/sysmonforlinux-1.3.3-0.el8.x86_64.rpm"
+rhel_7_3_sysmon="https://packages.microsoft.com/rhel/7.3/prod/Packages/s/sysmonforlinux-1.3.5-0.el8.x86_64.rpm"
 rhel_7_3_sysinternals="https://packages.microsoft.com/rhel/7.3/prod/Packages/s/sysinternalsebpf-1.4.0-0.el8.x86_64.rpm"
-rhel_7_4_sysmon="https://packages.microsoft.com/rhel/7.4/prod/Packages/s/sysmonforlinux-1.3.3-0.el8.x86_64.rpm"
+rhel_7_4_sysmon="https://packages.microsoft.com/rhel/7.4/prod/Packages/s/sysmonforlinux-1.3.5-0.el8.x86_64.rpm"
 rhel_7_4_sysinternals="https://packages.microsoft.com/rhel/7.4/prod/Packages/s/sysinternalsebpf-1.4.0-0.el8.x86_64.rpm"
-rhel_7_5_sysmon="https://packages.microsoft.com/rhel/7.5/prod/Packages/s/sysmonforlinux-1.3.3-0.el8.x86_64.rpm"
+rhel_7_5_sysmon="https://packages.microsoft.com/rhel/7.5/prod/Packages/s/sysmonforlinux-1.3.5-0.el8.x86_64.rpm"
 rhel_7_5_sysinternals="https://packages.microsoft.com/rhel/7.5/prod/Packages/s/sysinternalsebpf-1.4.0-0.el8.x86_64.rpm"
-rhel_7_8_sysmon="https://packages.microsoft.com/rhel/7.8/prod/Packages/s/sysmonforlinux-1.3.3-0.el8.x86_64.rpm"
+rhel_7_8_sysmon="https://packages.microsoft.com/rhel/7.8/prod/Packages/s/sysmonforlinux-1.3.5-0.el8.x86_64.rpm"
 rhel_7_8_sysinternals="https://packages.microsoft.com/rhel/7.8/prod/Packages/s/sysinternalsebpf-1.4.0-0.el8.x86_64.rpm"
-rhel_7_9_sysmon="https://packages.microsoft.com/rhel/7.9/prod/Packages/s/sysmonforlinux-1.3.3-0.el8.x86_64.rpm"
+rhel_7_9_sysmon="https://packages.microsoft.com/rhel/7.9/prod/Packages/s/sysmonforlinux-1.3.5-0.el8.x86_64.rpm"
 rhel_7_9_sysinternals="https://packages.microsoft.com/rhel/7.9/prod/Packages/s/sysinternalsebpf-1.4.0-0.el8.x86_64.rpm"
-rhel_7_sysmon="https://packages.microsoft.com/rhel/7/prod/Packages/s/sysmonforlinux-1.3.3-0.el8.x86_64.rpm"
+rhel_7_sysmon="https://packages.microsoft.com/rhel/7/prod/Packages/s/sysmonforlinux-1.3.5-0.el8.x86_64.rpm"
 rhel_7_sysinternals="https://packages.microsoft.com/rhel/7/prod/Packages/s/sysinternalsebpf-1.4.0-0.el8.x86_64.rpm"
-rhel_8_0_sysmon="https://packages.microsoft.com/rhel/8.0/prod/Packages/s/sysmonforlinux-1.3.3-0.el8.x86_64.rpm"
+rhel_8_0_sysmon="https://packages.microsoft.com/rhel/8.0/prod/Packages/s/sysmonforlinux-1.3.5-0.el8.x86_64.rpm"
 rhel_8_0_sysinternals="https://packages.microsoft.com/rhel/8.0/prod/Packages/s/sysinternalsebpf-1.4.0-0.el8.x86_64.rpm"
-rhel_8_1_sysmon="https://packages.microsoft.com/rhel/8.1/prod/Packages/s/sysmonforlinux-1.3.3-0.el8.x86_64.rpm"
+rhel_8_1_sysmon="https://packages.microsoft.com/rhel/8.1/prod/Packages/s/sysmonforlinux-1.3.5-0.el8.x86_64.rpm"
 rhel_8_1_sysinternals="https://packages.microsoft.com/rhel/8.1/prod/Packages/s/sysinternalsebpf-1.4.0-0.el8.x86_64.rpm"
-rhel_8_2_sysmon="https://packages.microsoft.com/rhel/8.2/prod/Packages/s/sysmonforlinux-1.3.3-0.el8.x86_64.rpm"
+rhel_8_2_sysmon="https://packages.microsoft.com/rhel/8.2/prod/Packages/s/sysmonforlinux-1.3.5-0.el8.x86_64.rpm"
 rhel_8_2_sysinternals="https://packages.microsoft.com/rhel/8.2/prod/Packages/s/sysinternalsebpf-1.4.0-0.el8.x86_64.rpm"
-rhel_8_sysmon="https://packages.microsoft.com/rhel/8/prod/Packages/s/sysmonforlinux-1.3.3-0.el8.x86_64.rpm"
+rhel_8_sysmon="https://packages.microsoft.com/rhel/8/prod/Packages/s/sysmonforlinux-1.3.5-0.el8.x86_64.rpm"
 rhel_8_sysinternals="https://packages.microsoft.com/rhel/8/prod/Packages/s/sysinternalsebpf-1.4.0-0.el8.x86_64.rpm"
-rhel_9_0_sysmon="https://packages.microsoft.com/rhel/9.0/prod/Packages/s/sysmonforlinux-1.3.3-0.el8.x86_64.rpm"
+rhel_9_0_sysmon="https://packages.microsoft.com/rhel/9.0/prod/Packages/s/sysmonforlinux-1.3.5-0.el8.x86_64.rpm"
 rhel_9_0_sysinternals="https://packages.microsoft.com/rhel/9.0/prod/Packages/s/sysinternalsebpf-1.4.0-0.el8.x86_64.rpm"
-rhel_9_sysmon="https://packages.microsoft.com/rhel/9/prod/Packages/s/sysmonforlinux-1.3.3-0.el8.x86_64.rpm"
+rhel_9_sysmon="https://packages.microsoft.com/rhel/9/prod/Packages/s/sysmonforlinux-1.3.5-0.el8.x86_64.rpm"
 rhel_9_sysinternals="https://packages.microsoft.com/rhel/9/prod/Packages/s/sysinternalsebpf-1.4.0-0.el8.x86_64.rpm"
 sles_12_sysmon="https://packages.microsoft.com/sles/12/prod/Packages/s/sysmonforlinux-1.3.3-0.el8.x86_64.rpm"
 sles_12_sysinternals="https://packages.microsoft.com/sles/12/prod/Packages/s/sysinternalsebpf-1.4.0-0.el8.x86_64.rpm"
-sles_15_sysmon="https://packages.microsoft.com/sles/15/prod/Packages/s/sysmonforlinux-1.3.3-0.el8.x86_64.rpm"
+sles_15_sysmon="https://packages.microsoft.com/sles/15/prod/Packages/s/sysmonforlinux-1.3.5-0.el8.x86_64.rpm"
 sles_15_sysinternals="https://packages.microsoft.com/sles/15/prod/Packages/s/sysinternalsebpf-1.4.0-0.el8.x86_64.rpm"
 ubuntu_18_04_sysmon="https://packages.microsoft.com/ubuntu/18.04/prod/pool/main/s/sysmonforlinux/sysmonforlinux_1.1.0-0_amd64.deb"
 ubuntu_18_04_sysinternals="https://packages.microsoft.com/ubuntu/18.04/prod/pool/main/s/sysinternalsebpf/sysinternalsebpf_1.1.0-0_amd64.deb"
-ubuntu_20_04_sysmon="https://packages.microsoft.com/ubuntu/20.04/prod/pool/main/s/sysmonforlinux/sysmonforlinux_1.3.3_amd64.deb"
+ubuntu_20_04_sysmon="https://packages.microsoft.com/ubuntu/20.04/prod/pool/main/s/sysmonforlinux/sysmonforlinux_1.3.5_amd64.deb"
 ubuntu_20_04_sysinternals="https://packages.microsoft.com/ubuntu/20.04/prod/pool/main/s/sysinternalsebpf/sysinternalsebpf_1.4.0_amd64.deb"
 ubuntu_21_04_sysmon="https://packages.microsoft.com/ubuntu/21.04/prod/pool/main/s/sysmonforlinux/sysmonforlinux_1.0.2-1_amd64.deb"
 ubuntu_21_04_sysinternals="https://packages.microsoft.com/ubuntu/21.04/prod/pool/main/s/sysinternalsebpf/sysinternalsebpf_1.0.2-1_amd64.deb"
-ubuntu_22_04_sysmon="https://packages.microsoft.com/ubuntu/22.04/prod/pool/main/s/sysmonforlinux/sysmonforlinux_1.3.3_amd64.deb"
+ubuntu_22_04_sysmon="https://packages.microsoft.com/ubuntu/22.04/prod/pool/main/s/sysmonforlinux/sysmonforlinux_1.3.5_amd64.deb"
 ubuntu_22_04_sysinternals="https://packages.microsoft.com/ubuntu/22.04/prod/pool/main/s/sysinternalsebpf/sysinternalsebpf_1.4.0_amd64.deb"
 ubuntu_23_04_sysmon="https://packages.microsoft.com/ubuntu/23.04/prod/pool/main/s/sysmonforlinux/sysmonforlinux_1.3.3_amd64.deb"
 ubuntu_23_04_sysinternals="https://packages.microsoft.com/ubuntu/23.04/prod/pool/main/s/sysinternalsebpf/sysinternalsebpf_1.3.0_amd64.deb"
+ubuntu_24_04_sysmon="https://packages.microsoft.com/ubuntu/24.04/prod/pool/main/s/sysmonforlinux/sysmonforlinux_1.3.5_amd64.deb"
+ubuntu_24_04_sysinternals="https://packages.microsoft.com/ubuntu/24.04/prod/pool/main/s/sysinternalsebpf/sysinternalsebpf_1.4.0_amd64.deb"
 #####################################################
 
 ##################### FUNCTIONS #####################
@@ -96,22 +101,55 @@ function print_banner {
     echo
 }
 
+function info {
+    echo "[*] $1"
+}
+
 function error {
     echo "[X] $1"
 }
 
+function download {
+    url=$1
+    output=$2
+
+    if [[ "$LOCAL" == "true" && "$url" == "$GITHUB_URL"* ]]; then
+        # Assume the URL is a local file path
+        if [[ ! -f "$url" ]]; then
+            error "Local file not found: $url"
+            return 1
+        fi
+        cp "$url" "$output"
+        info "Copied from local Github to $output"
+        return 0
+    fi
+    
+    # TODO: figure out how to fix the progress bar
+    if ! wget -O "$output" --no-check-certificate "$url"; then
+        # error "Failed to download with wget. Trying wget with older TLS version..."
+        # if ! wget -O "$output" --secure-protocol=TLSv1 --no-check-certificate "$url"; then
+            error "Failed to download with wget. Trying with curl..."
+            if ! curl -L -o "$output" -k "$url"; then
+                error "Failed to download with curl."
+            fi
+        # fi
+    fi
+}
+
 function print_os_options {
-    echo "Supported distros and versions: 
-    -> ubuntu (18, 20, 21, 22, 23)
+    echo "Officially supported distros and versions: 
+    -> ubuntu (18, 20, 21, 22, 23, 24)
     -> debian (9, 10, 11, 12)
-    -> fedora (33, 34, 36, 37, 38)
+    -> fedora (33, 34, 36, 37, 38, 40)
     -> rhel (7, 7.0 - 7.9, 8, 8.0 - 8.2, 9, 9.0)
     -> centos (7, 8)
     -> sles (12, 15)
     -> opensuse (15)"
+    echo "If your distro/version isn't on here, try the most similar one"
 }
 
 function print_options {
+    # TODO: update this
     echo "Usage: ./sysmon.sh <distro> <version>"
     print_os_options
     echo
@@ -129,6 +167,7 @@ function ask_for_os_info {
 }
 
 function install_from_repo {
+    # TODO: update this to use download function
     case $DISTRO in
         "ubuntu")
             if [ $VERSION -ge 18 ]; then
@@ -268,7 +307,12 @@ function install_from_package {
                     sysmon=$ubuntu_23_04_sysmon
                     sysinternals=$ubuntu_23_04_sysinternals
                     ;;
-                # TODO: try newer/older packages for 19 and 24
+                24)
+                    print_banner "Ubuntu $VERSION"
+                    sysmon=$ubuntu_24_04_sysmon
+                    sysinternals=$ubuntu_24_04_sysinternals
+                    ;;
+                # TODO: try newer/older packages for 19 and 25
                 *)
                     error "Unsupported Ubuntu version"
                     print_options
@@ -332,7 +376,12 @@ function install_from_package {
                     sysmon=$fedora_38_sysmon
                     sysinternals=$fedora_38_sysinternals
                     ;;
-                # TODO: try newer/older packages for 35, 39, and 40
+                40)
+                    print_banner "Fedora $VERSION"
+                    sysmon=$fedora_40_sysmon
+                    sysinternals=$fedora_40_sysinternals
+                    ;;
+                # TODO: try newer/older packages for 35, 39, and 41
                 *)
                     error "Unsupported Fedora version"
                     print_options
@@ -482,8 +531,8 @@ function install_from_package {
     esac
 
     # Download the sysinternals and sysmon packages
-    wget $sysmon -O "sysmon.$package_type"
-    wget $sysinternals -O "sysinternals.$package_type"
+    download $sysmon "sysmon.$package_type"
+    download $sysinternals "sysinternals.$package_type"
     
     # Install the packages
     case $package_type in
@@ -516,7 +565,7 @@ function install_from_package {
 }
 
 function configure {
-    wget $GITHUB_URL/linux/sysmon/sysmon-config.xml -O sysmon-config.xml
+    download $GITHUB_URL/linux/sysmon/sysmon-config.xml sysmon-config.xml
     sudo chown root:root sysmon-config.xml
     sudo chmod 600 sysmon-config.xml
     sudo mkdir -p /opt/ccdc/
@@ -526,6 +575,37 @@ function configure {
 #####################################################
 
 ######################## MAIN #######################
+while getopts "hg:l:d:v:" opt; do
+    case $opt in
+        h)
+            print_options
+            exit 0
+            ;;
+        g)
+            GITHUB_URL=$OPTARG
+            ;;
+        l)
+            LOCAL=true
+            GITHUB_URL="$(realpath "$OPTARG")"  # Use local path for GITHUB_URL
+            ;;
+        d)
+            DISTRO=$OPTARG
+            ;;
+        v)
+            VERSION=$OPTARG
+            ;;
+        \?)
+            error "Invalid option: $OPTARG"
+            print_usage
+            exit 1
+            ;;
+        :)
+            error "Option -$OPTARG requires an argument (-h for help)"
+            exit 1
+            ;;
+    esac
+done
+
 ask_for_os_info
 install_from_package
 configure

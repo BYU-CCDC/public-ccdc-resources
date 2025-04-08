@@ -1,4 +1,20 @@
 #!/bin/bash
+
+# Copyright (C) 2025 deltabluejay
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 ###################### GLOBALS ######################
 DEBUG_LOG='/var/log/ccdc/splunk.log'
 GITHUB_URL="https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main"
@@ -7,9 +23,11 @@ PM=""
 IP=""
 INDEXER=false
 PACKAGE="auto"
+LOCAL_PACKAGE=""
 SPLUNK_HOME="/opt/splunkforwarder"
 SPLUNK_ONLY=false
 ADDITIONAL_LOGGING_ONLY=false
+LOCAL=false
 SYSTEMD_SYSTEM=false
 
 # Special variables recognized by Splunk CLI for authentication
@@ -18,23 +36,25 @@ SPLUNK_USERNAME="splunk"
 SPLUNK_PASSWORD=""
 
 # Indexer
-indexer_deb="https://download.splunk.com/products/splunk/releases/9.2.4/linux/splunk-9.2.4-c103a21bb11d-linux-2.6-amd64.deb"
-indexer_rpm="https://download.splunk.com/products/splunk/releases/9.2.4/linux/splunk-9.2.4-c103a21bb11d.x86_64.rpm"
-indexer_tgz="https://download.splunk.com/products/splunk/releases/9.2.4/linux/splunk-9.2.4-c103a21bb11d-Linux-x86_64.tgz"
+indexer_deb="https://download.splunk.com/products/splunk/releases/9.2.5/linux/splunk-9.2.5-7bfc9a4ed6ba-linux-2.6-amd64.deb"
+indexer_rpm="https://download.splunk.com/products/splunk/releases/9.2.5/linux/splunk-9.2.5-7bfc9a4ed6ba.x86_64.rpm"
+indexer_tgz="https://download.splunk.com/products/splunk/releases/9.2.5/linux/splunk-9.2.5-7bfc9a4ed6ba-Linux-x86_64.tgz"
 
 # Forwarder
-deb="https://download.splunk.com/products/universalforwarder/releases/9.2.4/linux/splunkforwarder-9.2.4-c103a21bb11d-linux-2.6-amd64.deb"
-rpm="https://download.splunk.com/products/universalforwarder/releases/9.2.4/linux/splunkforwarder-9.2.4-c103a21bb11d.x86_64.rpm"
-tgz="https://download.splunk.com/products/universalforwarder/releases/9.2.4/linux/splunkforwarder-9.2.4-c103a21bb11d-Linux-x86_64.tgz"
-arm_deb="https://download.splunk.com/products/universalforwarder/releases/9.2.4/linux/splunkforwarder-9.2.4-c103a21bb11d-Linux-armv8.deb"
-arm_rpm="https://download.splunk.com/products/universalforwarder/releases/9.2.4/linux/splunkforwarder-9.2.4-c103a21bb11d.aarch64.rpm"
-arm_tgz="https://download.splunk.com/products/universalforwarder/releases/9.2.4/linux/splunkforwarder-9.2.4-c103a21bb11d-Linux-armv8.tgz"
+deb="https://download.splunk.com/products/universalforwarder/releases/9.2.5/linux/splunkforwarder-9.2.5-7bfc9a4ed6ba-linux-2.6-amd64.deb"
+rpm="https://download.splunk.com/products/universalforwarder/releases/9.2.5/linux/splunkforwarder-9.2.5-7bfc9a4ed6ba.x86_64.rpm"
+tgz="https://download.splunk.com/products/universalforwarder/releases/9.2.5/linux/splunkforwarder-9.2.5-7bfc9a4ed6ba-Linux-x86_64.tgz"
+arm_deb="https://download.splunk.com/products/universalforwarder/releases/9.2.5/linux/splunkforwarder-9.2.5-7bfc9a4ed6ba-Linux-armv8.deb"
+arm_rpm="https://download.splunk.com/products/universalforwarder/releases/9.2.5/linux/splunkforwarder-9.2.5-7bfc9a4ed6ba.aarch64.rpm"
+arm_tgz="https://download.splunk.com/products/universalforwarder/releases/9.2.5/linux/splunkforwarder-9.2.5-7bfc9a4ed6ba-Linux-armv8.tgz"
 old_deb="https://download.splunk.com/products/universalforwarder/releases/9.0.9/linux/splunkforwarder-9.0.9-6315942c563f-linux-2.6-amd64.deb"
 old_rpm="https://download.splunk.com/products/universalforwarder/releases/9.0.9/linux/splunkforwarder-9.0.9-6315942c563f.x86_64.rpm"
 old_tgz="https://download.splunk.com/products/universalforwarder/releases/9.0.9/linux/splunkforwarder-9.0.9-6315942c563f-Linux-x86_64.tgz"
 #####################################################
 
 ##################### FUNCTIONS #####################
+# TODO: add return codes to stuff based on whether it errors or not
+
 function print_banner {
     echo
     echo "#######################################"
@@ -71,6 +91,17 @@ function faketty () {
 function download {
     url=$1
     output=$2
+
+    if [[ "$LOCAL" == "true" && "$url" == "$GITHUB_URL"* ]]; then
+        # Assume the URL is a local file path
+        if [[ ! -f "$url" ]]; then
+            error "Local file not found: $url"
+            return 1
+        fi
+        cp "$url" "$output"
+        info "Copied from local Github to $output"
+        return 0
+    fi
     
     # TODO: figure out how to fix the progress bar
     if ! wget -O "$output" --no-check-certificate "$url"; then
@@ -86,19 +117,21 @@ function download {
 
 function print_usage {
     echo "Usage:"
-    echo "  ./splunk.sh -f <INDEXER IP> [flags]"
-    echo "  ./splunk.sh -a <LOG_PATH>"
+    echo "  ./splunk.sh -f <INDEXER IP> [flags]         # Install the forwarder"
+    echo "  ./splunk.sh -i [flags]                      # Install the indexer"
+    echo "  ./splunk.sh -a <LOG_PATH>                   # Add a new monitor"
     echo
     echo "Flags:
-  -h    Show this help message
-  -f    IP of the splunk indexer (required unless -i is used)
-  -i    Install the indexer instead of the forwarder
-  -p    Package type (defaults to auto; see below)
-  -u    Print Splunk package URLs
-  -S    Install Splunk only (no additional logging)
-  -L    Install additional logging sources only (no Splunk)
-  -g    Change the GitHub URL for downloading files (for debug or local hosting)
-  -a    Add a new monitor (use only after installation)"
+  -h            Show this help message
+  -f <ip>       Install the forwarder (-f is required unless -i or -a are used)
+  -i            Install the indexer
+  -p <type>     Package type (defaults to auto- see below)
+  -u            Print Splunk package URLs
+  -S            Install Splunk only (no additional logging)
+  -L            Install additional logging sources only (no Splunk)
+  -l <path>     Install from a locally cloned GitHub repository (provide filesystem path to repo)
+  -g <url>      Change the GitHub URL for downloading files (for local network hosting)
+  -a <path>     Add a new monitor (use only after installation)"
     echo
     echo "Available packages:
   auto (default; autodetects best package format based on package manager)
@@ -110,12 +143,14 @@ function print_usage {
     arm_debian (deb for ARM machines)
     arm_rpm (rpm for ARM machines)
     arm_tgz (tgz for ARM machines)
+    old_deb (compatibility package- try if you're getting glibc errors)
+    old_rpm (compatibility package- try if you're getting glibc errors)
+    old_tgz (compatibility package- try if you're getting glibc errors)
   Indexer:
     indexer_deb (Debian-based distros)
     indexer_rpm (RHEL-based distros)
     indexer_tgz (generic .tgz file)
-    
-Hint: if you're getting glibc errors, try one of the old packages (old_deb, old_rpm, old_tgz)"
+"
 }
 
 function autodetect_os {
@@ -158,6 +193,11 @@ function install_dependencies {
         info "No package manager detected."
     else
         sudo "$PM" install -y wget curl acl
+        if [ "$PM" == "apt-get" ]; then
+            sudo "$PM" install -y debsums
+        else
+            sudo "$PM" install -y rpm
+        fi
     fi
 
     if ! command -v wget &>/dev/null; then
@@ -223,23 +263,29 @@ function check_prereqs {
 
 function download_and_install_package {
     if [[ "$1" == *.deb ]]; then
-        download "$1" splunk.deb
+        if [[ -z "$LOCAL_PACKAGE" ]]; then
+            download "$1" splunk.deb
+        fi
         sudo dpkg -i ./splunk.deb
     elif [[ "$1" == *.rpm ]]; then
-        download "$1" splunk.rpm
+        if [[ -z "$LOCAL_PACKAGE" ]]; then
+            download "$1" splunk.rpm
+        fi
         if command -v zypper &>/dev/null; then
             sudo zypper --no-gpg-checks install -y ./splunk.rpm
         else
             sudo yum install --nogpgcheck ./splunk.rpm -y
         fi
     elif [[ "$1" == *.tgz ]]; then
-        download "$1" splunk.tgz
+        if [[ -z "$LOCAL_PACKAGE" ]]; then
+            download "$1" splunk.tgz
+        fi
         info "Extracting to $SPLUNK_HOME"
         sudo tar -xvf splunk.tgz -C /opt/ &> /dev/null
         # TODO: make sure it actually extracts to $SPLUNK_HOME
         sudo chown -R splunk:splunk $SPLUNK_HOME
     else
-        echo "Unknown package type. Please install Splunk manually to $SPLUNK_HOME, then run this script again to configure it."
+        error "Unknown package type. Please install Splunk manually to $SPLUNK_HOME, then run this script again to configure it."
         exit
     fi
 }
@@ -335,6 +381,19 @@ function create_splunk_user {
     else
         info "Creating splunk user"
         sudo useradd splunk -d $SPLUNK_HOME
+        # Allow package verification
+        if sudo [ -e /etc/sudoers.d ]; then
+            SUDOERS_FILE="/etc/sudoers.d/splunk"
+            if [[ "$PM" == "apt-get" ]]; then
+                echo "splunk ALL=(ALL) NOPASSWD: $(which debsums) -as" | sudo tee "$SUDOERS_FILE" > /dev/null
+            else
+                echo "splunk ALL=(ALL) NOPASSWD: $(which rpm) -Va" | sudo tee "$SUDOERS_FILE" > /dev/null
+            fi
+            sudo chown root:root
+            sudo chmod 440 "$SUDOERS_FILE"
+        else
+            error "Warning: /etc/sudoers.d does not exist. Splunk user will not have the sudo privileges needed for package verification."
+        fi
     fi
 
     if ! getent group "splunk" > /dev/null; then
@@ -757,8 +816,11 @@ function add_mysql_logs {
 # Adds scripted inputs
 function add_scripts {
     print_banner "Adding scripted inputs"
+    # TOOD: add this to the add-on inputs.conf instead
     info "Adding user sessions script"
     add_script $SPLUNK_HOME/etc/apps/ccdc-add-on/bin/sessions.sh "system" "180" "ccdc-sessions"
+    info "Adding package integrity verification"
+    add_script $SPLUNK_HOME/etc/apps/ccdc-add-on/bin/package-check.sh "system" "600" "ccdc-package-integrity"
 }
 
 # Adds monitors for the Splunk indexer service itself
@@ -831,9 +893,49 @@ function setup_forward_server {
 
 function install_auditd {
     print_banner "Installing auditd"
-    download "$GITHUB_URL/splunk/linux/auditd.sh" auditd.sh
-    chmod +x auditd.sh
-    ./auditd.sh
+
+    # Install auditd
+    info "Installing auditd package"
+    sudo $pm install -y auditd
+    if command -v systemctl &> /dev/null; then
+        sudo systemctl enable auditd
+        sudo systemctl start auditd
+    elif command -v service &> /dev/null; then
+        sudo service auditd start
+    fi
+
+    # Add custom rules
+    info "Adding custom audit rules"
+    if ! sudo [ -d "/etc/audit/rules.d/" ]; then
+        error "Could not locate audit rules directory"
+        return 1
+    fi
+    CUSTOM_RULE_FILE='/etc/audit/rules.d/ccdc.rules'
+
+    # Download custom rule file
+    download $GITHUB_URL/splunk/linux/ccdc.rules ./ccdc.rules
+    sudo chown root:root ./ccdc.rules
+    sudo chmod 600 $CUSTOM_RULE_FILE
+    sudo mv ./ccdc.rules $CUSTOM_RULE_FILE
+
+    # Add home directory rules
+    echo '' | sudo tee -a $CUSTOM_RULE_FILE
+    for dir in /home/*; do
+        if [ -d "$dir" ]; then
+            echo "-w ${dir}/.ssh/ -p w -k CCDC_modify_ssh_user" | sudo tee -a $CUSTOM_RULE_FILE
+
+            if [ -f "$dir/.bashrc" ]; then
+                echo "-w ${dir}/.bashrc -p w -k CCDC_modify_bashrc_user" | sudo tee -a $CUSTOM_RULE_FILE
+            fi
+        fi
+    done
+
+    sudo augenrules --load
+    sudo service auditd reload
+
+    info "Applied rules:"
+    sudo auditctl -l
+
     sudo setfacl -R -m u:splunk:rx /var/log/audit
     # TODO: add check for successful Splunk login to all Splunk commands
     add_monitor "/var/log/audit/audit.log" "system"
@@ -902,11 +1004,45 @@ function install_sysmon {
     print_banner "Installing Sysmon"
     download "$GITHUB_URL/linux/sysmon/sysmon.sh" sysmon.sh
     chmod +x sysmon.sh
-    if ./sysmon.sh; then
+
+    if [[ "$LOCAL" == true ]]; then
+        ./sysmon.sh -l "$GITHUB_URL"
+    else
+        ./sysmon.sh -g "$GITHUB_URL"
+    fi
+
+    if [[ $? -eq 0 ]]; then
         info "Sysmon installed successfully"
         install_sysmon_add_on
     else
         error "Sysmon installation failed"
+    fi
+}
+
+function install_ossec {
+    print_banner "Installing OSSEC"
+    download "$GITHUB_URL/linux/ossec.sh" ossec.sh
+    chmod +x ossec.sh
+
+    cmd="./ossec.sh "
+    if [[ "$LOCAL" == true ]]; then
+        cmd+="-l $GITHUB_URL "
+    else
+        cmd+="-g $GITHUB_URL "
+    fi
+
+    if [[ "$INDEXER" == true ]]; then
+        cmd+="-i $IP"
+    else
+        cmd+="-f $IP"
+    fi
+
+    eval $cmd
+
+    if [[ $? -eq 0 ]]; then
+        info "OSSEC installed successfully"
+    else
+        error "OSSEC installation failed"
     fi
 }
 #####################################################
@@ -962,6 +1098,7 @@ function main {
             fi
         fi
         install_sysmon
+        install_ossec
     else
         info "Skipping installation of additional logging sources"
     fi
@@ -977,7 +1114,7 @@ function main {
 }
 
 # TODO: add a reinstall option
-while getopts "hp:f:ig:uSa:L" opt; do
+while getopts "hp:P:f:i:g:uSa:Ll:" opt; do
     case $opt in
         h)
             print_usage
@@ -1009,12 +1146,16 @@ while getopts "hp:f:ig:uSa:L" opt; do
         p)
             PACKAGE=$OPTARG
             ;;
+        P)
+            LOCAL_PACKAGE=$OPTARG
+            ;;
         f)
             IP=$OPTARG
             ;;
         i)
             INDEXER=true
             SPLUNK_HOME="/opt/splunk"
+            IP=$OPTARG
             ;;
         g)
             GITHUB_URL=$OPTARG
@@ -1024,6 +1165,10 @@ while getopts "hp:f:ig:uSa:L" opt; do
             ;;
         L)
             ADDITIONAL_LOGGING_ONLY=true
+            ;;
+        l)
+            LOCAL=true
+            GITHUB_URL="$(realpath "$OPTARG")"  # Use local path for GITHUB_URL
             ;;
         a)
             # Pass -i before this argument if on the indexer
@@ -1051,7 +1196,7 @@ while getopts "hp:f:ig:uSa:L" opt; do
         :)
             error "Option -$OPTARG requires an argument (-h for help)"
             exit 1
-        ;;
+            ;;
     esac
 done
 

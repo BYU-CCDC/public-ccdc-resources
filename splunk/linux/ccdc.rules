@@ -28,6 +28,7 @@
 -w /usr/sbin/useradd -p x -k CCDC_exec_useradd
 -w /usr/sbin/adduser -p x -k CCDC_exec_adduser
 #-w /bin/bash -p x -k CCDC_new_shell
+-w /usr/bin/nc -p x -k CCDC_netcat
 
 ### SYSCALLS ###
 # execve activity by web users (web shell)
@@ -46,6 +47,22 @@
 -a always,exit -F arch=b64 -S socket -F a0=10 -F euid=33 -k CCDC_socket_web
 -a always,exit -F arch=b32 -S socket -F a0=2 -F euid=33  -k CCDC_socket_web
 -a always,exit -F arch=b64 -S socket -F a0=2 -F euid=33  -k CCDC_socket_web
+
+### KERNEL MODIFICATION ###
+# See https://github.com/Neo23x0/auditd/blob/master/audit.rules
+# Kernel module loading and unloading
+-a always,exit -F perm=x -F auid!=-1 -F path=/sbin/insmod -k modules
+-a always,exit -F perm=x -F auid!=-1 -F path=/sbin/modprobe -k modules
+-a always,exit -F perm=x -F auid!=-1 -F path=/sbin/rmmod -k modules
+-a always,exit -F arch=b64 -S finit_module -S init_module -S delete_module -F auid!=-1 -k modules
+
+# Modprobe configuration
+-w /etc/modprobe.conf -p wa -k modprobe
+-w /etc/modprobe.d -p wa -k modprobe
+
+# KExec usage (all actions)
+-a always,exit -F arch=b64 -S kexec_load -k KEXEC
+
 
 ### DYNAMIC ###
 # modification of /home/<USER>/.bashrc (replace <USER>)

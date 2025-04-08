@@ -1,5 +1,7 @@
 # public-ccdc-resources
 
+Please note our [license](./COPYING) regarding rules of use, modification, and sharing of this software.
+
 ## Open-source repositories
 Here is a list of open-source security repos. Check with competition organizers whether these repos are allowed:<br>
 [Open-source security repos](open-source-security-repos.md)

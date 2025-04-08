@@ -5,7 +5,7 @@ from bs4 import BeautifulSoup
 import re
 import sys
 
-version = '9.2.4'
+version = '9.2.5'
 if version == 'latest':
     indexer_url = 'https://www.splunk.com/en_us/download/splunk-enterprise.html'
     uf_url = 'https://www.splunk.com/en_us/download/universal-forwarder.html'
