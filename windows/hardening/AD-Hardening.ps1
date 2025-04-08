@@ -1750,7 +1750,7 @@ function Identify-and-Fix-ASREP-Roastable-Accounts{
 function Identify-and-Fix-Kerberoastable-Accounts{   
 
     #Identify Kerberoastable Accounts
-    $kerberoastableAccounts = Get-ADUser -Filter {ServicePrincipalName -ne "$null"} -Property servicePrincipalName | Select-Object Name, servicePrincipalName
+    $kerberoastableAccounts = Get-ADUser -Filter {ServicePrincipalName -ne "$null" -and msDS-SupportedEncryptionTypes -ne 24} -Property servicePrincipalName, msDS-SupportedEncryptionTypes | Select-Object Name, servicePrincipalName, msDS-SupportedEncryptionTypes
     Write-Host "Kerberoastable Accounts:"
     $kerberoastableAccounts
 
@@ -1772,7 +1772,9 @@ function Identify-and-Fix-Kerberoastable-Accounts{
             
             # Reset the password twice to flush insecure passwords from the domain controller cache
             Write-Host "Reset the password to flush insecure passwords from the domain controller cache" -ForegroundColor Yellow
+            for($i=0; $i -lt 2; $i++){
             Get-Set-Password -user $User
+            }
             Get-Set-Password -user $User
         }
     } else {
