@@ -1771,9 +1771,8 @@ function Identify-and-Fix-Kerberoastable-Accounts{
             Set-ADUser -Identity $User -Replace @{userAccountControl=$updatedValue}   
             
             # Reset the password twice to flush insecure passwords from the domain controller cache
-            for ($i = 0; $i -lt 2; $i++) {
-                Get-Set-Password -user $User
-            }
+            Write-Host "Reset the password to flush insecure passwords from the domain controller cache" -ForegroundColor Yellow
+            Get-Set-Password -user $User
             Get-Set-Password -user $User
         }
     } else {
