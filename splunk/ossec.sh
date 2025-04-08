@@ -158,7 +158,7 @@ function setup_ossec_server {
 
     # Start OSSEC
     info "Starting OSSEC server..."
-    sudo systemctl start ossec
+    sudo systemctl start ossec || sudo systemctl start ossec-hids
 
     # Start ossec-authd for automatic agent registration
     sudo $OSSEC_DIR/bin/ossec-authd -p 1515 -n
@@ -228,7 +228,7 @@ function install_ossec {
 
         # Start OSSEC
         info "Starting OSSEC client..."
-        sudo systemctl start ossec-hids
+        sudo systemctl start ossec-hids || sudo systemctl start ossec
     fi
 }
 

@@ -18,7 +18,7 @@
 ###################### GLOBALS ######################
 DEBUG_LOG='/var/log/ccdc/splunk.log'
 GITHUB_URL="https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main"
-INDEXES=( 'system' 'web' 'network' 'windows' 'misc' 'snoopy' )
+INDEXES=( 'system' 'web' 'network' 'windows' 'misc' 'snoopy' 'ossec' )
 PM=""
 IP=""
 INDEXER=false
@@ -104,11 +104,11 @@ function download {
     fi
     
     # TODO: figure out how to fix the progress bar
-    if ! wget -O "$output" --no-check-certificate "$url"; then
+    if ! wget -O "$output" --no-check-certificate -q --show-progress "$url"; then
         # error "Failed to download with wget. Trying wget with older TLS version..."
         # if ! wget -O "$output" --secure-protocol=TLSv1 --no-check-certificate "$url"; then
             error "Failed to download with wget. Trying with curl..."
-            if ! curl -L -o "$output" -k "$url"; then
+            if ! curl -L -o "$output" -# -k "$url"; then
                 error "Failed to download with curl."
             fi
         # fi
@@ -192,7 +192,7 @@ function install_dependencies {
     if [ "$PM" == "" ]; then
         info "No package manager detected."
     else
-        sudo "$PM" install -y wget curl acl
+        sudo "$PM" install -y wget curl acl unzip
         if [ "$PM" == "apt-get" ]; then
             sudo "$PM" install -y debsums
         else
@@ -381,19 +381,20 @@ function create_splunk_user {
     else
         info "Creating splunk user"
         sudo useradd splunk -d $SPLUNK_HOME
-        # Allow package verification
-        if sudo [ -e /etc/sudoers.d ]; then
-            SUDOERS_FILE="/etc/sudoers.d/splunk"
-            if [[ "$PM" == "apt-get" ]]; then
-                echo "splunk ALL=(ALL) NOPASSWD: $(which debsums) -as" | sudo tee "$SUDOERS_FILE" > /dev/null
-            else
-                echo "splunk ALL=(ALL) NOPASSWD: $(which rpm) -Va" | sudo tee "$SUDOERS_FILE" > /dev/null
-            fi
-            sudo chown root:root
-            sudo chmod 440 "$SUDOERS_FILE"
+    fi
+
+    # Allow package verification
+    if sudo [ -e /etc/sudoers.d ]; then
+        SUDOERS_FILE="/etc/sudoers.d/splunk"
+        if [[ "$PM" == "apt-get" ]]; then
+            echo "splunk ALL=(ALL) NOPASSWD: $(which debsums) -as" | sudo tee "$SUDOERS_FILE" > /dev/null
         else
-            error "Warning: /etc/sudoers.d does not exist. Splunk user will not have the sudo privileges needed for package verification."
+            echo "splunk ALL=(ALL) NOPASSWD: $(which rpm) -Va" | sudo tee "$SUDOERS_FILE" > /dev/null
         fi
+        sudo chown root:root "$SUDOERS_FILE"
+        sudo chmod 440 "$SUDOERS_FILE"
+    else
+        error "Warning: /etc/sudoers.d does not exist. Splunk user will not have the sudo privileges needed for package verification."
     fi
 
     if ! getent group "splunk" > /dev/null; then
@@ -583,11 +584,17 @@ function setup_splunk {
 # Arguments:
 #   $1: Path of log source
 #   $2: Index name
+#   $3: Sourcetype (optional)
 function add_monitor {
     source=$1
     index=$2
+    sourcetype=$3
     if sudo [ -e "$source" ]; then
-        sudo -H -u splunk $SPLUNK_HOME/bin/splunk add monitor "$source" -index "$index"
+        if [ "$sourcetype" != "" ]; then
+            sudo -H -u splunk $SPLUNK_HOME/bin/splunk add monitor "$source" -index "$index" -sourcetype "$sourcetype"
+        else
+            sudo -H -u splunk $SPLUNK_HOME/bin/splunk add monitor "$source" -index "$index"
+        fi
         # info "Added monitor for $source"
     else
         error "No file or dir found at $source"
@@ -1021,7 +1028,7 @@ function install_sysmon {
 
 function install_ossec {
     print_banner "Installing OSSEC"
-    download "$GITHUB_URL/linux/ossec.sh" ossec.sh
+    download "$GITHUB_URL/splunk/ossec.sh" ossec.sh
     chmod +x ossec.sh
 
     cmd="./ossec.sh "
@@ -1041,6 +1048,14 @@ function install_ossec {
 
     if [[ $? -eq 0 ]]; then
         info "OSSEC installed successfully"
+        OSSEC_DIR="/var/ossec"
+        if [[ "$INDEXER" == true ]]; then
+            sudo setfacl -m u:splunk:rx $OSSEC_DIR
+            sudo setfacl -R -m u:splunk:rx $OSSEC_DIR/logs/
+            add_monitor "$OSSEC_DIR/logs/ossec.log" "ossec" "ossec_log"
+            add_monitor "$OSSEC_DIR/logs/alerts/alerts.log" "ossec" "ossec_alert"
+            add_monitor "$OSSEC_DIR/logs/firewall/firewall.log" "ossec" "ossec_firewall"
+        fi
     else
         error "OSSEC installation failed"
     fi
