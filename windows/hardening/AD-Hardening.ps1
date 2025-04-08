@@ -1750,10 +1750,10 @@ function Identify-and-Fix-ASREP-Roastable-Accounts{
 function Identify-and-Fix-Kerberoastable-Accounts{   
 
     #Identify Kerberoastable Accounts
-    $kerberoastableAccounts = Get-ADUser -Filter {ServicePrincipalName -ne "$null" -and msDS-SupportedEncryptionTypes -ne 24} -Property servicePrincipalName, msDS-SupportedEncryptionTypes | Select-Object Name, servicePrincipalName, msDS-SupportedEncryptionTypes
+    $kerberoastableAccounts = Get-ADUser -Filter {ServicePrincipalName -ne "$null" -and msDS-SupportedEncryptionTypes -ne 24} -Property servicePrincipalName, msDS-SupportedEncryptionTypes | Select-Object Name
     Write-Host "Kerberoastable Accounts:"
     Write-Host $kerberoastableAccounts | Format-Table -Property Name, servicePrincipalName, msDS-SupportedEncryptionTypes -AutoSize
-
+    
     $confirmation = Prompt-Yes-No -Message "Should we fix kerberoastable accounts? (y/n)"
     if ($confirmation.toLower() -eq "y") {
         Write-Host "Fixing kerberoastable accounts"
