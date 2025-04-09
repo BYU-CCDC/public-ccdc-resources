@@ -1280,7 +1280,7 @@ function Configure-Secure-GPO {
                 "Key" = "HKLM\System\CurrentControlSet\Services\NTDS\Parameters"
                 "ValueName" = "LDAPServerIntegrity"
                 "Type" = "DWORD"
-                "Value" = 2
+                "Value" = 1 #doesn't enforce ldaps (ldap over tls), but prevents breaking the scoring engine if it is scoring normal ldap
             }
 
         }
@@ -1323,6 +1323,50 @@ function Configure-Secure-GPO {
     }
 }
 
+function Import-Firewall-GPOs {
+    Expand-Archive -Path ./gpos.zip
+
+    $gpos = Get-ChildItem ./gpos
+
+    $gpos | % {
+        $xml = New-Object xml
+        $xml.Load((Convert-Path ./gpos/$($_.name)/bkupInfo.xml))
+        $gpoName = $xml.BackupInst.GPODisplayName."#cdata-section"
+
+        New-GPO -Name $gpoName
+
+        Import-GPO -path "$pwd/gpos" -BackupId $_.name -targetName $gpoName
+
+        if ($gpoName.StartsWith("Domain") -and -not $gpoName -like "*Block*") {
+            New-GPLink -Name $gpoName -Target (Get-ADDomain -Current LocalComputer).DistinguishedName
+        } 
+        elseif ($gpoNaem.StartsWith("Web Servers")) {
+            New-GPLink -Name $gpoName -Target "OU=Web Servers,$((Get-ADDomain -Current LocalComputer).DistinguishedName)"
+        }
+        elseif ($gpoName.StartsWith("Workstations")) {
+            New-GPLink -Name $gpoName -Target "OU=Workstations,$((Get-ADDomain -Current LocalComputer).DistinguishedName)"
+        }
+        elseif ($gpoName.StartsWith("Databases")) {
+            New-GPLink -Name $gpoName -Target "OU=Databases,$((Get-ADDomain -Current LocalComputer).DistinguishedName)"
+        }
+        elseif ($gpoName.StartsWith("DC")) {
+            New-GPLink -Name $gpoName -Target "OU=Domain Controllers,$((Get-ADDomain -Current LocalComputer).DistinguishedName)"
+        }
+
+    }
+
+    Get-ADComputer -Filter * | Invoke-GPUpdate
+
+    $confirmation = Prompt-Yes-No -Message "Apply Default Block gpo? This shouldn't break AD... (y/n)"
+    if ($confirmation.toLower() -eq "y") {
+        New-GPLink -Name "Domain Allow AD + Core + Default Block" -Target "OU=Domain Controllers,$((Get-ADDomain -Current LocalComputer).DistinguishedName)"
+    } else {
+        Write-Host "Skipping..." -ForegroundColor Red
+    }
+    
+
+    
+}
 function Download-Install-Setup-Splunk {
     param([string]$Version, [string]$IP)
 
@@ -1701,8 +1745,10 @@ renderXml=false
     }
 }
 
-function Create-Workstations-OU {
+function Create-OUs {
     New-ADOrganizationalUnit -Name "Workstations"
+    New-ADOrganizationalUnit -Name "Web Servers"
+    New-ADOrganizationalUnit -Name "Databases"
 }
 
 Function Enable-Disable-RDP {
@@ -1853,6 +1899,14 @@ if ($confirmation.toLower() -eq "y") {
     Write-Host "Skipping..." -ForegroundColor Red
 }
 
+$confirmation = Prompt-Yes-No -Message "Enter the 'Import Firewall GPOs' function? (y/n)"
+if ($confirmation.toLower() -eq "y") {
+    Write-Host "`n***Import Firewall GPOs***" -ForegroundColor Magenta
+    Import-Firewall-GPOs
+} else {
+    Write-Host "Skipping..." -ForegroundColor Red
+}
+
 
 # Configure Auditing
 $confirmation = Prompt-Yes-No -Message "Enable Advanced Auditing and Firewall Logging? (y/n)"
@@ -1863,16 +1917,16 @@ if ($confirmation.toLower() -eq "y") {
 }
 
 # Create Workstations OU (gives you something to do while splunk is installing)
-$confirmation = Prompt-Yes-No -Message "Create Workstations OU? (y/n)"
+$confirmation = Prompt-Yes-No -Message "Create OUs? (y/n)"
 if ($confirmation.toLower() -eq "y") {
     try {
-        Write-Host "***Creating Workstations OU***" -ForegroundColor Magenta
+        Write-Host "***Creating OUs***" -ForegroundColor Magenta
         Create-Workstations-OU
-        Update-Log "Create Workstations OU" "Executed successfully"
+        Update-Log "Create OUs" "Executed successfully"
     } catch {
         Write-Host $_.Exception.Message -ForegroundColor Yellow
         Write-Host "Error Occurred..."
-        Update-Log "Create Workstations OU" "Failed with error: $($_.Exception.Message)"
+        Update-Log "Create OUs" "Failed with error: $($_.Exception.Message)"
     }
 } else {
     Write-Host "Skipping..." -ForegroundColor Red
