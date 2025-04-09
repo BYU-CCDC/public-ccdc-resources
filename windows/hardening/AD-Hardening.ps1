@@ -1359,7 +1359,7 @@ function Import-Firewall-GPOs {
 
     $confirmation = Prompt-Yes-No -Message "Apply Default Block gpo? This shouldn't break AD... (y/n)"
     if ($confirmation.toLower() -eq "y") {
-        New-GPLink -Name "Domain Allow AD + Core + Default Block" -Target "OU=Domain Controllers,$((Get-ADDomain -Current LocalComputer).DistinguishedName)"
+        New-GPLink -Name "Domain Allow AD + Core + Default Block" -Target "$((Get-ADDomain -Current LocalComputer).DistinguishedName)"
     } else {
         Write-Host "Skipping..." -ForegroundColor Red
     }
@@ -1899,6 +1899,22 @@ if ($confirmation.toLower() -eq "y") {
     Write-Host "Skipping..." -ForegroundColor Red
 }
 
+# Create Workstations OU (gives you something to do while splunk is installing)
+$confirmation = Prompt-Yes-No -Message "Create OUs? (y/n)"
+if ($confirmation.toLower() -eq "y") {
+    try {
+        Write-Host "***Creating OUs***" -ForegroundColor Magenta
+        Create-OUs
+        Update-Log "Create OUs" "Executed successfully"
+    } catch {
+        Write-Host $_.Exception.Message -ForegroundColor Yellow
+        Write-Host "Error Occurred..."
+        Update-Log "Create OUs" "Failed with error: $($_.Exception.Message)"
+    }
+} else {
+    Write-Host "Skipping..." -ForegroundColor Red
+}
+
 $confirmation = Prompt-Yes-No -Message "Enter the 'Import Firewall GPOs' function? (y/n)"
 if ($confirmation.toLower() -eq "y") {
     Write-Host "`n***Import Firewall GPOs***" -ForegroundColor Magenta
@@ -1916,21 +1932,6 @@ if ($confirmation.toLower() -eq "y") {
     Write-Host "Skipping..." -ForegroundColor Red
 }
 
-# Create Workstations OU (gives you something to do while splunk is installing)
-$confirmation = Prompt-Yes-No -Message "Create OUs? (y/n)"
-if ($confirmation.toLower() -eq "y") {
-    try {
-        Write-Host "***Creating OUs***" -ForegroundColor Magenta
-        Create-Workstations-OU
-        Update-Log "Create OUs" "Executed successfully"
-    } catch {
-        Write-Host $_.Exception.Message -ForegroundColor Yellow
-        Write-Host "Error Occurred..."
-        Update-Log "Create OUs" "Failed with error: $($_.Exception.Message)"
-    }
-} else {
-    Write-Host "Skipping..." -ForegroundColor Red
-}
 
 Write-Host "It is adviseable to configure other desired gpo attributes while the next steps are running."
 Write-Host @"
@@ -1941,6 +1942,7 @@ Consider, after starting the splunk install:
     -Adding Workstation Admins to workstation Administrators groups
     -Moving workstations into the Workstations OU
     -Applying group policy changes
+Remember to check back periodically to type in credentials as needed
 "@
 
 # Configure Splunk
