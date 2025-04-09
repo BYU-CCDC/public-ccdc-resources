@@ -1340,7 +1340,7 @@ function Import-Firewall-GPOs {
         if ($gpoName.StartsWith("Domain") -and -not $gpoName -like "*Block*") {
             New-GPLink -Name $gpoName -Target (Get-ADDomain -Current LocalComputer).DistinguishedName
         } 
-        elseif ($gpoNaem.StartsWith("Web Servers")) {
+        elseif ($gpoName.StartsWith("Web Servers")) {
             New-GPLink -Name $gpoName -Target "OU=Web Servers,$((Get-ADDomain -Current LocalComputer).DistinguishedName)"
         }
         elseif ($gpoName.StartsWith("Workstations")) {
