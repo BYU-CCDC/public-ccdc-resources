@@ -1337,7 +1337,7 @@ function Import-Firewall-GPOs {
 
         Import-GPO -path "$pwd/gpos" -BackupId $_.name -targetName $gpoName
 
-        if ($gpoName.StartsWith("Domain") -and -not $gpoName -like "*Block*") {
+        if (($gpoName.StartsWith("Domain")) -and ($gpoName -notlike "*Block*")) {
             New-GPLink -Name $gpoName -Target (Get-ADDomain -Current LocalComputer).DistinguishedName
         } 
         elseif ($gpoName.StartsWith("Web Servers")) {
