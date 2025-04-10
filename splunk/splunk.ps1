@@ -81,6 +81,11 @@ function download {
     } else {
         $wc = New-Object net.webclient
         $wc.Downloadfile($url, $path)
+
+        if (-not $?) {
+            error "Download failed; trying with wget"
+            wget $url -OutFile $path
+        }
     }
 }
 
@@ -231,11 +236,11 @@ function install_add_ons {
 function install_ossec {
     # Install OSSEC
     download $OSSEC_DOWNLOAD "ossec-agent.exe"
-    Start-Process -FilePath "ossec-agent.exe"
+    Start-Process -FilePath ".\ossec-agent.exe" -Wait
 
     # Install configuration file
     Move-Item -Path "$OSSECDIR\ossec.conf" "$OSSECDIR\ossec.conf.bak" -Force
-    download "$GITHUB_URL/ossec/windows/ossec-agent-local.conf" "ossec-agent.conf"
+    download "$GITHUB_URL/splunk/windows/ossec-agent-local.conf" "ossec-agent.conf"
     (Get-Content "ossec-agent.conf") -replace "{SERVER_IP}", $ip | Set-Content "ossec-agent.conf"
     Move-Item -Path "ossec-agent.conf" -Destination "$OSSECDIR\ossec.conf" -Force
 
@@ -290,6 +295,9 @@ if ($version -eq "7" -or $version -eq "8") {
 
 print "Adding web logs..."
 add_monitor "C:\inetpub\logs\LogFiles\" "web"
+
+print "Installing OSSEC..."
+install_ossec
 
 print "End of script"
 #####################################################
