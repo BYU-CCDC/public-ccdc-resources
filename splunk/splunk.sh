@@ -50,6 +50,11 @@ arm_tgz="https://download.splunk.com/products/universalforwarder/releases/9.2.5/
 old_deb="https://download.splunk.com/products/universalforwarder/releases/9.0.9/linux/splunkforwarder-9.0.9-6315942c563f-linux-2.6-amd64.deb"
 old_rpm="https://download.splunk.com/products/universalforwarder/releases/9.0.9/linux/splunkforwarder-9.0.9-6315942c563f.x86_64.rpm"
 old_tgz="https://download.splunk.com/products/universalforwarder/releases/9.0.9/linux/splunkforwarder-9.0.9-6315942c563f-Linux-x86_64.tgz"
+
+AUDITD_SUCCESSFUL=false
+SNOOPY_SUCCESSFUL=false
+SYSMON_SUCCESSFUL=false
+OSSEC_SUCCESSFUL=false
 #####################################################
 
 ##################### FUNCTIONS #####################
@@ -198,6 +203,18 @@ function install_dependencies {
         else
             sudo "$PM" install -y rpm
         fi
+
+        syslog_installed=false
+        for f in /var/log/syslog /var/log/auth.log /var/log/secure /var/log/auth.log; do
+            if sudo test -e "$f"; then
+                syslog_installed=true
+                break
+            fi
+        done
+
+        if ! $syslog_installed; then
+            sudo "$PM" install -y rsyslog
+        fi
     fi
 
     if ! command -v wget &>/dev/null; then
@@ -213,6 +230,11 @@ function install_dependencies {
 
     if ! command -v setfacl &>/dev/null; then
         error "Please install acl before using this script"
+        exit 1
+    fi
+
+    if ! command -v unzip &>/dev/null; then
+        error "Please install unzip before using this script"
         exit 1
     fi
 }
@@ -384,6 +406,7 @@ function create_splunk_user {
     fi
 
     # Allow package verification
+    info "Giving splunk user limited sudo privileges for package verification"
     if sudo [ -e /etc/sudoers.d ]; then
         SUDOERS_FILE="/etc/sudoers.d/splunk"
         if [[ "$PM" == "apt-get" ]]; then
@@ -440,7 +463,8 @@ function create_splunk_user {
     fi
     # Set ACL to allow splunk to read any log files (execute needed for directories)
     info "Giving splunk user access to /var/log/"
-    sudo setfacl -R -m u:splunk:rx /var/log/
+    sudo setfacl -Rm g:splunk:rx /var/log/
+    sudo setfacl -Rdm g:splunk:rx /var/log/
 
     # chown splunk installation directory
     sudo chown -R splunk:splunk $SPLUNK_HOME
@@ -903,7 +927,10 @@ function install_auditd {
 
     # Install auditd
     info "Installing auditd package"
-    sudo $pm install -y auditd
+    sudo $PM install -y auditd
+    if $? -ne 0; then
+        sudo $PM install -y audit
+    fi
     if command -v systemctl &> /dev/null; then
         sudo systemctl enable auditd
         sudo systemctl start auditd
@@ -943,9 +970,11 @@ function install_auditd {
     info "Applied rules:"
     sudo auditctl -l
 
-    sudo setfacl -R -m u:splunk:rx /var/log/audit
+    sudo setfacl -Rm g:splunk:rx /var/log/audit/
+    sudo setfacl -Rdm g:splunk:rx /var/log/audit/
     # TODO: add check for successful Splunk login to all Splunk commands
     add_monitor "/var/log/audit/audit.log" "system"
+    AUDITD_SUCCESSFUL=true
 }
 
 function install_snoopy {
@@ -987,7 +1016,8 @@ function install_snoopy {
             # Unfortunately required by snoopy in order to use a log file other than syslog/messages
             SNOOPY_LOG='/var/log/snoopy.log'
             sudo chmod 622 $SNOOPY_LOG
-            sudo setfacl -m u:splunk:rx /var/log/snoopy.log
+            sudo setfacl -m g:splunk:r /var/log/snoopy.log
+            sudo setfacl -dm g:splunk:r /var/log/snoopy.log
             echo "filter_chain = \"exclude_spawns_of:splunkd,btool\"" | sudo tee -a $SNOOPY_CONFIG
             echo "output = file:$SNOOPY_LOG" | sudo tee -a $SNOOPY_CONFIG
             echo
@@ -1003,6 +1033,7 @@ function install_snoopy {
         info "Snoopy installed successfully."
         info "NOTE: Unless you restart the server, Snoopy may not pick up on commands from existing processes."
         # see https://github.com/a2o/snoopy/issues/212
+        SNOOPY_SUCCESSFUL=true
         return 0
     fi
 }
@@ -1021,8 +1052,10 @@ function install_sysmon {
     if [[ $? -eq 0 ]]; then
         info "Sysmon installed successfully"
         install_sysmon_add_on
+        SYSMON_SUCCESSFUL=true
     else
         error "Sysmon installation failed"
+        return 1
     fi
 }
 
@@ -1050,14 +1083,15 @@ function install_ossec {
         info "OSSEC installed successfully"
         OSSEC_DIR="/var/ossec"
         if [[ "$INDEXER" == true ]]; then
-            sudo setfacl -m u:splunk:rx $OSSEC_DIR
-            sudo setfacl -R -m u:splunk:rx $OSSEC_DIR/logs/
+            sudo setfacl -Rm g:splunk:rx $OSSEC_DIR/logs/
+            sudo setfacl -Rdm g:splunk:rx $OSSEC_DIR/logs/
             add_monitor "$OSSEC_DIR/logs/ossec.log" "ossec" "ossec_log"
             add_monitor "$OSSEC_DIR/logs/alerts/alerts.log" "ossec" "ossec_alert"
             add_monitor "$OSSEC_DIR/logs/firewall/firewall.log" "ossec" "ossec_firewall"
         fi
     else
         error "OSSEC installation failed"
+        return 1
     fi
 }
 #####################################################
@@ -1125,6 +1159,12 @@ function main {
     # info "Add future additional scripted inputs with 'sudo -H -u splunk $SPLUNK_HOME/bin/splunk add exec $SPLUNK_HOME/etc/apps/ccdc-add-on/bin/<SCRIPT> -interval <SECONDS> -index <INDEX>'"
     echo
     info "A debug log is located at $DEBUG_LOG"
+    echo
+    echo "Summary of installation:"
+    echo "   Auditd successful? $AUDITD_SUCCESSFUL"
+    echo "   Snoopy successful? $SNOOPY_SUCCESSFUL"
+    echo "   Sysmon successful? $SYSMON_SUCCESSFUL"
+    echo "   OSSEC successful? $OSSEC_SUCCESSFUL"
     echo
 }
 
