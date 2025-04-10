@@ -10,6 +10,8 @@ $patchURLFile = "patchURLs.json"
 $groupManagementFile = "groupManagement.ps1"
 $mainFunctionsFile = "mainFunctionsList.txt"
 $splunkFile = "../../splunk/splunk.ps1"
+$localHardeningFile = "Local-Hardening.ps1"
+$wwHardeningFile = "ww-hardening.ps1"
 
 # Backup existing firewall rules
 netsh advfirewall export ./firewallbackup.wfw
@@ -34,7 +36,7 @@ netsh advfirewall firewall add rule name="TCP Outbound SMB" dir=out action=block
 netsh advfirewall firewall add rule name="UDP Outbound SMB" dir=out action=block protocol=UDP localport=445
 
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-$neededFiles = @($portsFile, $advancedAuditingFile, $patchURLFile, $groupManagementFile, $mainFunctionsFile, $splunkFile)
+$neededFiles = @($portsFile, $advancedAuditingFile, $patchURLFile, $groupManagementFile, $mainFunctionsFile, $splunkFile, $localHardeningFile, $wwHardeningFile)
 foreach ($file in $neededFiles) {
     $filename = $(Split-Path -Path $file -Leaf)
     try {
@@ -50,6 +52,11 @@ foreach ($file in $neededFiles) {
 }
 
 Write-Host "All necessary files have been downloaded." -ForegroundColor Green
+
+# Copy local hardening script to sysvol so local hardening can start ASAP without pulling down the script on each machine
+$domainDN = (Get-ADDomain).DistinguishedName
+cp "./$localHardeningFile" "\\$domainDN\sysvol\$domainDN\$localHardeningFile"
+cp "./$wwHardeningFile" "\\$domainDN\sysvol\$domainDN\$wwHardeningFile"
 
 function GetCompetitionUsers {
     try {
@@ -1315,15 +1322,15 @@ function Configure-Secure-GPO {
             Write-Host "All configurations applied successfully." -ForegroundColor Green
         }
 
-		Write-Host "Applying gpupdate across all machines on the domain" -ForegroundColor Magenta
-        Global-Gpupdate
+		#Write-Host "Applying gpupdate across all machines on the domain" -ForegroundColor Magenta
+        #Global-Gpupdate
     } catch {
         Write-Host $_.Exception.Message -ForegroundColor Yellow
         Write-Host "Error Occurred..."
     }
 }
 
-function Import-Firewall-GPOs {
+function Import-GPOs {
     Expand-Archive -Path ./gpos.zip
 
     $gpos = Get-ChildItem ./gpos
@@ -1351,6 +1358,9 @@ function Import-Firewall-GPOs {
         }
         elseif ($gpoName.StartsWith("DC")) {
             New-GPLink -Name $gpoName -Target "OU=Domain Controllers,$((Get-ADDomain -Current LocalComputer).DistinguishedName)"
+        }
+        elseif ($gpoName.StartsWith("Mail Servers")) {
+            New-GPLink -Name $gpoName -Target "OU=Mail Servers,$((Get-ADDomain -Current LocalComputer).DistinguishedName)"
         }
 
     }
@@ -1746,10 +1756,11 @@ renderXml=false
 }
 
 function Create-OUs {
-    New-ADOrganizationalUnit -Name "Workstations"
-    New-ADOrganizationalUnit -Name "Web Servers"
-    New-ADOrganizationalUnit -Name "Databases"
-}
+    New-ADOrganizationalUnit -Name "Workstations" -ErrorAction SilentlyContinue
+    New-ADOrganizationalUnit -Name "Web Servers" -ErrorAction SilentlyContinue
+    New-ADOrganizationalUnit -Name "Mail Servers" -ErrorAction SilentlyContinue
+    New-ADOrganizationalUnit -Name "Databases" -ErrorAction SilentlyContinue
+} 
 
 Function Enable-Disable-RDP {
     
@@ -1915,10 +1926,10 @@ if ($confirmation.toLower() -eq "y") {
     Write-Host "Skipping..." -ForegroundColor Red
 }
 
-$confirmation = Prompt-Yes-No -Message "Enter the 'Import Firewall GPOs' function? (y/n)"
+$confirmation = Prompt-Yes-No -Message "Enter the 'Import GPOs' function? (y/n)"
 if ($confirmation.toLower() -eq "y") {
-    Write-Host "`n***Import Firewall GPOs***" -ForegroundColor Magenta
-    Import-Firewall-GPOs
+    Write-Host "`n***Import GPOs***" -ForegroundColor Magenta
+    Import-GPOs
 } else {
     Write-Host "Skipping..." -ForegroundColor Red
 }
