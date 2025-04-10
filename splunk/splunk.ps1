@@ -14,6 +14,9 @@ param (
     [string]$url = "",
 
     [Parameter(Mandatory=$false)]
+    [string]$local = "",
+
+    [Parameter(Mandatory=$false)]
     [int]$arch = 64
     # pass 64 (bit) for x64, 32 (bit) for x86
 )
@@ -25,15 +28,26 @@ if ($url -ne "") {
 } else {
     $GITHUB_URL = "https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main"
 }
+
+if ($local -ne "") {
+    $LOCAL_INSTALL = $true
+    $GITHUB_URL = (Resolve-Path "$local").Path.TrimEnd('\')
+} else {
+    $LOCAL_INSTALL = $false
+}
+
 $SPLUNKDIR = ""
-$9_2_4_x64 = "https://download.splunk.com/products/universalforwarder/releases/9.2.4/windows/splunkforwarder-9.2.4-c103a21bb11d-x64-release.msi"
-$9_2_4_x86 = "https://download.splunk.com/products/universalforwarder/releases/9.2.4/windows/splunkforwarder-9.2.4-c103a21bb11d-x86-release.msi"
+$9_2_5_x64 = "https://download.splunk.com/products/universalforwarder/releases/9.2.5/windows/splunkforwarder-9.2.5-7bfc9a4ed6ba-x64-release.msi"
+$9_2_5_x86 = "https://download.splunk.com/products/universalforwarder/releases/9.2.5/windows/splunkforwarder-9.2.5-7bfc9a4ed6ba-x86-release.msi"
 $9_1_6_x64 = "https://download.splunk.com/products/universalforwarder/releases/9.1.6/windows/splunkforwarder-9.1.6-a28f08fac354-x64-release.msi"
 $9_1_6_x86 = "https://download.splunk.com/products/universalforwarder/releases/9.1.6/windows/splunkforwarder-9.1.6-a28f08fac354-x86-release.msi"
 $7_3_9_x64 = "https://download.splunk.com/products/universalforwarder/releases/7.3.9/windows/splunkforwarder-7.3.9-39a78bf1bc5b-x64-release.msi"
 $7_3_9_x86 = "https://download.splunk.com/products/universalforwarder/releases/7.3.9/windows/splunkforwarder-7.3.9-39a78bf1bc5b-x86-release.msi"
-$newest_x64 = $9_2_4_x64
-$newest_x86 = $9_2_4_x86
+$newest_x64 = $9_2_5_x64
+$newest_x86 = $9_2_5_x86
+
+$OSSECDIR="C:\Program Files (x86)\ossec-agent"
+$OSSEC_DOWNLOAD = "https://updates.atomicorp.com/channels/atomic/windows/ossec-agent-win32-3.8.0-35114.exe"
 #####################################################
 
 ##################### FUNCTIONS #####################
@@ -62,8 +76,12 @@ function download {
         Remove-Item $path -Force
     }
 
-    $wc = New-Object net.webclient
-    $wc.Downloadfile($url, $path)
+    if ($LOCAL_INSTALL -and $url.StartsWith($GITHUB_URL)) {
+        Copy-Item -Path $url -Destination $path -Force
+    } else {
+        $wc = New-Object net.webclient
+        $wc.Downloadfile($url, $path)
+    }
 }
 
 function detect_version {
@@ -208,6 +226,26 @@ function install_sysmon_ta {
 function install_add_ons {
     install_windows_ta
     install_sysmon_ta
+}
+
+function install_ossec {
+    # Install OSSEC
+    download $OSSEC_DOWNLOAD "ossec-agent.exe"
+    Start-Process -FilePath "ossec-agent.exe"
+
+    # Install configuration file
+    Move-Item -Path "$OSSECDIR\ossec.conf" "$OSSECDIR\ossec.conf.bak" -Force
+    download "$GITHUB_URL/ossec/windows/ossec-agent-local.conf" "ossec-agent.conf"
+    (Get-Content "ossec-agent.conf") -replace "{SERVER_IP}", $ip | Set-Content "ossec-agent.conf"
+    Move-Item -Path "ossec-agent.conf" -Destination "$OSSECDIR\ossec.conf" -Force
+
+    # Register and start agent
+    & "$OSSECDIR\agent-auth.exe" -m $ip -p 1515
+    & "$OSSECDIR\ossec-agent.exe" install-service
+    Start-Service -Name OssecSvc
+    Get-Service -Name OssecSvc
+
+    print "OSSEC installed"
 }
 #####################################################
 
