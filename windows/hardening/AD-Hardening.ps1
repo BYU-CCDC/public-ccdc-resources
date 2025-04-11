@@ -1898,7 +1898,7 @@ if ($confirmation.toLower() -eq "y") {
 }
 
 # Change DA Passwords
-$confirmation = Prompt-Yes-No -Message "Change DA passwords?"
+$confirmation = Prompt-Yes-No -Message "Change DA passwords? (y/n)"
 if ($confirmation.toLower() -eq "y") {
     Change-DA-Passwords
     Write-Host "All DA passwords changed" -ForegroundColor Red
@@ -1907,7 +1907,7 @@ if ($confirmation.toLower() -eq "y") {
 }
 
 # Change normal User Passwords
-$confirmation = Prompt-Yes-No -Message "Change non-DA passwords?"
+$confirmation = Prompt-Yes-No -Message "Change non-DA passwords? (y/n)"
 if ($confirmation.toLower() -eq "y") {
     Change-User-Passwords
     Write-Host "All non-DA passwords changed" -ForegroundColor Red
