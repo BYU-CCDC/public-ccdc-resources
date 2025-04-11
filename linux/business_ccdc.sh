@@ -3462,17 +3462,17 @@ function main {
     echo "[*] Start of full hardening process"
     detect_system_info
     install_prereqs
-    kill_other_sessions
+    #kill_other_sessions
     create_ccdc_users
-    change_passwords
-    kill_other_sessions
-    disable_users
+    #change_passwords
+    #kill_other_sessions
+    #disable_users
     remove_sudoers
     audit_running_services
-    kill_other_sessions
+    #kill_other_sessions
     disable_other_firewalls
     firewall_configuration_menu
-    kill_other_sessions
+    #kill_other_sessions
     if [ "$ANSIBLE" != "true" ]; then
          backups
     else
@@ -3486,15 +3486,15 @@ function main {
     secure_ssh
     remove_profiles
     fix_pam
-    kill_other_sessions
+    #kill_other_sessions
     search_ssn
     remove_unused_packages
     patch_vulnerabilities
-    kill_other_sessions
+    #kill_other_sessions
     check_permissions
     sysctl_config
     configure_login_banner
-    kill_other_sessions
+    #kill_other_sessions
     defend_against_forkbomb
 
     # Disable phpMyAdmin by default for both Ansible and non-interactive execution.
@@ -3516,7 +3516,7 @@ function main {
     fi
     run_rkhunter
     check_service_integrity
-    kill_other_sessions
+    #kill_other_sessions
     echo "[*] End of full hardening process"
     echo "[*] Script log can be viewed at $LOG"
     echo "[*][WARNING] FORWARD chain is set to DROP. If this box is a router or network device, please run 'sudo iptables -P FORWARD ALLOW'."
