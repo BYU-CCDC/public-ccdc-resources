@@ -1365,6 +1365,8 @@ function Import-GPOs {
 
     }
 
+    #try two ways to force gpupdates
+    Global-Gpupdate
     Get-ADComputer -Filter * | Invoke-GPUpdate
 
     $confirmation = Prompt-Yes-No -Message "Apply Default Block gpo? This shouldn't break AD... (y/n)"
