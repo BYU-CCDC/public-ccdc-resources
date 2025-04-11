@@ -39,6 +39,8 @@ iptables -A OUTPUT -p icmp --icmp-type echo-reply -j ACCEPT
 echo 'Splunk indexer IP: '
 read SPLUNK_IP
 iptables -A OUTPUT -d $SPLUNK_IP -p tcp --dport 9997 -j ACCEPT
+iptables -A OUTPUT -d $SPLUNK_IP -p udp --dport 1514 -j ACCEPT
+iptables -A OUTPUT -d $SPLUNK_IP -p udp --dport 1515 -j ACCEPT
 
 if [ -n "$SSH_CLIENT" ]; then
     echo 'SSH Detected. Whitelist client? (Y/n)'
