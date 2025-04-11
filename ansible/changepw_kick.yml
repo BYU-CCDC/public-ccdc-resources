@@ -1,0 +1,40 @@
+---
+- name: Create ccdcuser1/ccdcuser2, reset all user passwords, and terminate sessions
+  hosts: all
+  become: yes
+
+  vars_prompt:
+    - name: "temp_password"
+      prompt: "Enter the temporary password for all users:"
+      private: yes  # ensures it isn't displayed on screen
+
+  tasks:
+    - name: Create ccdcuser1 with the provided password
+      user:
+        name: "ccdcuser1"
+        password: "{{ temp_password | password_hash('sha512') }}"
+        groups: "wheel"      # or "sudo" on Debian/Ubuntu
+        append: yes
+        state: present
+
+    - name: Create ccdcuser2 with the provided password
+      user:
+        name: "ccdcuser2"
+        password: "{{ temp_password | password_hash('sha512') }}"
+        state: present
+
+    - name: Gather non-system users
+      shell: "awk -F: '$3 >= 1000 && $3 < 65534 && $7 !~ /nologin|false/ {print $1}' /etc/passwd"
+      register: valid_users
+
+    - name: Reset password for each valid user
+      user:
+        name: "{{ item }}"
+        password: "{{ temp_password | password_hash('sha512') }}"
+        update_password: always
+      loop: "{{ valid_users.stdout_lines }}"
+
+    - name: Kill all sessions for these users
+      shell: "pkill -KILL -u {{ item }}"
+      ignore_errors: true   # skip errors if user isn't logged in
+      loop: "{{ valid_users.stdout_lines }}"
