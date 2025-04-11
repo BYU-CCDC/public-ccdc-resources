@@ -1781,7 +1781,7 @@ function Change-DA-Passwords {
                 #Get-ADGroup -Filter 'name -like "Domain Admins"' | Get-ADGroupMember | Where-Object objectClass -eq User | Set-ADAccountPassword -Reset -NewPassword $pw
                 Get-ADGroup -Filter 'name -like "Domain Admins"' | Get-ADGroupMember | Where-Object objectClass -eq User | Foreach-object {
                     write-host "$pw$($_.name)"
-                    $newpw = "$pw$($_.name)" | Get-FileHash -Algorithm SHA256 
+                    $newpw = Get-FileHash -Algorithm SHA256 -InputStream [IO.MemoryStream]::new([byte[]][char[]]"$pw$($_.name)") 
                     write-host $newpw.Substring(0,12)
                     $_ | Set-ADAccountPassword -Reset -NewPassword (ConvertTo-SecureString -AsPlainText -String $newpw.Substring(0,12) -Force)
                 }
@@ -1818,7 +1818,7 @@ function Change-User-Passwords {
                 #Get-ADGroup -Filter 'name -notlike "Domain Admins"' | Get-ADGroupMember | Where-Object objectClass -eq User | Set-ADAccountPassword -Reset -NewPassword $pw
                 Get-ADGroup -Filter 'name -notlike "Domain Admins"' | Get-ADGroupMember | Where-Object objectClass -eq User | Foreach-object {
                     write-host "$pw$($_.name)"
-                    $newpw = "$pw$($_.name)" | Get-FileHash -Algorithm SHA256 
+                    $newpw = Get-FileHash -Algorithm SHA256 -InputStream [IO.MemoryStream]::new([byte[]][char[]]"$pw$($_.name)") 
                     write-host $newpw.Substring(0,12)
                     $_ | Set-ADAccountPassword -Reset -NewPassword (ConvertTo-SecureString -AsPlainText -String $newpw.Substring(0,12) -Force)
                 }
