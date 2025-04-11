@@ -147,6 +147,14 @@ function setup_ossec_server {
     sudo chown root:ossec $SERVER_CONF
     sudo chmod 660 $SERVER_CONF
 
+    info "Downloading local rules configuration..."
+    LOCAL_RULES="$OSSEC_DIR/rules/local_rules.xml"
+    sudo rm $LOCAL_RULES
+    download $GITHUB_URL/splunk/local_rules.xml ./local_rules.xml
+    sudo mv local_rules.xml $LOCAL_RULES
+    sudo chown root:ossec $LOCAL_RULES
+    sudo chmod 660 $LOCAL_RULES
+
     # Download custom shared client config
     info "Downloading custom shared OSSEC client configuration..."
     SHARED_CONF="$OSSEC_DIR/etc/shared/agent.conf"
