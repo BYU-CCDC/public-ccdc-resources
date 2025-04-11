@@ -1762,6 +1762,69 @@ function Create-OUs {
     New-ADOrganizationalUnit -Name "Databases" -ErrorAction SilentlyContinue
 } 
 
+function Change-DA-Passwords {
+    while ($true) {
+        try {
+            $pw = Read-Host -AsSecureString -Prompt "New password for Domain Admins:"
+            $conf = Read-Host -AsSecureString -Prompt "Confirm password for Domain Admins:"
+
+            # Convert SecureString to plain text
+            $pwPlainText = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($pw))
+            $confPlainText = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($conf))
+            if ($pwPlainText -eq $confPlainText -and $pwPlainText -ne "") {
+                Get-ADGroup -Filter 'name -like "Domain Admins"' | Get-ADGroupMember | Set-ADAccountPassword -Reset -NewPassword $pw
+                Write-Host "Success!!`n"
+
+                # Clear the plaintext passwords from memory
+                $pwPlainText = $null
+                $confPlainText = $null
+
+                # Optionally, force a garbage collection to reclaim memory (though this is not immediate)
+                [System.GC]::Collect()
+                $pw.Dispose()
+                $conf.Dispose()
+                break
+            } else {
+                Write-Host "Either the passwords didn't match, or you typed nothing" -ForegroundColor Yellow
+            } 
+        } catch {
+            Write-Host $_.Exception.Message "`n"
+            Write-Host "There was an error with your password submission. Try again...`n" -ForegroundColor Yellow
+        }
+    }
+}
+function Change-User-Passwords {
+    while ($true) {
+        try {
+            $pw = Read-Host -AsSecureString -Prompt "New password for non-Domain Admins:"
+            $conf = Read-Host -AsSecureString -Prompt "Confirm password for non-Domain Admins:"
+
+            # Convert SecureString to plain text
+            $pwPlainText = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($pw))
+            $confPlainText = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($conf))
+            if ($pwPlainText -eq $confPlainText -and $pwPlainText -ne "") {
+                Get-ADGroup -Filter 'name -notlike "Domain Admins"' | Get-ADGroupMember | Set-ADAccountPassword -Reset -NewPassword $pw
+                Write-Host "Success!!`n"
+
+                # Clear the plaintext passwords from memory
+                $pwPlainText = $null
+                $confPlainText = $null
+
+                # Optionally, force a garbage collection to reclaim memory (though this is not immediate)
+                [System.GC]::Collect()
+                $pw.Dispose()
+                $conf.Dispose()
+                break
+            } else {
+                Write-Host "Either the passwords didn't match, or you typed nothing" -ForegroundColor Yellow
+            } 
+        } catch {
+            Write-Host $_.Exception.Message "`n"
+            Write-Host "There was an error with your password submission. Try again...`n" -ForegroundColor Yellow
+        }
+    }
+}
+
 Function Enable-Disable-RDP {
     
     $confirmation = Prompt-Yes-No -Message "Should RDP be enabled?"
@@ -1832,6 +1895,23 @@ if ($confirmation.toLower() -eq "y") {
     Write-Host "Skipping..." -ForegroundColor Red
 }
 
+# Change DA Passwords
+$confirmation = Prompt-Yes-No -Message "Change DA passwords?"
+if ($confirmation.toLower() -eq "y") {
+    Change-DA-Passwords
+    Write-Host "All DA passwords changed" -ForegroundColor Red
+} else {
+    Write-Host "Skipping..." -ForegroundColor Red
+}
+
+# Change normal User Passwords
+$confirmation = Prompt-Yes-No -Message "Change non-DA passwords?"
+if ($confirmation.toLower() -eq "y") {
+    Change-User-Passwords
+    Write-Host "All non-DA passwords changed" -ForegroundColor Red
+} else {
+    Write-Host "Skipping..." -ForegroundColor Red
+}
 
 # Mass Disable Users
 $confirmation = Prompt-Yes-No -Message "Disable every user but your own? (y/n)"
