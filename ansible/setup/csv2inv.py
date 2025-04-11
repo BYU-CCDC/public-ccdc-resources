@@ -5,26 +5,19 @@ import sys
 
 def csv_to_ansible_inventory(csv_file_path, ini_file_path):
     """
-    Reads a CSV file with rows like 'ip|username|password' and writes
-    out a hosts.ini file where each IP is its own section.
-    Variables are placed on separate lines for easy updates.
+    Reads a CSV file with rows like:
+      ip|username|password
+    And writes out a single-line format for each host, e.g.:
+      192.168.4.90 ansible_user=sysadmin ansible_password=password2 ansible_become_password=password2
     """
     with open(csv_file_path, 'r', newline='') as csvfile, open(ini_file_path, 'w') as inifile:
         reader = csv.reader(csvfile, delimiter=',')
-
-        # For each row in the CSV, output an INI section
         for row in reader:
-            if not row or len(row) < 3:
-                continue
+            if len(row) < 3:
+                continue  # Skip any malformed lines
 
             ip, uname, pw = row[0].strip(), row[1].strip(), row[2].strip()
-
-            # A bracketed section named after the IP
-            inifile.write(f"[{ip}]\n")
-            inifile.write(f"ansible_host={ip}\n")
-            inifile.write(f"ansible_user={uname}\n")
-            inifile.write(f"ansible_password={pw}\n")
-            inifile.write(f"ansible_become_password={pw}\n\n")
+            inifile.write(f"{ip} ansible_user={uname} ansible_password={pw} ansible_become_password={pw}\n")
 
 def main():
     if len(sys.argv) != 3:
