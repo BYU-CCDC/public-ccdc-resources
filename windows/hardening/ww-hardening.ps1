@@ -197,7 +197,7 @@ Write-Output "===================================="
 $OSInfo = Get-CimInstance -ClassName Win32_OperatingSystem
 try {
     $Domain = (Get-ADDomain -ErrorAction Stop).DNSRoot
-    $DC = (Get-CimInstance -Class Win32_OperatingSystem -Filter 'ProductType = "2"') ? $true : $false
+    $DC = if (Get-CimInstance -Class Win32_OperatingSystem -Filter 'ProductType = "2"') { $true } else { $false }
 } catch {
     $Domain = "N/A"
     $DC = $false
