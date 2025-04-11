@@ -1772,7 +1772,7 @@ function Change-DA-Passwords {
             $pwPlainText = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($pw))
             $confPlainText = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($conf))
             if ($pwPlainText -eq $confPlainText -and $pwPlainText -ne "") {
-                Get-ADGroup -Filter 'name -like "Domain Admins"' | Get-ADGroupMember | Set-ADAccountPassword -Reset -NewPassword $pw
+                Get-ADGroup -Filter 'name -like "Domain Admins"' | Get-ADGroupMember | Where-Object objectClass -eq User | Set-ADAccountPassword -Reset -NewPassword $pw
                 Write-Host "Success!!`n"
 
                 # Clear the plaintext passwords from memory
@@ -1803,7 +1803,7 @@ function Change-User-Passwords {
             $pwPlainText = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($pw))
             $confPlainText = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($conf))
             if ($pwPlainText -eq $confPlainText -and $pwPlainText -ne "") {
-                Get-ADGroup -Filter 'name -notlike "Domain Admins"' | Get-ADGroupMember | Set-ADAccountPassword -Reset -NewPassword $pw
+                Get-ADGroup -Filter 'name -notlike "Domain Admins"' | Get-ADGroupMember | Where-Object objectType -eq User | Set-ADAccountPassword -Reset -NewPassword $pw
                 Write-Host "Success!!`n"
 
                 # Clear the plaintext passwords from memory
