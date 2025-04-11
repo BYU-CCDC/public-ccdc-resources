@@ -1780,10 +1780,10 @@ function Change-DA-Passwords {
             if ($pwPlainText -eq $confPlainText -and $pwPlainText -ne "") {
                 #Get-ADGroup -Filter 'name -like "Domain Admins"' | Get-ADGroupMember | Where-Object objectClass -eq User | Set-ADAccountPassword -Reset -NewPassword $pw
                 Get-ADGroup -Filter 'name -like "Domain Admins"' | Get-ADGroupMember | Where-Object objectClass -eq User | Foreach-object {
-                    write-host "$pwPlainText$($_.name)"
+                    write-host "$pwPlainText$($_.name)!"
                     $stringAsStream = [System.IO.MemoryStream]::new()
                     $writer = [System.IO.StreamWriter]::new($stringAsStream)
-                    $writer.write("$pwPlainText$($_.name)")
+                    $writer.write("$pwPlainText$($_.name)!")
                     $writer.Flush()
                     $stringAsStream.Position = 0
                     $newpw = (Get-FileHash -Algorithm SHA256 -InputStream $stringAsStream).hash
@@ -1822,11 +1822,11 @@ function Change-User-Passwords {
             if ($pwPlainText -eq $confPlainText -and $pwPlainText -ne "") {
                 #Get-ADGroup -Filter 'name -notlike "Domain Admins"' | Get-ADGroupMember | Where-Object objectClass -eq User | Set-ADAccountPassword -Reset -NewPassword $pw
                 Get-ADGroup -Filter 'name -notlike "Domain Admins"' | Get-ADGroupMember | Where-Object objectClass -eq User | Foreach-object {
-                    write-host "$pwPlainText$($_.name)"
+                    write-host "$pwPlainText$($_.name)!"
                     #$newpw = Get-FileHash -Algorithm SHA256 -InputStream [Text.Encoding]::Utf8.GetBytes("$pwPlainText$($_.name)") 
                     $stringAsStream = [System.IO.MemoryStream]::new()
                     $writer = [System.IO.StreamWriter]::new($stringAsStream)
-                    $writer.write("$pwPlainText$($_.name)")
+                    $writer.write("$pwPlainText$($_.name)!")
                     $writer.Flush()
                     $stringAsStream.Position = 0
                     $newpw = (Get-FileHash -Algorithm SHA256 -InputStream $stringAsStream).hash
