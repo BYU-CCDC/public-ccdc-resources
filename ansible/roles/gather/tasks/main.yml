@@ -1,0 +1,99 @@
+---
+- name: Gather base facts
+  ansible.builtin.setup:
+    gather_subset:
+      - all
+
+- name: Gather user list
+  become: yes
+  ansible.builtin.getent:
+    database: passwd
+  register: user_list
+  changed_when: false
+
+- name: Gather installed packages (generic)
+  ansible.builtin.package_facts:
+    manager: auto
+  register: packages
+  changed_when: false
+  when: ansible_facts['os_family'] in ['RedHat', 'Debian']
+
+- name: Gather extra package details for RPM-based systems (e.g. RedHat/CentOS/Fedora)
+  ansible.builtin.shell: "rpm -qa --queryformat '%{NAME} %{VERSION}-%{RELEASE} %{SIZE} %{SIGMD5}\\n'"
+  register: rpm_package_hashes
+  changed_when: false
+  when: ansible_facts['os_family'] == 'RedHat'
+  ignore_errors: true
+
+- name: Gather extra package details for Debian-based systems (e.g. Ubuntu/Debian)
+  ansible.builtin.shell: "dpkg-query -W -f='${Package} ${Version} ${Installed-Size} ${MD5sum}\\n'"
+  register: deb_package_hashes
+  changed_when: false
+  when: ansible_facts['os_family'] == 'Debian'
+  ignore_errors: true
+
+- name: Gather systemd services (if systemd is present)
+  become: yes
+  community.general.systemd_info:
+    unitname: "*.service"
+  register: systemd_services
+  changed_when: false
+  ignore_errors: true
+
+- name: Gather cron file listings
+  ansible.builtin.shell: "ls -1 /etc/cron.d/ /var/spool/cron/ || true"
+  register: cron_list
+  changed_when: false
+
+- name: Gather SELinux status (typical for RedHat family)
+  ansible.builtin.shell: "getenforce"
+  register: selinux_state
+  changed_when: false
+  ignore_errors: true
+  when: ansible_facts['os_family'] == 'RedHat'
+
+- name: Gather AppArmor status (common on Debian/Ubuntu)
+  ansible.builtin.shell: "aa-status"
+  register: apparmor_state
+  changed_when: false
+  ignore_errors: true
+  when: ansible_facts['os_family'] == 'Debian'
+
+- name: Gather list of files modified in the last 24 hours (example)
+  # This is an illustrative example for searching /var/log.
+  # Adjust 'paths' and 'age' as necessary or pass them in as vars.
+  ansible.builtin.find:
+    paths: "/var/log"
+    file_type: file
+    # '1d' means “files modified less than 1 day ago”.
+    # For more advanced filtering by exact timestamps, you could use 'shell' + 'find ... -newermt'.
+    age: "1d"
+    age_stamp: "mtime"
+  register: recent_files
+  changed_when: false
+  ignore_errors: true
+
+- name: Compile full fact set into a single variable
+  ansible.builtin.set_fact:
+    my_host_facts:
+      hostname: "{{ ansible_facts['hostname'] }}"
+      ip_addresses: "{{ ansible_facts['all_ipv4_addresses'] | default([]) }}"
+      os_distribution: "{{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}"
+      kernel_version: "{{ ansible_facts['kernel'] | default(ansible_facts['ansible_kernel'] | default('N/A')) }}"
+      users_list: "{{ user_list['getent'] | default([]) }}"
+      installed_packages: "{{ packages['packages'] | default({}) }}"
+      rpm_package_hashes: "{{ rpm_package_hashes.stdout_lines | default([]) }}"
+      deb_package_hashes: "{{ deb_package_hashes.stdout_lines | default([]) }}"
+      services: "{{ systemd_services['services'] | default({}) }}"
+      cron_files: "{{ cron_list.stdout_lines | default([]) }}"
+      selinux_enforce_mode: "{{ selinux_state.stdout | default('Not available') }}"
+      apparmor_status: "{{ apparmor_state.stdout | default('Not available') }}"
+      recent_files_modified: "{{ recent_files.files | default([]) }}"
+
+- name: Write facts to file on the controller
+  become: false
+  local_action:
+    module: copy
+    content: "{{ my_host_facts | to_nice_json }}"
+    dest: "./collected_facts_{{ inventory_hostname }}.json"
+  run_once: false

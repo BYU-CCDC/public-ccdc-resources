@@ -147,18 +147,28 @@ function setup_ossec_server {
     sudo chown root:ossec $SERVER_CONF
     sudo chmod 660 $SERVER_CONF
 
+    info "Downloading local rules configuration..."
+    LOCAL_RULES="$OSSEC_DIR/rules/local_rules.xml"
+    sudo rm $LOCAL_RULES
+    download $GITHUB_URL/splunk/local_rules.xml ./local_rules.xml
+    sudo mv local_rules.xml $LOCAL_RULES
+    sudo chown root:ossec $LOCAL_RULES
+    sudo chmod 660 $LOCAL_RULES
+
+    # Actually, this feature is a piece of garbage so don't use it
     # Download custom shared client config
-    info "Downloading custom shared OSSEC client configuration..."
-    SHARED_CONF="$OSSEC_DIR/etc/shared/agent.conf"
-    download $GITHUB_URL/splunk/linux/ossec-agent-shared.conf ./agent.conf
-    sed -i "s/{SERVER_IP}/$IP/" agent.conf
-    sudo mv agent.conf $SHARED_CONF
-    sudo chown root:ossec $SHARED_CONF
-    sudo chmod 660 $SHARED_CONF
+    # info "Downloading custom shared OSSEC client configuration..."
+    # SHARED_CONF="$OSSEC_DIR/etc/shared/agent.conf"
+    # download $GITHUB_URL/splunk/linux/ossec-agent-shared.conf ./agent.conf
+    # sed -i "s/{SERVER_IP}/$IP/" agent.conf
+    # sudo mv agent.conf $SHARED_CONF
+    # sudo chown root:ossec $SHARED_CONF
+    # sudo chmod 660 $SHARED_CONF
 
     # Start OSSEC
     info "Starting OSSEC server..."
-    sudo systemctl start ossec
+    sudo systemctl start ossec || sudo systemctl start ossec-hids
+    sudo systemctl enable ossec || sudo systemctl enable ossec-hids
 
     # Start ossec-authd for automatic agent registration
     sudo $OSSEC_DIR/bin/ossec-authd -p 1515 -n
@@ -215,8 +225,8 @@ function install_ossec {
         # Download custom config
         info "Downloading OSSEC client configuration..."
         CLIENT_CONFIG="$OSSEC_DIR/etc/ossec.conf"
-        # sudo sed -i "s/<server-ip>[\d\.]+</server-ip>/<server-ip>$IP</server-ip>/" $OSSEC_DIR/etc/ossec.conf
-        download $GITHUB_URL/splunk/linux/ossec-agent-local.conf ./ossec-agent.conf
+        # download $GITHUB_URL/splunk/linux/ossec-agent-local.conf ./ossec-agent.conf
+        download $GITHUB_URL/splunk/linux/ossec-agent.conf ./ossec-agent.conf
         # Replace dynamic values
         sed -i "s/{SERVER_IP}/$IP/" ossec-agent.conf
         sudo mv ossec-agent.conf $CLIENT_CONFIG
@@ -228,7 +238,8 @@ function install_ossec {
 
         # Start OSSEC
         info "Starting OSSEC client..."
-        sudo systemctl start ossec-hids
+        sudo systemctl start ossec-hids || sudo systemctl start ossec
+        sudo systemctl enable ossec-hids || sudo systemctl enable ossec
     fi
 }
 

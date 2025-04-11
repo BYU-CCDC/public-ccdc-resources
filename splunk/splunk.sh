@@ -18,7 +18,7 @@
 ###################### GLOBALS ######################
 DEBUG_LOG='/var/log/ccdc/splunk.log'
 GITHUB_URL="https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main"
-INDEXES=( 'system' 'web' 'network' 'windows' 'misc' 'snoopy' )
+INDEXES=( 'system' 'web' 'network' 'windows' 'misc' 'snoopy' 'ossec' )
 PM=""
 IP=""
 INDEXER=false
@@ -50,6 +50,12 @@ arm_tgz="https://download.splunk.com/products/universalforwarder/releases/9.2.5/
 old_deb="https://download.splunk.com/products/universalforwarder/releases/9.0.9/linux/splunkforwarder-9.0.9-6315942c563f-linux-2.6-amd64.deb"
 old_rpm="https://download.splunk.com/products/universalforwarder/releases/9.0.9/linux/splunkforwarder-9.0.9-6315942c563f.x86_64.rpm"
 old_tgz="https://download.splunk.com/products/universalforwarder/releases/9.0.9/linux/splunkforwarder-9.0.9-6315942c563f-Linux-x86_64.tgz"
+
+AUDITD_SUCCESSFUL=false
+SNOOPY_SUCCESSFUL=false
+SYSMON_SUCCESSFUL=false
+OSSEC_SUCCESSFUL=false
+SUCCESSFUL_MONITORS=()
 #####################################################
 
 ##################### FUNCTIONS #####################
@@ -104,11 +110,11 @@ function download {
     fi
     
     # TODO: figure out how to fix the progress bar
-    if ! wget -O "$output" --no-check-certificate "$url"; then
+    if ! wget -O "$output" --no-check-certificate -q --show-progress "$url"; then
         # error "Failed to download with wget. Trying wget with older TLS version..."
         # if ! wget -O "$output" --secure-protocol=TLSv1 --no-check-certificate "$url"; then
             error "Failed to download with wget. Trying with curl..."
-            if ! curl -L -o "$output" -k "$url"; then
+            if ! curl -L -o "$output" -# -k "$url"; then
                 error "Failed to download with curl."
             fi
         # fi
@@ -192,11 +198,23 @@ function install_dependencies {
     if [ "$PM" == "" ]; then
         info "No package manager detected."
     else
-        sudo "$PM" install -y wget curl acl
+        sudo "$PM" install -y wget curl acl unzip
         if [ "$PM" == "apt-get" ]; then
             sudo "$PM" install -y debsums
         else
             sudo "$PM" install -y rpm
+        fi
+
+        syslog_installed=false
+        for f in /var/log/syslog /var/log/auth.log /var/log/secure /var/log/auth.log; do
+            if sudo test -e "$f"; then
+                syslog_installed=true
+                break
+            fi
+        done
+
+        if ! $syslog_installed; then
+            sudo "$PM" install -y rsyslog
         fi
     fi
 
@@ -213,6 +231,11 @@ function install_dependencies {
 
     if ! command -v setfacl &>/dev/null; then
         error "Please install acl before using this script"
+        exit 1
+    fi
+
+    if ! command -v unzip &>/dev/null; then
+        error "Please install unzip before using this script"
         exit 1
     fi
 }
@@ -381,19 +404,21 @@ function create_splunk_user {
     else
         info "Creating splunk user"
         sudo useradd splunk -d $SPLUNK_HOME
-        # Allow package verification
-        if sudo [ -e /etc/sudoers.d ]; then
-            SUDOERS_FILE="/etc/sudoers.d/splunk"
-            if [[ "$PM" == "apt-get" ]]; then
-                echo "splunk ALL=(ALL) NOPASSWD: $(which debsums) -as" | sudo tee "$SUDOERS_FILE" > /dev/null
-            else
-                echo "splunk ALL=(ALL) NOPASSWD: $(which rpm) -Va" | sudo tee "$SUDOERS_FILE" > /dev/null
-            fi
-            sudo chown root:root
-            sudo chmod 440 "$SUDOERS_FILE"
+    fi
+
+    # Allow package verification
+    info "Giving splunk user limited sudo privileges for package verification"
+    if sudo [ -e /etc/sudoers.d ]; then
+        SUDOERS_FILE="/etc/sudoers.d/splunk"
+        if [[ "$PM" == "apt-get" ]]; then
+            echo "splunk ALL=(ALL) NOPASSWD: $(which debsums) -as" | sudo tee "$SUDOERS_FILE" > /dev/null
         else
-            error "Warning: /etc/sudoers.d does not exist. Splunk user will not have the sudo privileges needed for package verification."
+            echo "splunk ALL=(ALL) NOPASSWD: $(which rpm) -Va" | sudo tee "$SUDOERS_FILE" > /dev/null
         fi
+        sudo chown root:root "$SUDOERS_FILE"
+        sudo chmod 440 "$SUDOERS_FILE"
+    else
+        error "Warning: /etc/sudoers.d does not exist. Splunk user will not have the sudo privileges needed for package verification."
     fi
 
     if ! getent group "splunk" > /dev/null; then
@@ -439,7 +464,8 @@ function create_splunk_user {
     fi
     # Set ACL to allow splunk to read any log files (execute needed for directories)
     info "Giving splunk user access to /var/log/"
-    sudo setfacl -R -m u:splunk:rx /var/log/
+    sudo setfacl -Rm g:splunk:rx /var/log/
+    sudo setfacl -Rdm g:splunk:rx /var/log/
 
     # chown splunk installation directory
     sudo chown -R splunk:splunk $SPLUNK_HOME
@@ -583,12 +609,19 @@ function setup_splunk {
 # Arguments:
 #   $1: Path of log source
 #   $2: Index name
+#   $3: Sourcetype (optional)
 function add_monitor {
     source=$1
     index=$2
+    sourcetype=$3
     if sudo [ -e "$source" ]; then
-        sudo -H -u splunk $SPLUNK_HOME/bin/splunk add monitor "$source" -index "$index"
+        if [ "$sourcetype" != "" ]; then
+            sudo -H -u splunk $SPLUNK_HOME/bin/splunk add monitor "$source" -index "$index" -sourcetype "$sourcetype"
+        else
+            sudo -H -u splunk $SPLUNK_HOME/bin/splunk add monitor "$source" -index "$index"
+        fi
         # info "Added monitor for $source"
+        SUCCESSFUL_MONITORS+=("$source")
     else
         error "No file or dir found at $source"
     fi
@@ -731,14 +764,18 @@ function add_web_logs {
         echo "Adding monitors for Apache logs"
         APACHE_ACCESS="/var/log/apache2/access.log"
         APACHE_ERROR="/var/log/apache2/error.log"
+        WAF="/var/log/apache2/modsec_audit.log"
         add_monitor "$APACHE_ACCESS" "$INDEX"
         add_monitor "$APACHE_ERROR" "$INDEX"
+        add_monitor "$WAF" "$INDEX"
     elif [ -d "/var/log/httpd/" ]; then
         info "Adding monitors for Apache logs"
         APACHE_ACCESS="/var/log/httpd/access_log"
         APACHE_ERROR="/var/log/httpd/error_log"
+        WAF="/var/log/httpd/modsec_audit.log"
         add_monitor "$APACHE_ACCESS" "$INDEX"
         add_monitor "$APACHE_ERROR" "$INDEX"
+        add_monitor "$WAF" "$INDEX"
     elif [ -d "/var/log/lighttpd/" ]; then
         info "Adding monitor for lighttpd error logs"
         # LIGHTTPD_ACCESS="/var/log/lighhtpd/access.log"
@@ -896,7 +933,10 @@ function install_auditd {
 
     # Install auditd
     info "Installing auditd package"
-    sudo $pm install -y auditd
+    sudo $PM install -y auditd
+    if $? -ne 0; then
+        sudo $PM install -y audit
+    fi
     if command -v systemctl &> /dev/null; then
         sudo systemctl enable auditd
         sudo systemctl start auditd
@@ -936,9 +976,11 @@ function install_auditd {
     info "Applied rules:"
     sudo auditctl -l
 
-    sudo setfacl -R -m u:splunk:rx /var/log/audit
+    sudo setfacl -Rm g:splunk:rx /var/log/audit/
+    sudo setfacl -Rdm g:splunk:rx /var/log/audit/
     # TODO: add check for successful Splunk login to all Splunk commands
     add_monitor "/var/log/audit/audit.log" "system"
+    AUDITD_SUCCESSFUL=true
 }
 
 function install_snoopy {
@@ -980,7 +1022,8 @@ function install_snoopy {
             # Unfortunately required by snoopy in order to use a log file other than syslog/messages
             SNOOPY_LOG='/var/log/snoopy.log'
             sudo chmod 622 $SNOOPY_LOG
-            sudo setfacl -m u:splunk:rx /var/log/snoopy.log
+            sudo setfacl -m g:splunk:r /var/log/snoopy.log
+            sudo setfacl -dm g:splunk:r /var/log/snoopy.log
             echo "filter_chain = \"exclude_spawns_of:splunkd,btool\"" | sudo tee -a $SNOOPY_CONFIG
             echo "output = file:$SNOOPY_LOG" | sudo tee -a $SNOOPY_CONFIG
             echo
@@ -996,6 +1039,7 @@ function install_snoopy {
         info "Snoopy installed successfully."
         info "NOTE: Unless you restart the server, Snoopy may not pick up on commands from existing processes."
         # see https://github.com/a2o/snoopy/issues/212
+        SNOOPY_SUCCESSFUL=true
         return 0
     fi
 }
@@ -1014,14 +1058,16 @@ function install_sysmon {
     if [[ $? -eq 0 ]]; then
         info "Sysmon installed successfully"
         install_sysmon_add_on
+        SYSMON_SUCCESSFUL=true
     else
         error "Sysmon installation failed"
+        return 1
     fi
 }
 
 function install_ossec {
     print_banner "Installing OSSEC"
-    download "$GITHUB_URL/linux/ossec.sh" ossec.sh
+    download "$GITHUB_URL/splunk/ossec.sh" ossec.sh
     chmod +x ossec.sh
 
     cmd="./ossec.sh "
@@ -1041,8 +1087,22 @@ function install_ossec {
 
     if [[ $? -eq 0 ]]; then
         info "OSSEC installed successfully"
+        OSSEC_DIR="/var/ossec"
+        if [[ "$INDEXER" == true ]]; then
+            sudo setfacl -Rm g:splunk:rx $OSSEC_DIR/
+            sudo setfacl -Rm g:splunk:rx $OSSEC_DIR/logs/
+            sudo setfacl -Rm g:splunk:rx $OSSEC_DIR/logs/alerts/
+            sudo setfacl -Rdm g:splunk:rx $OSSEC_DIR/logs/alerts/
+            sudo setfacl -Rm g:splunk:rx $OSSEC_DIR/logs/firewall/
+            sudo setfacl -Rdm g:splunk:rx $OSSEC_DIR/logs/firewall/
+            add_monitor "$OSSEC_DIR/logs/ossec.log" "ossec" "ossec_log"
+            add_monitor "$OSSEC_DIR/logs/alerts/alerts.log" "ossec" "ossec_alert"
+            add_monitor "$OSSEC_DIR/logs/firewall/firewall.log" "ossec" "ossec_firewall"
+        fi
+        OSSEC_SUCCESSFUL=true
     else
         error "OSSEC installation failed"
+        return 1
     fi
 }
 #####################################################
@@ -1110,6 +1170,16 @@ function main {
     # info "Add future additional scripted inputs with 'sudo -H -u splunk $SPLUNK_HOME/bin/splunk add exec $SPLUNK_HOME/etc/apps/ccdc-add-on/bin/<SCRIPT> -interval <SECONDS> -index <INDEX>'"
     echo
     info "A debug log is located at $DEBUG_LOG"
+    echo
+    echo "Summary of installation:"
+    echo "   Auditd successful? $AUDITD_SUCCESSFUL"
+    echo "   Snoopy successful? $SNOOPY_SUCCESSFUL"
+    echo "   Sysmon successful? $SYSMON_SUCCESSFUL"
+    echo "   OSSEC successful? $OSSEC_SUCCESSFUL"
+    echo "   Added monitors for: "
+    for item in "${SUCCESSFUL_MONITORS[@]}"; do
+        echo "    - $item"
+    done
     echo
 }
 
