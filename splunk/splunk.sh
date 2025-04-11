@@ -55,6 +55,7 @@ AUDITD_SUCCESSFUL=false
 SNOOPY_SUCCESSFUL=false
 SYSMON_SUCCESSFUL=false
 OSSEC_SUCCESSFUL=false
+SUCCESSFUL_MONITORS=()
 #####################################################
 
 ##################### FUNCTIONS #####################
@@ -620,6 +621,7 @@ function add_monitor {
             sudo -H -u splunk $SPLUNK_HOME/bin/splunk add monitor "$source" -index "$index"
         fi
         # info "Added monitor for $source"
+        SUCCESSFUL_MONITORS+=("$source")
     else
         error "No file or dir found at $source"
     fi
@@ -762,14 +764,18 @@ function add_web_logs {
         echo "Adding monitors for Apache logs"
         APACHE_ACCESS="/var/log/apache2/access.log"
         APACHE_ERROR="/var/log/apache2/error.log"
+        WAF="/var/log/apache2/modsec_audit.log"
         add_monitor "$APACHE_ACCESS" "$INDEX"
         add_monitor "$APACHE_ERROR" "$INDEX"
+        add_monitor "$WAF" "$INDEX"
     elif [ -d "/var/log/httpd/" ]; then
         info "Adding monitors for Apache logs"
         APACHE_ACCESS="/var/log/httpd/access_log"
         APACHE_ERROR="/var/log/httpd/error_log"
+        WAF="/var/log/httpd/modsec_audit.log"
         add_monitor "$APACHE_ACCESS" "$INDEX"
         add_monitor "$APACHE_ERROR" "$INDEX"
+        add_monitor "$WAF" "$INDEX"
     elif [ -d "/var/log/lighttpd/" ]; then
         info "Adding monitor for lighttpd error logs"
         # LIGHTTPD_ACCESS="/var/log/lighhtpd/access.log"
@@ -1089,6 +1095,7 @@ function install_ossec {
             add_monitor "$OSSEC_DIR/logs/alerts/alerts.log" "ossec" "ossec_alert"
             add_monitor "$OSSEC_DIR/logs/firewall/firewall.log" "ossec" "ossec_firewall"
         fi
+        OSSEC_SUCCESSFUL=true
     else
         error "OSSEC installation failed"
         return 1
@@ -1165,6 +1172,10 @@ function main {
     echo "   Snoopy successful? $SNOOPY_SUCCESSFUL"
     echo "   Sysmon successful? $SYSMON_SUCCESSFUL"
     echo "   OSSEC successful? $OSSEC_SUCCESSFUL"
+    echo "   Added monitors for: "
+    for item in "${SUCCESSFUL_MONITORS[@]}"; do
+        echo "    - $item"
+    done
     echo
 }
 
