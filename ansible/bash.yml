@@ -2,10 +2,12 @@
 - name: Run a specified Bash script on remote hosts
   hosts: all
   become: yes
+  gather_facts: no
 
   vars:
     # Provide a default path if no extra_var is passed
     script: "/tmp/script.sh"
+    args: ""               # default to no arguments
 
   tasks:
     - name: Copy the script to remote hosts
@@ -15,4 +17,4 @@
         mode: "0755"
 
     - name: Execute the script on the remote hosts
-      command: "/tmp/myscript.sh"
+      command: "/tmp/myscript.sh {{ args }}"
