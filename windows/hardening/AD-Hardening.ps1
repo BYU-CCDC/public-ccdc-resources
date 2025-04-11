@@ -1406,7 +1406,7 @@ function Download-Install-Setup-Splunk {
         if ((Get-ChildItem ./splunk.ps1).Length -lt 6000) {
             ./splunk.ps1 $Version $SplunkServer
         } else {
-            ./splunk.ps1 $Version $SplunkServer "dc"
+            ./splunk.ps1 $Version $SplunkServer "dc" -local "../.."
         }
 
     } catch {
