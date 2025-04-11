@@ -1827,7 +1827,7 @@ function Change-User-Passwords {
     }
 }
 
-Function Enable-Disable-RDP {
+function Enable-Disable-RDP {
     
     $confirmation = Prompt-Yes-No -Message "Should RDP be enabled?"
     if ($confirmation.toLower() -eq "y") {
@@ -1844,6 +1844,64 @@ Function Enable-Disable-RDP {
         Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server" -Name "fDenyTSConnections" -Value 1
     }
 
+}
+
+function Identify-and-Fix-ASREP-Roastable-Accounts{
+    $roastableAccounts = Get-ADUser -Filter 'DoesNotRequirePreAuth -eq $true' -Properties DoesNotRequirePreAuth
+    Write-Host "ASREP Roastable Accounts:"
+    $roastableAccounts
+
+    $confirmation = Prompt-Yes-No -Message "Should we fix ASREP roastable accounts?(y/n)"
+    if ($confirmation.toLower() -eq "y") {
+        Write-Host "Fixing ASREP roastable accounts"
+        
+        foreach ($account in $roastableAccounts) {
+            # Define the username of the user
+            $UserName = $account.Name
+            $User = Get-ADUser -Identity $UserName -ErrorAction Stop
+            $updatedValue = $User.userAccountControl -band -4194305
+            Set-ADUser -Identity $User -Replace @{userAccountControl=$updatedValue}  
+
+            Write-Output "ASREP roastable account fixed for user: $UserName"
+        }
+    } else {
+        Write-Host "Skipping..." -ForegroundColor Red
+    }
+}
+
+function Identify-and-Fix-Kerberoastable-Accounts{   
+
+    #Identify Kerberoastable Accounts
+    $kerberoastableAccounts = Get-ADUser -Filter {ServicePrincipalName -ne "$null" -and msDS-SupportedEncryptionTypes -ne 24} -Property servicePrincipalName, msDS-SupportedEncryptionTypes | Select-Object Name
+    Write-Host "Kerberoastable Accounts:"
+    Write-Host $kerberoastableAccounts | Format-Table -Property Name, servicePrincipalName, msDS-SupportedEncryptionTypes -AutoSize
+    
+    $confirmation = Prompt-Yes-No -Message "Should we fix kerberoastable accounts? (y/n)"
+    if ($confirmation.toLower() -eq "y") {
+        Write-Host "Fixing kerberoastable accounts"
+        
+        foreach ($account in $kerberoastableAccounts) {
+            # Define the username of the user
+            $UserName = $account.Name
+            $User = Get-ADUser -Identity $UserName -ErrorAction Stop
+
+            # Set the msDS-SupportedEncryptionTypes to enforce AES128 and AES256 (Value: 24)
+            Set-ADUser -Identity $User -Replace @{"msDS-SupportedEncryptionTypes"=24}
+
+            Write-Output "AES128 and AES256 encryption enforced for user: $UserName"
+            $updatedValue = $User.userAccountControl -band -4194305
+            Set-ADUser -Identity $User -Replace @{userAccountControl=$updatedValue}   
+            
+            # Reset the password twice to flush insecure passwords from the domain controller cache
+            Write-Host "Reset the password to flush insecure passwords from the domain controller cache" -ForegroundColor Yellow
+            for($i=0; $i -lt 2; $i++){
+            Get-Set-Password -user $User
+            }
+            Get-Set-Password -user $User
+        }
+    } else {
+        Write-Host "Skipping..." -ForegroundColor Red
+    }
 }
 ###################################### MAIN ######################################
 
@@ -2105,6 +2163,24 @@ $confirmation = Prompt-Yes-No -Message "Patch Mimikatz? (y/n)"
 if ($confirmation.toLower() -eq "y") {
     Write-Host "`n***Patching Mimikatz...***" -ForegroundColor Magenta
     Patch-Mimikatz
+} else {
+    Write-Host "Skipping..." -ForegroundColor Red
+}
+
+## Identify and Fix ASREP Roastable Accounts
+$confirmation = Prompt-Yes-No -Message "Identify and Fix ASREP Roastable Accounts? (y/n)"
+if ($confirmation.toLower() -eq "y") {
+    Write-Host "`n***Identifying and Fixing ASREP Roastable Accounts...***" -ForegroundColor Magenta
+    Identify-and-Fix-ASREP-Roastable-Accounts
+} else {
+    Write-Host "Skipping..." -ForegroundColor Red
+}
+
+## Identify and Fix Kerberoastable Accounts
+$confirmation = Prompt-Yes-No -Message "Identify and Fix Kerberoastable Accounts? (y/n)"
+if ($confirmation.toLower() -eq "y") {
+    Write-Host "`n***Identifying and Fixing Kerberoastable Accounts...***" -ForegroundColor Magenta
+    Identify-and-Fix-Kerberoastable-Accounts
 } else {
     Write-Host "Skipping..." -ForegroundColor Red
 }

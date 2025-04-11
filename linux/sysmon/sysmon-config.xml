@@ -22,6 +22,9 @@ Config is based on MSTIC config with GTFObins added...etc
 	<EventFiltering>
 		<!-- Event ID 1 == ProcessCreate -->
 		<RuleGroup name="" groupRelation="or">
+			<ProcessCreate onmatch="exclude">
+				<User condition="is">splunk</User>
+			</ProcessCreate>
 			<ProcessCreate onmatch="include">
 				<Rule name="TechniqueID=T1021.004,TechniqueName=Remote Services: SSH" groupRelation="and">
 					<Image condition="end with">
