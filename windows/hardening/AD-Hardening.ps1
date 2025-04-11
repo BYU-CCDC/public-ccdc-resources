@@ -1972,23 +1972,24 @@ if ($confirmation.toLower() -eq "y") {
 }
 
 
+# These steps are redundant now. The Good-GPO that got made is now part of gpos.zip
 # Create Blank GPO
-$confirmation = Prompt-Yes-No -Message "Enter the 'Create Blank GPO with Correct Permissions' function? (y/n)"
-if ($confirmation.toLower() -eq "y") {
-    Write-Host "`n***Creating Blank GPO and applying to Root of domain...***" -ForegroundColor Magenta
-	Create-Good-GPO
-} else {
-    Write-Host "Skipping..." -ForegroundColor Red
-}
+#$confirmation = Prompt-Yes-No -Message "Enter the 'Create Blank GPO with Correct Permissions' function? (y/n)"
+#if ($confirmation.toLower() -eq "y") {
+#    Write-Host "`n***Creating Blank GPO and applying to Root of domain...***" -ForegroundColor Magenta
+#	Create-Good-GPO
+#} else {
+#    Write-Host "Skipping..." -ForegroundColor Red
+#}
 
 
-$confirmation = Prompt-Yes-No -Message "Enter the 'Configure Secure GPO' function? (y/n)"
-if ($confirmation.toLower() -eq "y") {
-    Write-Host "`n***Configuring Secure GPO***" -ForegroundColor Magenta
-    Configure-Secure-GPO
-} else {
-    Write-Host "Skipping..." -ForegroundColor Red
-}
+#$confirmation = Prompt-Yes-No -Message "Enter the 'Configure Secure GPO' function? (y/n)"
+#if ($confirmation.toLower() -eq "y") {
+#    Write-Host "`n***Configuring Secure GPO***" -ForegroundColor Magenta
+#    Configure-Secure-GPO
+#} else {
+#    Write-Host "Skipping..." -ForegroundColor Red
+#}
 
 # Create Workstations OU (gives you something to do while splunk is installing)
 $confirmation = Prompt-Yes-No -Message "Create OUs? (y/n)"
