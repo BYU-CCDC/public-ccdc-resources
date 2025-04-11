@@ -20,6 +20,10 @@ netsh advfirewall export ./firewallbackup.wfw
 dnscmd localhost /zoneexport $env:USERDNSDOMAIN backup\$env:USERDNSDOMAIN
 dnscmd localhost /zoneexport _msdcs.$env:USERDNSDOMAIN backup\_msdcs.$env:USERDNSDOMAIN
 
+# Export group memberships before editing stuff
+mkdir ~/groups
+get-adgroup -filter * | foreach-object { $_ | get-adgroupmember | export-csv -Path "~/groups/$($_.name).txt" }
+
 # Block SMB initially, we'll turn it back on in the firewall section
 # Inbound rules
 netsh advfirewall firewall add rule name="TCP Inbound SMB" dir=in action=block protocol=TCP localport=139

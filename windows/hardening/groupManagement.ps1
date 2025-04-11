@@ -2,10 +2,6 @@ Import-Module ActiveDirectory
 
 write-host "`nRemoving users out of groups unless they belong by default.`n"
 
-# Export group memberships before editing stuff
-mkdir groups
-get-adgroup -filter * | foreach-object { $_ | get-adgroupmember | export-csv -Path "~/groups/$($_.name).txt" }
-
 try{
 	foreach( $user in (Get-AdGroupMember -Identity "Administrators") ){
 		if( $user.SamAccountName -eq "Administrator" ){
