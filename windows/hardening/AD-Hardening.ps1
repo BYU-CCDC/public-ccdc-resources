@@ -10,6 +10,8 @@ $patchURLFile = "patchURLs.json"
 $groupManagementFile = "groupManagement.ps1"
 $mainFunctionsFile = "mainFunctionsList.txt"
 $splunkFile = "../../splunk/splunk.ps1"
+$localHardeningFile = "Local-Hardening.ps1"
+$wwHardeningFile = "ww-hardening.ps1"
 
 # Backup existing firewall rules
 netsh advfirewall export ./firewallbackup.wfw
@@ -34,7 +36,7 @@ netsh advfirewall firewall add rule name="TCP Outbound SMB" dir=out action=block
 netsh advfirewall firewall add rule name="UDP Outbound SMB" dir=out action=block protocol=UDP localport=445
 
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-$neededFiles = @($portsFile, $advancedAuditingFile, $patchURLFile, $groupManagementFile, $mainFunctionsFile, $splunkFile)
+$neededFiles = @($portsFile, $advancedAuditingFile, $patchURLFile, $groupManagementFile, $mainFunctionsFile, $splunkFile, $localHardeningFile, $wwHardeningFile)
 foreach ($file in $neededFiles) {
     $filename = $(Split-Path -Path $file -Leaf)
     try {
@@ -50,6 +52,11 @@ foreach ($file in $neededFiles) {
 }
 
 Write-Host "All necessary files have been downloaded." -ForegroundColor Green
+
+# Copy local hardening script to sysvol so local hardening can start ASAP without pulling down the script on each machine
+$domainDN = (Get-ADDomain).DistinguishedName
+cp "./$localHardeningFile" "\\$domainDN\sysvol\$domainDN\$localHardeningFile"
+cp "./$wwHardeningFile" "\\$domainDN\sysvol\$domainDN\$wwHardeningFile"
 
 function GetCompetitionUsers {
     try {
@@ -1280,7 +1287,7 @@ function Configure-Secure-GPO {
                 "Key" = "HKLM\System\CurrentControlSet\Services\NTDS\Parameters"
                 "ValueName" = "LDAPServerIntegrity"
                 "Type" = "DWORD"
-                "Value" = 2
+                "Value" = 1 #doesn't enforce ldaps (ldap over tls), but prevents breaking the scoring engine if it is scoring normal ldap
             }
 
         }
@@ -1315,14 +1322,63 @@ function Configure-Secure-GPO {
             Write-Host "All configurations applied successfully." -ForegroundColor Green
         }
 
-		Write-Host "Applying gpupdate across all machines on the domain" -ForegroundColor Magenta
-        Global-Gpupdate
+		#Write-Host "Applying gpupdate across all machines on the domain" -ForegroundColor Magenta
+        #Global-Gpupdate
     } catch {
         Write-Host $_.Exception.Message -ForegroundColor Yellow
         Write-Host "Error Occurred..."
     }
 }
 
+function Import-GPOs {
+    Expand-Archive -Path ./gpos.zip
+
+    $gpos = Get-ChildItem ./gpos
+
+    $gpos | % {
+        $xml = New-Object xml
+        $xml.Load((Convert-Path ./gpos/$($_.name)/bkupInfo.xml))
+        $gpoName = $xml.BackupInst.GPODisplayName."#cdata-section"
+
+        New-GPO -Name $gpoName
+
+        Import-GPO -path "$pwd/gpos" -BackupId $_.name -targetName $gpoName
+
+        if (($gpoName.StartsWith("Domain")) -and ($gpoName -notlike "*Block*")) {
+            New-GPLink -Name $gpoName -Target (Get-ADDomain -Current LocalComputer).DistinguishedName
+        } 
+        elseif ($gpoName.StartsWith("Web Servers")) {
+            New-GPLink -Name $gpoName -Target "OU=Web Servers,$((Get-ADDomain -Current LocalComputer).DistinguishedName)"
+        }
+        elseif ($gpoName.StartsWith("Workstations")) {
+            New-GPLink -Name $gpoName -Target "OU=Workstations,$((Get-ADDomain -Current LocalComputer).DistinguishedName)"
+        }
+        elseif ($gpoName.StartsWith("Databases")) {
+            New-GPLink -Name $gpoName -Target "OU=Databases,$((Get-ADDomain -Current LocalComputer).DistinguishedName)"
+        }
+        elseif ($gpoName.StartsWith("DC")) {
+            New-GPLink -Name $gpoName -Target "OU=Domain Controllers,$((Get-ADDomain -Current LocalComputer).DistinguishedName)"
+        }
+        elseif ($gpoName.StartsWith("Mail Servers")) {
+            New-GPLink -Name $gpoName -Target "OU=Mail Servers,$((Get-ADDomain -Current LocalComputer).DistinguishedName)"
+        }
+
+    }
+
+    #try two ways to force gpupdates
+    Global-Gpupdate
+    Get-ADComputer -Filter * | Invoke-GPUpdate
+
+    $confirmation = Prompt-Yes-No -Message "Apply Default Block gpo? This shouldn't break AD... (y/n)"
+    if ($confirmation.toLower() -eq "y") {
+        New-GPLink -Name "Domain Allow AD + Core + Default Block" -Target "$((Get-ADDomain -Current LocalComputer).DistinguishedName)"
+    } else {
+        Write-Host "Skipping..." -ForegroundColor Red
+    }
+    
+
+    
+}
 function Download-Install-Setup-Splunk {
     param([string]$Version, [string]$IP)
 
@@ -1701,8 +1757,74 @@ renderXml=false
     }
 }
 
-function Create-Workstations-OU {
-    New-ADOrganizationalUnit -Name "Workstations"
+function Create-OUs {
+    New-ADOrganizationalUnit -Name "Workstations" -ErrorAction SilentlyContinue
+    New-ADOrganizationalUnit -Name "Web Servers" -ErrorAction SilentlyContinue
+    New-ADOrganizationalUnit -Name "Mail Servers" -ErrorAction SilentlyContinue
+    New-ADOrganizationalUnit -Name "Databases" -ErrorAction SilentlyContinue
+} 
+
+function Change-DA-Passwords {
+    while ($true) {
+        try {
+            $pw = Read-Host -AsSecureString -Prompt "New password for Domain Admins:"
+            $conf = Read-Host -AsSecureString -Prompt "Confirm password for Domain Admins:"
+
+            # Convert SecureString to plain text
+            $pwPlainText = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($pw))
+            $confPlainText = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($conf))
+            if ($pwPlainText -eq $confPlainText -and $pwPlainText -ne "") {
+                Get-ADGroup -Filter 'name -like "Domain Admins"' | Get-ADGroupMember | Where-Object objectClass -eq User | Set-ADAccountPassword -Reset -NewPassword $pw
+                Write-Host "Success!!`n"
+
+                # Clear the plaintext passwords from memory
+                $pwPlainText = $null
+                $confPlainText = $null
+
+                # Optionally, force a garbage collection to reclaim memory (though this is not immediate)
+                [System.GC]::Collect()
+                $pw.Dispose()
+                $conf.Dispose()
+                break
+            } else {
+                Write-Host "Either the passwords didn't match, or you typed nothing" -ForegroundColor Yellow
+            } 
+        } catch {
+            Write-Host $_.Exception.Message "`n"
+            Write-Host "There was an error with your password submission. Try again...`n" -ForegroundColor Yellow
+        }
+    }
+}
+function Change-User-Passwords {
+    while ($true) {
+        try {
+            $pw = Read-Host -AsSecureString -Prompt "New password for non-Domain Admins:"
+            $conf = Read-Host -AsSecureString -Prompt "Confirm password for non-Domain Admins:"
+
+            # Convert SecureString to plain text
+            $pwPlainText = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($pw))
+            $confPlainText = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($conf))
+            if ($pwPlainText -eq $confPlainText -and $pwPlainText -ne "") {
+                Get-ADGroup -Filter 'name -notlike "Domain Admins"' | Get-ADGroupMember | Where-Object objectType -eq User | Set-ADAccountPassword -Reset -NewPassword $pw
+                Write-Host "Success!!`n"
+
+                # Clear the plaintext passwords from memory
+                $pwPlainText = $null
+                $confPlainText = $null
+
+                # Optionally, force a garbage collection to reclaim memory (though this is not immediate)
+                [System.GC]::Collect()
+                $pw.Dispose()
+                $conf.Dispose()
+                break
+            } else {
+                Write-Host "Either the passwords didn't match, or you typed nothing" -ForegroundColor Yellow
+            } 
+        } catch {
+            Write-Host $_.Exception.Message "`n"
+            Write-Host "There was an error with your password submission. Try again...`n" -ForegroundColor Yellow
+        }
+    }
 }
 
 function Enable-Disable-RDP {
@@ -1833,6 +1955,23 @@ if ($confirmation.toLower() -eq "y") {
     Write-Host "Skipping..." -ForegroundColor Red
 }
 
+# Change DA Passwords
+$confirmation = Prompt-Yes-No -Message "Change DA passwords? (y/n)"
+if ($confirmation.toLower() -eq "y") {
+    Change-DA-Passwords
+    Write-Host "All DA passwords changed" -ForegroundColor Red
+} else {
+    Write-Host "Skipping..." -ForegroundColor Red
+}
+
+# Change normal User Passwords
+$confirmation = Prompt-Yes-No -Message "Change non-DA passwords? (y/n)"
+if ($confirmation.toLower() -eq "y") {
+    Change-User-Passwords
+    Write-Host "All non-DA passwords changed" -ForegroundColor Red
+} else {
+    Write-Host "Skipping..." -ForegroundColor Red
+}
 
 # Mass Disable Users
 $confirmation = Prompt-Yes-No -Message "Disable every user but your own? (y/n)"
@@ -1893,20 +2032,45 @@ if ($confirmation.toLower() -eq "y") {
 }
 
 
+# These steps are redundant now. The Good-GPO that got made is now part of gpos.zip
 # Create Blank GPO
-$confirmation = Prompt-Yes-No -Message "Enter the 'Create Blank GPO with Correct Permissions' function? (y/n)"
+#$confirmation = Prompt-Yes-No -Message "Enter the 'Create Blank GPO with Correct Permissions' function? (y/n)"
+#if ($confirmation.toLower() -eq "y") {
+#    Write-Host "`n***Creating Blank GPO and applying to Root of domain...***" -ForegroundColor Magenta
+#	Create-Good-GPO
+#} else {
+#    Write-Host "Skipping..." -ForegroundColor Red
+#}
+
+
+#$confirmation = Prompt-Yes-No -Message "Enter the 'Configure Secure GPO' function? (y/n)"
+#if ($confirmation.toLower() -eq "y") {
+#    Write-Host "`n***Configuring Secure GPO***" -ForegroundColor Magenta
+#    Configure-Secure-GPO
+#} else {
+#    Write-Host "Skipping..." -ForegroundColor Red
+#}
+
+# Create Workstations OU (gives you something to do while splunk is installing)
+$confirmation = Prompt-Yes-No -Message "Create OUs? (y/n)"
 if ($confirmation.toLower() -eq "y") {
-    Write-Host "`n***Creating Blank GPO and applying to Root of domain...***" -ForegroundColor Magenta
-	Create-Good-GPO
+    try {
+        Write-Host "***Creating OUs***" -ForegroundColor Magenta
+        Create-OUs
+        Update-Log "Create OUs" "Executed successfully"
+    } catch {
+        Write-Host $_.Exception.Message -ForegroundColor Yellow
+        Write-Host "Error Occurred..."
+        Update-Log "Create OUs" "Failed with error: $($_.Exception.Message)"
+    }
 } else {
     Write-Host "Skipping..." -ForegroundColor Red
 }
 
-
-$confirmation = Prompt-Yes-No -Message "Enter the 'Configure Secure GPO' function? (y/n)"
+$confirmation = Prompt-Yes-No -Message "Enter the 'Import GPOs' function? (y/n)"
 if ($confirmation.toLower() -eq "y") {
-    Write-Host "`n***Configuring Secure GPO***" -ForegroundColor Magenta
-    Configure-Secure-GPO
+    Write-Host "`n***Import GPOs***" -ForegroundColor Magenta
+    Import-GPOs
 } else {
     Write-Host "Skipping..." -ForegroundColor Red
 }
@@ -1920,21 +2084,6 @@ if ($confirmation.toLower() -eq "y") {
     Write-Host "Skipping..." -ForegroundColor Red
 }
 
-# Create Workstations OU (gives you something to do while splunk is installing)
-$confirmation = Prompt-Yes-No -Message "Create Workstations OU? (y/n)"
-if ($confirmation.toLower() -eq "y") {
-    try {
-        Write-Host "***Creating Workstations OU***" -ForegroundColor Magenta
-        Create-Workstations-OU
-        Update-Log "Create Workstations OU" "Executed successfully"
-    } catch {
-        Write-Host $_.Exception.Message -ForegroundColor Yellow
-        Write-Host "Error Occurred..."
-        Update-Log "Create Workstations OU" "Failed with error: $($_.Exception.Message)"
-    }
-} else {
-    Write-Host "Skipping..." -ForegroundColor Red
-}
 
 Write-Host "It is adviseable to configure other desired gpo attributes while the next steps are running."
 Write-Host @"
@@ -1945,6 +2094,7 @@ Consider, after starting the splunk install:
     -Adding Workstation Admins to workstation Administrators groups
     -Moving workstations into the Workstations OU
     -Applying group policy changes
+Remember to check back periodically to type in credentials as needed
 "@
 
 # Configure Splunk
