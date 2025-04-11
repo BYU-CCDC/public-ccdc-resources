@@ -248,7 +248,8 @@ function install_ossec {
 
     # Install configuration file
     Move-Item -Path "$OSSECDIR\ossec.conf" "$OSSECDIR\ossec.conf.bak" -Force 2>$null
-    download "$GITHUB_URL/splunk/windows/ossec-agent-local.conf" "$pwd\ossec-agent.conf"
+    # download "$GITHUB_URL/splunk/windows/ossec-agent-local.conf" "$pwd\ossec-agent.conf"
+    download "$GITHUB_URL/splunk/windows/ossec-agent.conf" "$pwd\ossec-agent.conf"
 
     (Get-Content ".\ossec-agent.conf") -replace "{SERVER_IP}", $ip | Set-Content ".\ossec-agent.conf"
     Move-Item -Path ".\ossec-agent.conf" -Destination "$OSSECDIR\ossec.conf" -Force

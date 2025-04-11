@@ -1091,7 +1091,10 @@ function install_ossec {
         if [[ "$INDEXER" == true ]]; then
             sudo setfacl -Rm g:splunk:rx $OSSEC_DIR/
             sudo setfacl -Rm g:splunk:rx $OSSEC_DIR/logs/
-            sudo setfacl -Rdm g:splunk:rx $OSSEC_DIR/logs/
+            sudo setfacl -Rm g:splunk:rx $OSSEC_DIR/logs/alerts/
+            sudo setfacl -Rdm g:splunk:rx $OSSEC_DIR/logs/alerts/
+            sudo setfacl -Rm g:splunk:rx $OSSEC_DIR/logs/firewall/
+            sudo setfacl -Rdm g:splunk:rx $OSSEC_DIR/logs/firewall/
             add_monitor "$OSSEC_DIR/logs/ossec.log" "ossec" "ossec_log"
             add_monitor "$OSSEC_DIR/logs/alerts/alerts.log" "ossec" "ossec_alert"
             add_monitor "$OSSEC_DIR/logs/firewall/firewall.log" "ossec" "ossec_firewall"

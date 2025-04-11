@@ -155,14 +155,15 @@ function setup_ossec_server {
     sudo chown root:ossec $LOCAL_RULES
     sudo chmod 660 $LOCAL_RULES
 
+    # Actually, this feature is a piece of garbage so don't use it
     # Download custom shared client config
-    info "Downloading custom shared OSSEC client configuration..."
-    SHARED_CONF="$OSSEC_DIR/etc/shared/agent.conf"
-    download $GITHUB_URL/splunk/linux/ossec-agent-shared.conf ./agent.conf
-    sed -i "s/{SERVER_IP}/$IP/" agent.conf
-    sudo mv agent.conf $SHARED_CONF
-    sudo chown root:ossec $SHARED_CONF
-    sudo chmod 660 $SHARED_CONF
+    # info "Downloading custom shared OSSEC client configuration..."
+    # SHARED_CONF="$OSSEC_DIR/etc/shared/agent.conf"
+    # download $GITHUB_URL/splunk/linux/ossec-agent-shared.conf ./agent.conf
+    # sed -i "s/{SERVER_IP}/$IP/" agent.conf
+    # sudo mv agent.conf $SHARED_CONF
+    # sudo chown root:ossec $SHARED_CONF
+    # sudo chmod 660 $SHARED_CONF
 
     # Start OSSEC
     info "Starting OSSEC server..."
