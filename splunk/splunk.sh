@@ -1089,6 +1089,7 @@ function install_ossec {
         info "OSSEC installed successfully"
         OSSEC_DIR="/var/ossec"
         if [[ "$INDEXER" == true ]]; then
+            sudo setfacl -Rm g:splunk:rx $OSSEC_DIR/
             sudo setfacl -Rm g:splunk:rx $OSSEC_DIR/logs/
             sudo setfacl -Rdm g:splunk:rx $OSSEC_DIR/logs/
             add_monitor "$OSSEC_DIR/logs/ossec.log" "ossec" "ossec_log"
