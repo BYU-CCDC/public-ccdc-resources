@@ -1778,7 +1778,13 @@ function Change-DA-Passwords {
             $pwPlainText = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($pw))
             $confPlainText = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($conf))
             if ($pwPlainText -eq $confPlainText -and $pwPlainText -ne "") {
-                Get-ADGroup -Filter 'name -like "Domain Admins"' | Get-ADGroupMember | Where-Object objectClass -eq User | Set-ADAccountPassword -Reset -NewPassword $pw
+                #Get-ADGroup -Filter 'name -like "Domain Admins"' | Get-ADGroupMember | Where-Object objectClass -eq User | Set-ADAccountPassword -Reset -NewPassword $pw
+                Get-ADGroup -Filter 'name -like "Domain Admins"' | Get-ADGroupMember | Where-Object objectClass -eq User | Foreach-object {
+                    write-host "$pw$($_.name)"
+                    $newpw = "$pw$($_.name)" | Get-FileHash -Algorithm SHA256 
+                    write-host $newpw.Substring(0,12)
+                    $_ | Set-ADAccountPassword -Reset -NewPassword (ConvertTo-SecureString -AsPlainText -String $newpw.Substring(0,12) -Force)
+                }
                 Write-Host "Success!!`n"
 
                 # Clear the plaintext passwords from memory
@@ -1809,7 +1815,13 @@ function Change-User-Passwords {
             $pwPlainText = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($pw))
             $confPlainText = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($conf))
             if ($pwPlainText -eq $confPlainText -and $pwPlainText -ne "") {
-                Get-ADGroup -Filter 'name -notlike "Domain Admins"' | Get-ADGroupMember | Where-Object objectClass -eq User | Set-ADAccountPassword -Reset -NewPassword $pw
+                #Get-ADGroup -Filter 'name -notlike "Domain Admins"' | Get-ADGroupMember | Where-Object objectClass -eq User | Set-ADAccountPassword -Reset -NewPassword $pw
+                Get-ADGroup -Filter 'name -notlike "Domain Admins"' | Get-ADGroupMember | Where-Object objectClass -eq User | Foreach-object {
+                    write-host "$pw$($_.name)"
+                    $newpw = "$pw$($_.name)" | Get-FileHash -Algorithm SHA256 
+                    write-host $newpw.Substring(0,12)
+                    $_ | Set-ADAccountPassword -Reset -NewPassword (ConvertTo-SecureString -AsPlainText -String $newpw.Substring(0,12) -Force)
+                }
                 Write-Host "Success!!`n"
 
                 # Clear the plaintext passwords from memory
