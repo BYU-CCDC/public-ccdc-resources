@@ -1781,7 +1781,12 @@ function Change-DA-Passwords {
                 #Get-ADGroup -Filter 'name -like "Domain Admins"' | Get-ADGroupMember | Where-Object objectClass -eq User | Set-ADAccountPassword -Reset -NewPassword $pw
                 Get-ADGroup -Filter 'name -like "Domain Admins"' | Get-ADGroupMember | Where-Object objectClass -eq User | Foreach-object {
                     write-host "$pwPlainText$($_.name)"
-                    $newpw = Get-FileHash -Algorithm SHA256 -InputStream [Text.Encoding]::Utf8.GetBytes("$pwPlainText$($_.name)") 
+                    $stringAsStream = [System.IO.MemoryStream]::new()
+                    $writer = [System.IO.StreamWriter]::new($stringAsStream)
+                    $writer.write("$pwPlainText$($_.name)")
+                    $writer.Flush()
+                    $stringAsStream.Position = 0
+                    $newpw = Get-FileHash -Algorithm SHA256 -InputStream $stringAsStream 
                     write-host $newpw.Substring(0,12)
                     $_ | Set-ADAccountPassword -Reset -NewPassword (ConvertTo-SecureString -AsPlainText -String $newpw.Substring(0,12) -Force)
                 }
@@ -1818,7 +1823,13 @@ function Change-User-Passwords {
                 #Get-ADGroup -Filter 'name -notlike "Domain Admins"' | Get-ADGroupMember | Where-Object objectClass -eq User | Set-ADAccountPassword -Reset -NewPassword $pw
                 Get-ADGroup -Filter 'name -notlike "Domain Admins"' | Get-ADGroupMember | Where-Object objectClass -eq User | Foreach-object {
                     write-host "$pwPlainText$($_.name)"
-                    $newpw = Get-FileHash -Algorithm SHA256 -InputStream [Text.Encoding]::Utf8.GetBytes("$pwPlainText$($_.name)") 
+                    #$newpw = Get-FileHash -Algorithm SHA256 -InputStream [Text.Encoding]::Utf8.GetBytes("$pwPlainText$($_.name)") 
+                    $stringAsStream = [System.IO.MemoryStream]::new()
+                    $writer = [System.IO.StreamWriter]::new($stringAsStream)
+                    $writer.write("$pwPlainText$($_.name)")
+                    $writer.Flush()
+                    $stringAsStream.Position = 0
+                    $newpw = Get-FileHash -Algorithm SHA256 -InputStream $stringAsStream 
                     write-host $newpw.Substring(0,12)
                     $_ | Set-ADAccountPassword -Reset -NewPassword (ConvertTo-SecureString -AsPlainText -String $newpw.Substring(0,12) -Force)
                 }
