@@ -1201,6 +1201,34 @@ function firewall_configuration_menu {
     esac
 }
 
+
+function toggle_permissions {
+    local mode="${1:-apply}"
+    
+    if [ "$mode" == "revert" ]; then
+        echo -e "\033[34m[i] Reverting Permissions\033[0m"
+        setfacl -x u:www-data "$(which bash)" 2>/dev/null
+        setfacl -x u:www-data "$(which dash)" 2>/dev/null
+        setfacl -x u:www-data "$(which sh)" 2>/dev/null
+        setfacl -x u:www-data "$(which setfacl)" 2>/dev/null
+        setfacl -x u:apache "$(which bash)" 2>/dev/null
+        setfacl -x u:apache "$(which dash)" 2>/dev/null
+        setfacl -x u:apache "$(which sh)" 2>/dev/null
+        setfacl -x u:apache "$(which setfacl)" 2>/dev/null
+    else
+        echo -e "\033[34m[i] Setting Permissions\033[0m"
+        setfacl -m u:www-data:--- "$(which bash)" 2>/dev/null
+        setfacl -m u:www-data:--- "$(which dash)" 2>/dev/null
+        setfacl -m u:www-data:--- "$(which sh)" 2>/dev/null
+        setfacl -m u:www-data:--- "$(which setfacl)" 2>/dev/null
+        setfacl -m u:apache:--- "$(which bash)" 2>/dev/null
+        setfacl -m u:apache:--- "$(which dash)" 2>/dev/null
+        setfacl -m u:apache:--- "$(which sh)" 2>/dev/null
+        setfacl -m u:apache:--- "$(which setfacl)" 2>/dev/null
+    fi
+}
+
+
 ########################################################################
 # FUNCTION: backup_directories
 ########################################################################
@@ -3205,43 +3233,58 @@ function run_full_advanced_hardening {
     echo "[*] Full Advanced Hardening Process Completed."
 }
 
+#==============================================================================
+# FUNCTION: advanced_hardening
+# DESCRIPTION:
+#   Presents a menu of advanced hardening & automation tasks, now including
+#   our new toggle_permissions option.
+#==============================================================================
 function advanced_hardening {
     if [ "$ANSIBLE" == "true" ]; then
          echo "[*] Ansible mode: Skipping advanced hardening prompts."
          return 0
     fi
+
     local adv_choice
     while true; do
         print_banner "Advanced Hardening & Automation"
-        echo "1) Run Full Advanced Hardening Process"
-        echo "2) Run rkhunter scan"
-        echo "3) Check Service Integrity"
-        echo "4) Fix Web Browser Permissions"
-        echo "5) Configure SELinux or AppArmor"
-        echo "6) Disable SSHD/Cockpit services"
-        echo "7) Set up iptables persistence cronjob (dev)"
-        echo "8) Set up firewall maintenance cronjob (dev)"
-        echo "9) Set up NAT table clear cronjob (dev)"
+        echo " 1) Run Full Advanced Hardening Process"
+        echo " 2) Run rkhunter scan"
+        echo " 3) Check Service Integrity"
+        echo " 4) Fix Web Browser Permissions"
+        echo " 5) Configure SELinux or AppArmor"
+        echo " 6) Disable SSHD/Cockpit services"
+        echo " 7) Set up iptables persistence cronjob (dev)"
+        echo " 8) Set up firewall maintenance cronjob (dev)"
+        echo " 9) Set up NAT table clear cronjob (dev)"
         echo "10) Set up service restart cronjob (dev)"
         echo "11) Reset Advanced Hardening Configurations (dev)"
-        echo "12) Exit Advanced Hardening Menu"
-        read -p "Enter your choice [1-12]: " adv_choice
+        echo "12) Restrict shell interpreter permissions (apply ACLs)"
+        echo "13) Revert shell interpreter permissions (remove ACLs)"
+        echo "14) Kill other sessions"
+        echo "15) Exit Advanced Hardening Menu"
+        read -p "Enter your choice [1-15]: " adv_choice
+        echo
+
         case $adv_choice in
-            1) run_full_advanced_hardening ;;
-            2) run_rkhunter ;;
-            3) check_service_integrity ;;
-            4) fix_web_browser ;;
-            5) configure_security_modules ;; 
-            6) disable_unnecessary_services ;;
-            7) setup_iptables_cronjob ;;
-            8) setup_firewall_maintenance_cronjob ;;
-            9) setup_nat_clear_cronjob ;;
-            10) setup_service_restart_cronjob ;;
-            11) reset_advanced_hardening ;;
-            12) echo "[*] Exiting advanced hardening menu."; break ;;
-            *) echo "[X] Invalid option." ;;
+            1)  run_full_advanced_hardening    ;;
+            2)  run_rkhunter                   ;;
+            3)  check_service_integrity        ;;
+            4)  fix_web_browser                ;;
+            5)  configure_security_modules     ;;
+            6)  disable_unnecessary_services   ;;
+            7)  setup_iptables_cronjob         ;;
+            8)  setup_firewall_maintenance_cronjob ;;
+            9)  setup_nat_clear_cronjob        ;;
+           10)  setup_service_restart_cronjob ;;
+           11)  reset_advanced_hardening       ;;
+           12)  toggle_permissions apply       ;;
+           13)  toggle_permissions revert      ;;
+           14)  kill_other_sessions            ;;
+           15)  echo "[*] Exiting advanced hardening menu."; break ;;
+            *)  echo "[X] Invalid option."       ;;
         esac
-        echo ""
+        echo
     done
 }
 
@@ -3278,12 +3321,15 @@ function show_web_hardening_menu {
             install_modsecurity_manual
             backup_databases
             secure_php_ini
+            kill_other_sessions
             configure_apache_htaccess
             my_secure_sql_installation
             disable_phpmyadmin
+            kill_other_sessions
             configure_modsecurity
             web_hardening_menu
             manage_web_immutability_menu
+            kill_other_sessions
             ;;
         2)
             print_banner "Installing Manual ModSecurity"
@@ -3416,13 +3462,17 @@ function main {
     echo "[*] Start of full hardening process"
     detect_system_info
     install_prereqs
+    kill_other_sessions
     create_ccdc_users
     change_passwords
+    kill_other_sessions
     disable_users
     remove_sudoers
     audit_running_services
+    kill_other_sessions
     disable_other_firewalls
     firewall_configuration_menu
+    kill_other_sessions
     if [ "$ANSIBLE" != "true" ]; then
          backups
     else
@@ -3436,12 +3486,15 @@ function main {
     secure_ssh
     remove_profiles
     fix_pam
+    kill_other_sessions
     search_ssn
     remove_unused_packages
     patch_vulnerabilities
+    kill_other_sessions
     check_permissions
     sysctl_config
     configure_login_banner
+    kill_other_sessions
     defend_against_forkbomb
 
     # Disable phpMyAdmin by default for both Ansible and non-interactive execution.
@@ -3463,6 +3516,7 @@ function main {
     fi
     run_rkhunter
     check_service_integrity
+    kill_other_sessions
     echo "[*] End of full hardening process"
     echo "[*] Script log can be viewed at $LOG"
     echo "[*][WARNING] FORWARD chain is set to DROP. If this box is a router or network device, please run 'sudo iptables -P FORWARD ALLOW'."
