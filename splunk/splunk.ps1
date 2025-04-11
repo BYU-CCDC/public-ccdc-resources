@@ -138,7 +138,8 @@ function install_splunk {
     }
 
     print "Downloading the Splunk installer"
-    download $msi "$pwd\splunk.msi"
+    $installer_path = "$pwd\splunk.msi"
+    download $msi $installer_path
     print "Download complete"
     print "Please enter a password for the new splunk user"
     print "WARNING: this needs to be at least 8 characters and match system password complexity requirements or else the install will fail"
@@ -161,7 +162,7 @@ function install_splunk {
 
     print "The installation will now continue in the background. This may take a few minutes."
     # TODO: create splunk service user
-    Start-Process msiexec.exe -ArgumentList "/i $path SPLUNKUSERNAME=splunk SPLUNKPASSWORD=$password USE_LOCAL_SYSTEM=1 RECEIVING_INDEXER=$ip AGREETOLICENSE=yes LAUNCHSPLUNK=1 SERVICESTARTTYPE=auto /L*v splunk_log.txt /quiet" -Wait -NoNewWindow
+    Start-Process msiexec.exe -ArgumentList "/i $installer_path SPLUNKUSERNAME=splunk SPLUNKPASSWORD=$password USE_LOCAL_SYSTEM=1 RECEIVING_INDEXER=`"$ip:9997`" AGREETOLICENSE=yes LAUNCHSPLUNK=1 SERVICESTARTTYPE=auto /L*v splunk_log.txt /quiet" -Wait -NoNewWindow
 
     if (Test-Path "C:\Program Files\SplunkUniversalForwarder\bin\splunk.exe") {
         print "Splunk installed successfully"
@@ -173,12 +174,14 @@ function install_splunk {
 
 function install_sysmon {
     print "Downloading Sysmon..."
-    download "$GITHUB_URL/windows/hardening/sysmon/Sysmon.zip" "$pwd\Sysmon.zip"
-    download "$GITHUB_URL/windows/hardening/sysmon/sysmonconfig-export.xml" "$pwd\sysmonconfig-export.xml"
+    $sysmon_zip_path = "$pwd\Sysmon.zip"
+    $sysmon_config_path = "$pwd\sysmonconfig-export.xml"
+    $sysmon_extract_path = "$pwd\Sysmon"
+    download "$GITHUB_URL/windows/hardening/sysmon/Sysmon.zip" "$sysmon_zip_path"
+    download "$GITHUB_URL/windows/hardening/sysmon/sysmonconfig-export.xml" "$sysmon_config_path"
 
     print "Extracting Sysmon..."
-    $sysmon_extract_path = $(Get-Location).path + "\Sysmon"
-    Expand-Archive -Path $sysmon_zip_path -DestinationPath $sysmon_extract_path -Force
+    Expand-Archive -Path $sysmon_zip_path -DestinationPath "$sysmon_extract_path" -Force
 
     print "Installing Sysmon configuration..."
     Start-Process -FilePath "$sysmon_extract_path\Sysmon.exe" -ArgumentList "-accepteula -i $sysmon_config_path" -Wait -NoNewWindow
@@ -190,7 +193,7 @@ function install_custom_inputs {
     download "$GITHUB_URL/splunk/windows/custom-inputs.conf" "$pwd\custom-inputs.conf"
     # TODO: change this for the indexer?
     # TODO: check that inputs doesn't already exist or add to it
-    Move-Item -Path $path -Destination "$SPLUNKDIR\etc\apps\SplunkUniversalForwarder\local\inputs.conf" -Force
+    Move-Item -Path "$pwd\custom-inputs.conf" -Destination "$SPLUNKDIR\etc\apps\SplunkUniversalForwarder\local\inputs.conf" -Force
 }
 
 function add_monitor {
@@ -205,32 +208,32 @@ function add_monitor {
 function install_windows_ta {
     print "Installing Splunk Add-on for Microsoft Windows..."
     download "$GITHUB_URL/splunk/windows/splunk-add-on-for-microsoft-windows_901.tgz" "$pwd\splunk-add-on-for-microsoft-windows_901.tgz"
-    & "$SPLUNKDIR\bin\splunk.exe" install app $path -update 1
+    & "$SPLUNKDIR\bin\splunk.exe" install app "$pwd\splunk-add-on-for-microsoft-windows_901.tgz" -update 1
 
     print "Enabling inputs for the Windows TA..."
     New-Item -Path "$SPLUNKDIR\etc\apps\Splunk_TA_windows\local\" -ItemType Directory -Force
     download "$GITHUB_URL/splunk/windows/windows-ta-inputs.conf" "$pwd\windows-ta-inputs.conf"
 
     if ($type -eq "dc") {
-        "`n[admon://default]`ndisabled=0`nmonitorSubtree=1" | Out-File -Append -Encoding ascii $path
+        "`n[admon://default]`ndisabled=0`nmonitorSubtree=1" | Out-File -Append -Encoding ascii "$pwd\windows-ta-inputs.conf"
     }
 
     # TODO: change permissions
     # icacls "windows-ta-inputs.conf" /setowner "splunk"
-    Move-Item -Path $path -Destination "$SPLUNKDIR\etc\apps\Splunk_TA_windows\local\inputs.conf" -Force
+    Move-Item -Path "$pwd\windows-ta-inputs.conf" -Destination "$SPLUNKDIR\etc\apps\Splunk_TA_windows\local\inputs.conf" -Force
 }
 
 function install_sysmon_ta {
     print "Installing Splunk Add-on for Sysmon..."
     download "$GITHUB_URL/splunk/windows/splunk-add-on-for-sysmon_402.tgz" "$pwd\splunk-add-on-for-sysmon_402.tgz"
-    & "$SPLUNKDIR\bin\splunk.exe" install app $path -update 1
+    & "$SPLUNKDIR\bin\splunk.exe" install app "$pwd\splunk-add-on-for-sysmon_402.tgz" -update 1
 
     print "Enabling inputs for the Sysmon TA..."
     New-Item -Path "$SPLUNKDIR\etc\apps\Splunk_TA_microsoft_sysmon\local\" -ItemType Directory -Force
     download "$GITHUB_URL/splunk/windows/sysmon-ta-inputs.conf" "$pwd\sysmon-ta-inputs.conf"
     # TODO: change permissions
     # icacls "windows-ta-inputs.conf" /setowner "splunk"
-    Move-Item -Path $path -Destination "$SPLUNKDIR\etc\apps\Splunk_TA_microsoft_sysmon\local\inputs.conf" -Force
+    Move-Item -Path "$pwd\sysmon-ta-inputs.conf" -Destination "$SPLUNKDIR\etc\apps\Splunk_TA_microsoft_sysmon\local\inputs.conf" -Force
 }
 
 function install_add_ons {
@@ -251,11 +254,9 @@ function install_ossec {
     Move-Item -Path ".\ossec-agent.conf" -Destination "$OSSECDIR\ossec.conf" -Force
 
     # Register and start agent
-    & "$OSSECDIR\agent-auth.exe" -m $ip -p 1515
     & "$OSSECDIR\ossec-agent.exe" install-service
-    Start-Service -Name OssecSvc
-    Get-Service -Name OssecSvc
-
+    & "$OSSECDIR\agent-auth.exe" -m $ip -p 1515
+    Move-Item "client.keys" "$OSSECDIR\client.keys" -Force
     print "OSSEC installed"
 }
 #####################################################
@@ -274,7 +275,7 @@ if ($ip -eq "indexer" -or $ip -eq "i") {
     error "Indexer installation not implemented yet"
 } else {
     $SPLUNKDIR = "C:\Program Files\SplunkUniversalForwarder"
-    $ip = $ip + ":9997"
+    # $ip = $ip + ":9997"
 
     # Check that the IP is valid
     $regex = '\b(([01]?\d?\d|2[0-4]\d|25[0-5])\.){3}([01]?\d?\d|2[0-4]\d|25[0-5])\b'
@@ -303,7 +304,10 @@ print "Adding web logs..."
 add_monitor "C:\inetpub\logs\LogFiles\" "web"
 
 print "Installing OSSEC..."
+print "You do not need to provide a key or server IP (just close the window when it asks for it)"
 install_ossec
+Start-Service OssecSvc
+Get-Service OssecSvc
 
 print "End of script"
 #####################################################
