@@ -225,8 +225,8 @@ function install_ossec {
         # Download custom config
         info "Downloading OSSEC client configuration..."
         CLIENT_CONFIG="$OSSEC_DIR/etc/ossec.conf"
-        # sudo sed -i "s/<server-ip>[\d\.]+</server-ip>/<server-ip>$IP</server-ip>/" $OSSEC_DIR/etc/ossec.conf
-        download $GITHUB_URL/splunk/linux/ossec-agent-local.conf ./ossec-agent.conf
+        # download $GITHUB_URL/splunk/linux/ossec-agent-local.conf ./ossec-agent.conf
+        download $GITHUB_URL/splunk/linux/ossec-agent.conf ./ossec-agent.conf
         # Replace dynamic values
         sed -i "s/{SERVER_IP}/$IP/" ossec-agent.conf
         sudo mv ossec-agent.conf $CLIENT_CONFIG
