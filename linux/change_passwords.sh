@@ -8,9 +8,6 @@ fi
 
 # Function to change all user passwords to the given password
 change_all_passwords() {
-  local new_password="$1"
-  local user_list
-
   # Get a list of all user accounts (excluding system users)
   if ! user_list=$(getent passwd | awk -F: '$3 >= 1000 && $1 != "nobody" {print $1}'); then
     echo "Error: Unable to retrieve user list."
@@ -19,6 +16,13 @@ change_all_passwords() {
 
   # Loop through each user and change their password
   for user in $user_list; do
+    # Ask the user for the new password
+    read -p "Enter the new password for $user: " -s new_password
+    echo
+
+    # Ask the user to confirm the password
+    read -p "Retype the new password to confirm: " -s confirm_password
+    echo
     if ! echo "$user:$new_password" | chpasswd; then
       echo "Failed to change password for $user."
     else
@@ -27,13 +31,7 @@ change_all_passwords() {
   done
 }
 
-# Ask the user for the new password
-read -p "Enter the new password for all users: " -s new_password
-echo
 
-# Ask the user to confirm the password
-read -p "Retype the new password to confirm: " -s confirm_password
-echo
 
 if [ "$new_password" != "$confirm_password" ]; then
   echo "Passwords do not match. Passwords were not changed."
