@@ -1786,9 +1786,9 @@ function Change-DA-Passwords {
                     $writer.write("$pwPlainText$($_.name)")
                     $writer.Flush()
                     $stringAsStream.Position = 0
-                    $newpw = (Get-FileHash -Algorithm SHA256 -InputStream $stringAsStream).hash + "!"
+                    $newpw = (Get-FileHash -Algorithm SHA256 -InputStream $stringAsStream).hash
                     write-host $newpw.Substring(0,12)
-                    $_ | Set-ADAccountPassword -Reset -NewPassword (ConvertTo-SecureString -AsPlainText -String $newpw.Substring(0,12) -Force)
+                    $_ | Set-ADAccountPassword -Reset -NewPassword (ConvertTo-SecureString -AsPlainText -String ($newpw.Substring(0,12) + "!") -Force)
                 }
                 Write-Host "Success!!`n"
 
@@ -1829,9 +1829,9 @@ function Change-User-Passwords {
                     $writer.write("$pwPlainText$($_.name)")
                     $writer.Flush()
                     $stringAsStream.Position = 0
-                    $newpw = (Get-FileHash -Algorithm SHA256 -InputStream $stringAsStream).hash + "!"
+                    $newpw = (Get-FileHash -Algorithm SHA256 -InputStream $stringAsStream).hash
                     write-host $newpw.Substring(0,12)
-                    $_ | Set-ADAccountPassword -Reset -NewPassword (ConvertTo-SecureString -AsPlainText -String $newpw.Substring(0,12) -Force)
+                    $_ | Set-ADAccountPassword -Reset -NewPassword (ConvertTo-SecureString -AsPlainText -String ($newpw.Substring(0,12) + "!") -Force)
                 }
                 Write-Host "Success!!`n"
 
