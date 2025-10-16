@@ -2,3 +2,4 @@ splunk/ccdc-app
 splunk/ccdc-add-on
 splunk/linux/*/
 splunk/windows/*/
+.DS_Store
