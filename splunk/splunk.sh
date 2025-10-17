@@ -91,7 +91,11 @@ function get_input_string {
 }
 
 function faketty () {
-    script -qfc "$(printf "%q " "$@")" /dev/null
+    if command -v script >/dev/null 2>&1; then
+        script -qfc "$(printf "%q " "$@")" /dev/null
+    else
+        "$@"
+    fi
 }
 
 function download {
