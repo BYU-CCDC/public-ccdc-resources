@@ -76,6 +76,7 @@ WEB_MENU_ACTIONS=(
 )
 
 CONTINUOUS_WORKFLOW_STEPS=(
+    "run_clamav_scan"
     "run_rkhunter"
 )
 
@@ -370,15 +371,20 @@ function show_core_menu {
 function show_continuous_menu {
     while true; do
         print_banner "Continuous Monitoring"
-        echo "1) Run rkhunter"
-        echo "2) Return to main menu"
-        read -r -p "Enter your choice [1-2]: " adv_choice
+        echo "1) Run ClamAV malware scan"
+        echo "2) Run full continuous workflow (ClamAV + rkhunter)"
+        echo "3) Return to main menu"
+        read -r -p "Enter your choice [1-3]: " adv_choice
         echo
         case "$adv_choice" in
             1)
-                run_continuous_workflow
+                initialize_environment
+                run_if_exists run_clamav_scan
                 ;;
             2)
+                run_continuous_workflow
+                ;;
+            3)
                 log_info "Returning to main menu..."
                 break
                 ;;

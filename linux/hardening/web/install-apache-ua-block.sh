@@ -89,10 +89,30 @@ mkdir -p "$CONF_DIR" "$LOG_DIR"
 }
 
 enable_module() {
-local mod="$1"
-if command -v a2enmod >/dev/null 2>&1; then
-apache2ctl -M 2>/dev/null | grep -qiE "\\b${mod}_module\\b" || a2enmod "$mod" >/dev/null
-fi
+    local mod="$1"
+
+    if command -v "$CTL" >/dev/null 2>&1; then
+        if "$CTL" -M 2>/dev/null | grep -qiE "\\b${mod}_module\\b"; then
+            return 0
+        fi
+    fi
+
+    if command -v a2query >/dev/null 2>&1; then
+        if a2query -m "$mod" 2>/dev/null | grep -qiE 'enabled|static'; then
+            return 0
+        fi
+    fi
+
+    if command -v a2enmod >/dev/null 2>&1; then
+        if a2enmod "$mod" >/dev/null 2>&1; then
+            return 0
+        fi
+
+        if [[ ! -f "/etc/apache2/mods-available/${mod}.load" ]]; then
+            echo "Module $mod not available on this platform; skipping enable." >&2
+            return 0
+        fi
+    fi
 }
 
 safe_write() {
