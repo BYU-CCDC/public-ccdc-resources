@@ -307,17 +307,29 @@ function secure_mysql {
 
     local current_root_pass
     local new_root_pass
+    local confirm_root_pass
 
     current_root_pass=$(get_silent_input_string "Enter current MySQL root password (leave blank if none): ")
     echo
 
-    new_root_pass=$(get_silent_input_string "Enter desired MySQL root password: ")
-    echo
+    while true; do
+        new_root_pass=$(get_silent_input_string "Enter desired MySQL root password: ")
+        echo
 
-    if [ -z "$new_root_pass" ]; then
-        log_warning "No new MySQL root password provided. Aborting MySQL hardening."
-        return 1
-    fi
+        if [ -z "$new_root_pass" ]; then
+            log_error "New MySQL root password cannot be blank. Please try again."
+            continue
+        fi
+
+        confirm_root_pass=$(get_silent_input_string "Confirm MySQL root password: ")
+        echo
+
+        if [ "$new_root_pass" == "$confirm_root_pass" ]; then
+            break
+        fi
+
+        log_error "Passwords do not match. Please try again."
+    done
 
     local escaped_new_pass
     escaped_new_pass=$(_escape_sql_string "$new_root_pass")
