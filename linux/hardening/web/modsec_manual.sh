@@ -49,10 +49,17 @@ harden_modsecurity_base() {
     ensure_directive_line "$conf" "SecRequestBodyNoFilesLimit" "SecRequestBodyNoFilesLimit 131072"
     ensure_directive_line "$conf" "SecRequestBodyInMemoryLimit" "SecRequestBodyInMemoryLimit 131072"
     ensure_directive_line "$conf" "SecRequestBodyLimitAction" "SecRequestBodyLimitAction Reject"
+    ensure_directive_line "$conf" "SecRequestBodyAccess" "SecRequestBodyAccess On"
     ensure_directive_line "$conf" "SecResponseBodyAccess" "SecResponseBodyAccess Off"
+    ensure_directive_line "$conf" "SecDefaultAction" "SecDefaultAction \"phase:1,deny,log,status:403\""
+    ensure_directive_line "$conf" "SecPcreMatchLimit" "SecPcreMatchLimit 1000"
+    ensure_directive_line "$conf" "SecPcreMatchLimitRecursion" "SecPcreMatchLimitRecursion 1000"
     ensure_directive_line "$conf" "SecAuditLogType" "SecAuditLogType Serial"
     ensure_directive_line "$conf" "SecAuditLogParts" "SecAuditLogParts ABCEFHJKZ"
     ensure_directive_line "$conf" "SecAuditEngine" "SecAuditEngine RelevantOnly"
+    ensure_directive_line "$conf" "SecAuditLog" "SecAuditLog /var/log/apache2/modsec_audit.log"
+    ensure_directive_line "$conf" "SecTmpDir" "SecTmpDir /var/cache/modsecurity/tmp"
+    ensure_directive_line "$conf" "SecDataDir" "SecDataDir /var/cache/modsecurity/data"
 }
 
 deploy_ccdc_crs_profile() {
@@ -174,6 +181,10 @@ install_modsecurity_manual() {
     sudo chmod 644 /etc/modsecurity/modsecurity.conf
     harden_modsecurity_base "/etc/modsecurity/modsecurity.conf"
 
+    sudo mkdir -p /var/cache/modsecurity/tmp /var/cache/modsecurity/data
+    sudo chown root:root /var/cache/modsecurity /var/cache/modsecurity/tmp /var/cache/modsecurity/data
+    sudo chmod 750 /var/cache/modsecurity /var/cache/modsecurity/tmp /var/cache/modsecurity/data
+
     local audit_log="/var/log/apache2/modsec_audit.log"
     sudo mkdir -p /var/log/apache2
     if [ ! -f "$audit_log" ]; then
@@ -265,6 +276,7 @@ configure_modsecurity() {
 
     sudo chown root:root "$main_conf"
     sudo chmod 644 "$main_conf"
+    harden_modsecurity_base "$main_conf"
 
     sudo mkdir -p /var/log/apache2
     local audit_log="/var/log/apache2/modsec_audit.log"
@@ -273,6 +285,10 @@ configure_modsecurity() {
     fi
     sudo chown www-data:www-data "$audit_log"
     sudo chmod 640 "$audit_log"
+
+    sudo mkdir -p /var/cache/modsecurity/tmp /var/cache/modsecurity/data
+    sudo chown root:root /var/cache/modsecurity /var/cache/modsecurity/tmp /var/cache/modsecurity/data
+    sudo chmod 750 /var/cache/modsecurity /var/cache/modsecurity/tmp /var/cache/modsecurity/data
 
     local crs_repo="/usr/share/owasp-modsecurity-crs"
     if [ -d "$crs_repo/.git" ]; then
@@ -315,6 +331,9 @@ configure_modsecurity() {
         fi
         if ! grep -q "Include /usr/share/owasp-modsecurity-crs/rules/*.conf" "$sec_conf"; then
             echo "Include /usr/share/owasp-modsecurity-crs/rules/*.conf" | sudo tee -a "$sec_conf" >/dev/null
+        fi
+        if ! grep -q "IncludeOptional /etc/modsecurity/crs/custom/*.conf" "$sec_conf"; then
+            echo "IncludeOptional /etc/modsecurity/crs/custom/*.conf" | sudo tee -a "$sec_conf" >/dev/null
         fi
     else
         log_error "$sec_conf not found. ModSecurity might not be enabled with 'a2enmod security2'."
