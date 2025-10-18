@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 function generate_strict_modsec_conf {
     local conf_file="/tmp/modsecurity_strict.conf"
     print_banner "Generating Strict ModSecurity Configuration"

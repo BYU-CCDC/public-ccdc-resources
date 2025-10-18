@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 function run_rkhunter {
     print_banner "Running Rootkit Hunter"
 

@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 function remove_profiles {
     print_banner "Removing Profile Files"
 

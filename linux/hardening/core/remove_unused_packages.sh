@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 function remove_unused_packages {
     print_banner "Removing Unused Packages"
 

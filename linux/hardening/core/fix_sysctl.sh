@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 function sysctl_config {
     print_banner "Applying sysctl Configurations"
 

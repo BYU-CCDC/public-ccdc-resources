@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 function search_ssn {
     print_banner "Searching for SSN Patterns"
 

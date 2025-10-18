@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 function setup_proxy_certificates_and_config {
     print_banner "Proxy and Certificate Configuration Setup"
 

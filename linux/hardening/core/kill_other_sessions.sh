@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 function kill_other_sessions {
     # Get the current TTY device (e.g., /dev/pts/0)
     local current_tty=$(tty 2>/dev/null)

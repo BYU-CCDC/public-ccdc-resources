@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 # Global Apache hardening helpers
 
 function configure_apache_htaccess {
@@ -70,8 +72,16 @@ ServerTokens Prod
 
     <IfModule mod_headers.c>
         Header always set X-Content-Type-Options "nosniff"
-        Header always set X-Frame-Options "SAMEORIGIN"
+        Header always set X-Frame-Options "DENY"
         Header always set X-XSS-Protection "1; mode=block"
+        Header always set Referrer-Policy "strict-origin-when-cross-origin"
+        Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(), interest-cohort=()"
+        Header always set Content-Security-Policy "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
+        Header always set Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+        Header always set X-Permitted-Cross-Domain-Policies "none"
+        Header always set Cross-Origin-Resource-Policy "same-origin"
+        Header always set Cross-Origin-Embedder-Policy "require-corp"
+        Header always set Cross-Origin-Opener-Policy "same-origin"
     </IfModule>
 </Directory>
 

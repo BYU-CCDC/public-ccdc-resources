@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 function defend_against_forkbomb {
     print_banner "Defending Against Fork Bombing"
 

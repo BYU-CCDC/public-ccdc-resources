@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 function fix_pam {
     print_banner "Fixing PAM Configuration and Enforcing Password Policies"
 

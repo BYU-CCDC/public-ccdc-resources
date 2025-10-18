@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 function secure_php_ini {
     print_banner "Securing php.ini Files"
 

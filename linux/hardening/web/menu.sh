@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 function show_web_hardening_menu {
     print_banner "Web Hardening Menu"
     if [ "$ANSIBLE" == "true" ]; then

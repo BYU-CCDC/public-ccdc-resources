@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 function check_permissions {
     print_banner "Checking and Setting Permissions"
 

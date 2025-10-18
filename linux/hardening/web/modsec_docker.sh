@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 function install_modsecurity_docker {
     print_banner "Dockerized ModSecurity Installation (Strict Mode)"
     

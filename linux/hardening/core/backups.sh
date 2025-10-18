@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 function backup_directories {
     if [ "$ANSIBLE" == "true" ]; then
         log_warning "Ansible mode: Skipping encrypted backup creation."

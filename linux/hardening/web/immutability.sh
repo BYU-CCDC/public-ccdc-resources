@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 function manage_web_immutability_menu {
     # A list of “candidate” directories that you believe should normally be immutable.
     # Adjust this list to suit your environment. 

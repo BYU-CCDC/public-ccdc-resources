@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 function check_service_integrity {
     print_banner "Checking Service Binary Integrity"
 

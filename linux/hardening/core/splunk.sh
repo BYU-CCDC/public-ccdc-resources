@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 function setup_splunk {
     print_banner "Installing Splunk"
 

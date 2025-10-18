@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 function change_root_password {
     if [ "$ANSIBLE" == "true" ]; then
         log_info "Ansible mode: Skipping root password change."

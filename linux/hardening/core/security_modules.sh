@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 function configure_security_modules {
     print_banner "Configuring Security Modules (SELinux & AppArmor)"
 

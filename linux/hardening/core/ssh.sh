@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 function configure_login_banner {
     print_banner "Configuring Login Banner"
 

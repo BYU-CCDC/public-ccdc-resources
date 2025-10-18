@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 function patch_vulnerabilities {
     print_banner "Patching Vulnerabilities"
 

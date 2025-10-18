@@ -133,15 +133,36 @@ configure_modsecurity() {
 
     sudo mkdir -p /etc/modsecurity
 
-    local recommended_conf="/etc/modsecurity/modsecurity.conf-recommended"
+    local recommended_conf=""
     local main_conf="/etc/modsecurity/modsecurity.conf"
-    if [ -f "$recommended_conf" ]; then
-        sudo cp "$recommended_conf" "$main_conf"
-        sudo sed -i 's/^SecRuleEngine\s\+DetectionOnly/SecRuleEngine On/i' "$main_conf"
-    else
-        log_error "${recommended_conf} not found! Cannot configure ModSecurity."
+    local candidate
+    for candidate in \
+        /etc/modsecurity/modsecurity.conf-recommended \
+        /usr/share/doc/libapache2-mod-security2/examples/modsecurity.conf-recommended \
+        /usr/share/modsecurity-crs/modsecurity.conf-recommended \
+        /usr/share/owasp-modsecurity-crs/modsecurity.conf-recommended; do
+        if [ -f "$candidate" ]; then
+            recommended_conf="$candidate"
+            break
+        fi
+    done
+
+    if [ -z "$recommended_conf" ]; then
+        log_error "modsecurity.conf-recommended not found. Install ModSecurity packages first."
         return 1
     fi
+
+    log_info "Using recommended ModSecurity config from $recommended_conf"
+    sudo cp "$recommended_conf" "$main_conf"
+    if ! sudo sed -Ei 's/^\s*SecRuleEngine\s+.*/SecRuleEngine On/I' "$main_conf"; then
+        log_error "Failed to enable blocking mode in $main_conf"
+        return 1
+    fi
+    if ! sudo grep -qE '^\s*SecRuleEngine\s+On' "$main_conf"; then
+        log_error "SecRuleEngine On not detected in $main_conf after update"
+        return 1
+    fi
+    log_success "SecRuleEngine enforced in $main_conf"
 
     sudo chown root:root "$main_conf"
     sudo chmod 644 "$main_conf"
@@ -172,6 +193,7 @@ configure_modsecurity() {
     sudo mkdir -p /etc/modsecurity/crs
     if [ -f "/usr/share/owasp-modsecurity-crs/crs-setup.conf.example" ] && [ ! -f "/etc/modsecurity/crs/crs-setup.conf" ]; then
         sudo cp /usr/share/owasp-modsecurity-crs/crs-setup.conf.example /etc/modsecurity/crs/crs-setup.conf
+        log_info "Copied CRS setup file to /etc/modsecurity/crs/crs-setup.conf"
     fi
 
     local sec_conf="/etc/apache2/mods-enabled/security2.conf"
@@ -179,18 +201,20 @@ configure_modsecurity() {
 
     if [ -f "$sec_conf" ]; then
         sudo cp "$sec_conf" "$backup_sec_conf"
-        sudo sed -i 's|^\([ \t]*Include.*modsecurity-crs.*\)|#\1|' "$sec_conf"
-        sudo sed -i 's|^\([ \t]*IncludeOptional.*modsecurity-crs.*\)|#\1|' "$sec_conf"
-        sudo sed -i 's|^\([ \t]*Include.*owasp-modsecurity-crs.*\)|#\1|' "$sec_conf"
-        sudo sed -i 's|^\([ \t]*IncludeOptional.*owasp-modsecurity-crs.*\)|#\1|' "$sec_conf"
-        grep -q "Include /etc/modsecurity/crs/crs-setup.conf" "$sec_conf" || \
+        sudo sed -i 's|^\([ \t]*Include\(Optional\)\?.*modsecurity-crs.*\)|#\1|' "$sec_conf"
+        sudo sed -i 's|^\([ \t]*Include\(Optional\)\?.*owasp-modsecurity-crs.*\)|#\1|' "$sec_conf"
+        if ! grep -q "Include /etc/modsecurity/crs/crs-setup.conf" "$sec_conf"; then
             echo "Include /etc/modsecurity/crs/crs-setup.conf" | sudo tee -a "$sec_conf" >/dev/null
-        grep -q "Include /usr/share/owasp-modsecurity-crs/rules/*.conf" "$sec_conf" || \
+        fi
+        if ! grep -q "Include /usr/share/owasp-modsecurity-crs/rules/*.conf" "$sec_conf"; then
             echo "Include /usr/share/owasp-modsecurity-crs/rules/*.conf" | sudo tee -a "$sec_conf" >/dev/null
+        fi
     else
         log_error "$sec_conf not found. ModSecurity might not be enabled with 'a2enmod security2'."
         return 1
     fi
+
+    log_success "security2.conf updated to use CRS includes"
 
     local apachectl_cmd=""
     if command -v apachectl >/dev/null 2>&1; then
@@ -246,16 +270,6 @@ configure_modsecurity() {
         log_warning "No Apache restart command available; please restart manually to apply changes."
     fi
 
-    local default_site="/etc/apache2/sites-enabled/000-default.conf"
-    if [ -f "$default_site" ]; then
-        sudo sed -i '/CustomLog ${APACHE_LOG_DIR}\/access.log combined/ a \
-        SecRuleEngine On
-' "$default_site"
-        log_info "Inserted 'SecRuleEngine On' into $default_site"
-    else
-        log_warning "Default Apache site $default_site not found; skipping inline SecRuleEngine insertion."
-    fi
-
     local servername_conf="/etc/apache2/conf-available/servername.conf"
     if [ -d "/etc/apache2/conf-available" ] && [ ! -f "$servername_conf" ]; then
         echo "ServerName localhost" | sudo tee "$servername_conf" >/dev/null
@@ -265,8 +279,10 @@ configure_modsecurity() {
         log_info "Registered default ServerName localhost to silence Apache warnings."
     fi
 
-    log_info "ModSecurity configured in blocking mode; /etc/modsecurity/crs/crs-setup.conf is used."
-    log_info "Any old /usr/share/... references have been commented out in security2.conf."
+    log_success "ModSecurity configured in blocking mode with OWASP CRS"
+    log_info "Main config: $main_conf"
+    log_info "CRS setup: /etc/modsecurity/crs/crs-setup.conf"
+    log_info "Rules include: /usr/share/owasp-modsecurity-crs/rules/*.conf"
 
     return 0
 }

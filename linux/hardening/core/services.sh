@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 function audit_running_services {
     print_banner "Auditing Running Services"
     log_info "Listing running services (TCP/UDP listening ports):"

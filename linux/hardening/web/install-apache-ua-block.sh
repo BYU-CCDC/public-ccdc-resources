@@ -64,6 +64,7 @@ CONF_TAG="# Managed by [install-apache-ua-block.sh](http://install-apache-ua-blo
 
 CACHE_DIR="/var/cache/ua-block"
 CACHE_LIST="$CACHE_DIR/bad-user-agents.list"
+LOCAL_FALLBACK_LIST="$SCRIPT_DIR/data/bad-user-agents.defaults"
 MAX_REGEX_CHARS=3500
 
 # CLI defaults
@@ -179,16 +180,28 @@ safe_write() {
 fetch_list() {
 mkdir -p "$CACHE_DIR"
 log_info "Fetching remote User-Agent block lists"
-if curl -fsSL "$PRIMARY_URL" -o "$CACHE_LIST.tmp"; then
-log_success "Fetched primary UA list"
-elif curl -fsSL "$FALLBACK_URL" -o "$CACHE_LIST.tmp"; then
-log_warning "Primary UA list unavailable; using fallback list"
+local tmp_file="$CACHE_LIST.tmp"
+rm -f "$tmp_file"
+
+if curl --connect-timeout 5 --retry 2 --retry-delay 2 -fsSL "$PRIMARY_URL" -o "$tmp_file"; then
+    log_success "Fetched primary UA list"
+elif curl --connect-timeout 5 --retry 2 --retry-delay 2 -fsSL "$FALLBACK_URL" -o "$tmp_file"; then
+    log_warning "Primary UA list unavailable; using fallback mirror"
+elif [[ -f "$LOCAL_FALLBACK_LIST" ]]; then
+    log_warning "Remote UA lists unavailable; using bundled fallback list"
+    cp "$LOCAL_FALLBACK_LIST" "$tmp_file"
 else
-log_error "Both remote UA lists unavailable; using built-in defaults"
-printf "sqlmap\nnikto\nnmap\ncurl\npython\nmasscan\nwpscan\n" >"$CACHE_LIST.tmp"
+    log_error "No remote or local UA lists available; falling back to minimal defaults"
+    printf "sqlmap\nnikto\nnmap\ncurl\npython\nmasscan\nwpscan\n" >"$tmp_file"
 fi
-tr -d '\r' <"$CACHE_LIST.tmp" | grep -Ev '^(#|$)' >"$CACHE_LIST"
-rm -f "$CACHE_LIST.tmp"
+
+if [[ -s "$tmp_file" ]]; then
+    tr -d '\r' <"$tmp_file" | grep -Ev '^(#|$)' >"$CACHE_LIST"
+else
+    log_error "Downloaded UA list is empty; writing minimal defaults"
+    printf "sqlmap\nnikto\nnmap\ncurl\npython\nmasscan\nwpscan\n" >"$CACHE_LIST"
+fi
+rm -f "$tmp_file"
 }
 
 build_chunks() {
