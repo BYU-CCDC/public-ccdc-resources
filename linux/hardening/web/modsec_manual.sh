@@ -62,34 +62,36 @@ harden_modsecurity_base() {
     ensure_directive_line "$conf" "SecDataDir" "SecDataDir /var/cache/modsecurity/data"
 }
 
-deploy_ccdc_crs_profile() {
-    local custom_dir="/etc/modsecurity/crs/custom"
-    local custom_conf="$custom_dir/zz-ccdc-hardening.conf"
+refresh_crs_tuning_block() {
+    local file="$1"
+    local begin="# --- BEGIN CCDC Managed CRS Tuning ---"
+    local end="# --- END CCDC Managed CRS Tuning ---"
 
-    sudo mkdir -p "$custom_dir"
-    log_info "Refreshing CCDC CRS customization profile at $custom_conf"
-    cat <<'EOF' | sudo tee "$custom_conf" >/dev/null
-# Managed by CCDC ModSecurity automation
-# Enforces a stricter, business-friendly OWASP CRS profile
+    if sudo grep -q "$begin" "$file"; then
+        sudo sed -i "/$begin/,/$end/d" "$file"
+    fi
+
+    cat <<'EOF' | sudo tee -a "$file" >/dev/null
+# --- BEGIN CCDC Managed CRS Tuning ---
 SecAction \
- "id:901000,\
+ "id:900100,\
   phase:1,\
   nolog,\
   pass,\
   t:none,\
-  setvar:tx.paranoia_level=2,\
-  setvar:tx.blocking_paranoia_level=2,\
-  setvar:tx.inbound_anomaly_score_threshold=5,\
-  setvar:tx.outbound_anomaly_score_threshold=4,\
-  setvar:tx.enforce_bodyproc_urlencoded=1,\
-  setvar:tx.allowed_methods=GET HEAD POST OPTIONS,\
-  setvar:tx.allowed_request_content_type=|application/x-www-form-urlencoded|multipart/form-data|text/xml|application/json|application/xml|text/plain|application/soap+xml|application/graphql|application/grpc|application/octet-stream|application/pdf|image/png|image/jpeg|image/gif|,\
-  setvar:tx.allowed_request_content_type_charset=utf-8|iso-8859-1|,\
-  setvar:tx.restricted_extensions=.cmd .exe .com .bat .cgi .reg .dll .scr .pif .jar .jsp .asp .aspx .php .php3 .php4 .php5 .phtml .pl .py .rb .war,\
-  setvar:tx.restricted_headers=/proxy/ /if-modified-since/ /if-unmodified-since/ /if-match/ /if-none-match/ /referer/ /via/ /x-forwarded-for/,\
-  setvar:tx.dos_burst_time_slice=60,\
-  setvar:tx.dos_counter_threshold=75,\
-  setvar:tx.dos_block_timeout=600"
+  setvar:'tx.paranoia_level=2',\
+  setvar:'tx.blocking_paranoia_level=2',\
+  setvar:'tx.enforce_bodyproc_urlencoded=1',\
+  setvar:'tx.inbound_anomaly_score_threshold=5',\
+  setvar:'tx.outbound_anomaly_score_threshold=4',\
+  setvar:'tx.allowed_methods=GET HEAD POST OPTIONS',\
+  setvar:'tx.allowed_request_content_type=|application/x-www-form-urlencoded|multipart/form-data|text/xml|application/json|application/xml|text/plain|image/png|image/jpeg|image/gif|',\
+  setvar:'tx.allowed_request_content_type_charset=utf-8|iso-8859-1|',\
+  setvar:'tx.restricted_extensions=.cmd .exe .com .bat .cgi .reg .dll .scr .pif .jar .jsp .asp .aspx .php .php3 .php4 .php5 .phtml .pl .py .rb .war',\
+  setvar:'tx.restricted_headers=/proxy/ /if-modified-since/ /if-unmodified-since/ /if-match/ /if-none-match/ /referer/ /via/ /x-forwarded-for/',\
+  setvar:'tx.dos_burst_time_slice=60',\
+  setvar:'tx.dos_counter_threshold=75',\
+  setvar:'tx.dos_block_timeout=600'"
 
 SecRule REQUEST_METHOD "!^(?:GET|POST|HEAD|OPTIONS)$" \
  "id:901100,\
@@ -127,11 +129,47 @@ SecRule REQUEST_HEADERS:Content-Type "!@rx ^(?:application|text|image|multipart)
   status:415,\
   msg:'CCDC Hardening: Unsupported Content-Type for request body',\
   severity:WARNING"
+# --- END CCDC Managed CRS Tuning ---
 EOF
+}
 
-    sudo chown root:root "$custom_conf"
-    sudo chmod 640 "$custom_conf"
-    log_success "Deployed CCDC OWASP CRS customization profile at $custom_conf"
+ensure_crs_setup_profile() {
+    local destination="/etc/modsecurity/crs/crs-setup.conf"
+    local sources=(
+        "/etc/modsecurity/crs/crs-setup.conf"
+        "/usr/share/owasp-modsecurity-crs/crs-setup.conf.example"
+        "/usr/share/modsecurity-crs/crs-setup.conf.example"
+        "/usr/share/owasp-modsecurity-crs/crs-setup.conf"
+        "/usr/share/modsecurity-crs/crs-setup.conf"
+    )
+
+    sudo mkdir -p "$(dirname "$destination")"
+
+    if [ ! -f "$destination" ]; then
+        local source=""
+        for candidate in "${sources[@]}"; do
+            if [ -f "$candidate" ]; then
+                source="$candidate"
+                break
+            fi
+        done
+
+        if [ -n "$source" ]; then
+            log_info "Populating CRS setup file from $source"
+            sudo cp "$source" "$destination"
+        else
+            log_error "Unable to locate a CRS setup template. Install OWASP CRS before continuing."
+            return 1
+        fi
+    else
+        log_info "Existing CRS setup file detected at $destination"
+    fi
+
+    sudo chown root:root "$destination"
+    sudo chmod 640 "$destination"
+    refresh_crs_tuning_block "$destination"
+
+    return 0
 }
 
 install_modsecurity_manual() {
@@ -192,6 +230,11 @@ install_modsecurity_manual() {
     fi
     sudo chown www-data:www-data "$audit_log"
     sudo chmod 640 "$audit_log"
+
+    if ! ensure_crs_setup_profile; then
+        log_error "CRS setup provisioning failed"
+        return 1
+    fi
 
     if command -v a2enmod >/dev/null 2>&1; then
         if sudo a2enmod security2 >/dev/null 2>&1; then
@@ -311,13 +354,9 @@ configure_modsecurity() {
         fi
     fi
 
-    sudo mkdir -p /etc/modsecurity/crs
-    if [ -f "/usr/share/owasp-modsecurity-crs/crs-setup.conf.example" ] && [ ! -f "/etc/modsecurity/crs/crs-setup.conf" ]; then
-        sudo cp /usr/share/owasp-modsecurity-crs/crs-setup.conf.example /etc/modsecurity/crs/crs-setup.conf
-        log_info "Copied CRS setup file to /etc/modsecurity/crs/crs-setup.conf"
+    if ! ensure_crs_setup_profile; then
+        return 1
     fi
-
-    deploy_ccdc_crs_profile
 
     local sec_conf="/etc/apache2/mods-enabled/security2.conf"
     local backup_sec_conf="/etc/apache2/mods-enabled/security2.conf.bak"
