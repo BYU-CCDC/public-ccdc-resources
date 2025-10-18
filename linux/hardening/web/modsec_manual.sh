@@ -29,6 +29,104 @@ if ! declare -F log_info >/dev/null 2>&1; then
     log_error() { _modsec_emit "ERROR" "$RED" "$@"; }
 fi
 
+ensure_directive_line() {
+    local file="$1"
+    local directive="$2"
+    local replacement="$3"
+
+    if sudo grep -Eq "^\\s*${directive}\\b" "$file"; then
+        sudo sed -Ei "s|^\\s*${directive}\\b.*|${replacement}|" "$file"
+    else
+        echo "$replacement" | sudo tee -a "$file" >/dev/null
+    fi
+}
+
+harden_modsecurity_base() {
+    local conf="$1"
+
+    log_info "Applying opinionated ModSecurity base hardening to $conf"
+    ensure_directive_line "$conf" "SecRequestBodyLimit" "SecRequestBodyLimit 13107200"
+    ensure_directive_line "$conf" "SecRequestBodyNoFilesLimit" "SecRequestBodyNoFilesLimit 131072"
+    ensure_directive_line "$conf" "SecRequestBodyInMemoryLimit" "SecRequestBodyInMemoryLimit 131072"
+    ensure_directive_line "$conf" "SecRequestBodyLimitAction" "SecRequestBodyLimitAction Reject"
+    ensure_directive_line "$conf" "SecResponseBodyAccess" "SecResponseBodyAccess Off"
+    ensure_directive_line "$conf" "SecAuditLogType" "SecAuditLogType Serial"
+    ensure_directive_line "$conf" "SecAuditLogParts" "SecAuditLogParts ABCEFHJKZ"
+    ensure_directive_line "$conf" "SecAuditEngine" "SecAuditEngine RelevantOnly"
+}
+
+deploy_ccdc_crs_profile() {
+    local custom_dir="/etc/modsecurity/crs/custom"
+    local custom_conf="$custom_dir/zz-ccdc-hardening.conf"
+
+    sudo mkdir -p "$custom_dir"
+    log_info "Refreshing CCDC CRS customization profile at $custom_conf"
+    cat <<'EOF' | sudo tee "$custom_conf" >/dev/null
+# Managed by CCDC ModSecurity automation
+# Enforces a stricter, business-friendly OWASP CRS profile
+SecAction \
+ "id:901000,\
+  phase:1,\
+  nolog,\
+  pass,\
+  t:none,\
+  setvar:tx.paranoia_level=2,\
+  setvar:tx.blocking_paranoia_level=2,\
+  setvar:tx.inbound_anomaly_score_threshold=5,\
+  setvar:tx.outbound_anomaly_score_threshold=4,\
+  setvar:tx.enforce_bodyproc_urlencoded=1,\
+  setvar:tx.allowed_methods=GET HEAD POST OPTIONS,\
+  setvar:tx.allowed_request_content_type=|application/x-www-form-urlencoded|multipart/form-data|text/xml|application/json|application/xml|text/plain|application/soap+xml|application/graphql|application/grpc|application/octet-stream|application/pdf|image/png|image/jpeg|image/gif|,\
+  setvar:tx.allowed_request_content_type_charset=utf-8|iso-8859-1|,\
+  setvar:tx.restricted_extensions=.cmd .exe .com .bat .cgi .reg .dll .scr .pif .jar .jsp .asp .aspx .php .php3 .php4 .php5 .phtml .pl .py .rb .war,\
+  setvar:tx.restricted_headers=/proxy/ /if-modified-since/ /if-unmodified-since/ /if-match/ /if-none-match/ /referer/ /via/ /x-forwarded-for/,\
+  setvar:tx.dos_burst_time_slice=60,\
+  setvar:tx.dos_counter_threshold=75,\
+  setvar:tx.dos_block_timeout=600"
+
+SecRule REQUEST_METHOD "!^(?:GET|POST|HEAD|OPTIONS)$" \
+ "id:901100,\
+  phase:1,\
+  log,\
+  deny,\
+  status:405,\
+  msg:'CCDC Hardening: HTTP method not allowed',\
+  severity:WARNING"
+
+SecRule REQUEST_HEADERS:User-Agent "^\s*$" \
+ "id:901110,\
+  phase:1,\
+  log,\
+  deny,\
+  status:403,\
+  msg:'CCDC Hardening: Empty User-Agent blocked',\
+  severity:WARNING"
+
+SecRule REQUEST_HEADERS:Content-Length "@gt 0" \
+ "id:901120,\
+  phase:1,\
+  log,\
+  deny,\
+  status:400,\
+  msg:'CCDC Hardening: Requests with a body must declare an allowed Content-Type',\
+  chain"
+    SecRule &REQUEST_HEADERS:Content-Type "@eq 0" "t:none"
+
+SecRule REQUEST_HEADERS:Content-Type "!@rx ^(?:application|text|image|multipart)/" \
+ "id:901121,\
+  phase:1,\
+  log,\
+  deny,\
+  status:415,\
+  msg:'CCDC Hardening: Unsupported Content-Type for request body',\
+  severity:WARNING"
+EOF
+
+    sudo chown root:root "$custom_conf"
+    sudo chmod 640 "$custom_conf"
+    log_success "Deployed CCDC OWASP CRS customization profile at $custom_conf"
+}
+
 install_modsecurity_manual() {
     if ! command -v apt-get >/dev/null 2>&1; then
         log_error "Manual ModSecurity installation is only implemented for Debian-based systems."
@@ -74,6 +172,7 @@ install_modsecurity_manual() {
 
     sudo chown root:root /etc/modsecurity/modsecurity.conf
     sudo chmod 644 /etc/modsecurity/modsecurity.conf
+    harden_modsecurity_base "/etc/modsecurity/modsecurity.conf"
 
     local audit_log="/var/log/apache2/modsec_audit.log"
     sudo mkdir -p /var/log/apache2
@@ -175,10 +274,18 @@ configure_modsecurity() {
     sudo chown www-data:www-data "$audit_log"
     sudo chmod 640 "$audit_log"
 
-    if [ ! -d "/usr/share/owasp-modsecurity-crs" ]; then
-        log_info "OWASP CRS not found; cloning from GitHub..."
+    local crs_repo="/usr/share/owasp-modsecurity-crs"
+    if [ -d "$crs_repo/.git" ]; then
+        log_info "Updating existing OWASP CRS repository at $crs_repo"
+        if ! sudo git -C "$crs_repo" pull --ff-only; then
+            log_warning "Unable to automatically update OWASP CRS; continuing with existing ruleset"
+        fi
+    elif [ -d "$crs_repo" ]; then
+        log_info "OWASP CRS directory detected at $crs_repo"
+    else
+        log_info "OWASP CRS not found; cloning from GitHub (coreruleset/coreruleset)"
         if command -v git >/dev/null 2>&1; then
-            if ! sudo git clone https://github.com/coreruleset/coreruleset.git /usr/share/owasp-modsecurity-crs; then
+            if ! sudo git clone https://github.com/coreruleset/coreruleset.git "$crs_repo"; then
                 log_error "Failed to clone OWASP CRS."
                 return 1
             fi
@@ -186,8 +293,6 @@ configure_modsecurity() {
             log_error "git is not installed. Install git and try again."
             return 1
         fi
-    else
-        log_info "OWASP CRS found; you may pull updates if needed."
     fi
 
     sudo mkdir -p /etc/modsecurity/crs
@@ -195,6 +300,8 @@ configure_modsecurity() {
         sudo cp /usr/share/owasp-modsecurity-crs/crs-setup.conf.example /etc/modsecurity/crs/crs-setup.conf
         log_info "Copied CRS setup file to /etc/modsecurity/crs/crs-setup.conf"
     fi
+
+    deploy_ccdc_crs_profile
 
     local sec_conf="/etc/apache2/mods-enabled/security2.conf"
     local backup_sec_conf="/etc/apache2/mods-enabled/security2.conf.bak"

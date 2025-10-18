@@ -177,6 +177,37 @@ safe_write() {
     fi
 }
 
+download_to_file() {
+    local url="$1" dest="$2" tool=""
+
+    if command -v wget >/dev/null 2>&1; then
+        tool="wget"
+        if wget -q -O "$dest" --tries=2 --timeout=5 "$url"; then
+            log_verbose "Downloaded $url with wget"
+            return 0
+        fi
+        log_warning "wget was unable to download $url"
+    else
+        log_verbose "wget not found; will try curl for $url"
+    fi
+
+    if command -v curl >/dev/null 2>&1; then
+        tool="curl"
+        if curl --connect-timeout 5 --retry 2 --retry-delay 2 -fsSL "$url" -o "$dest"; then
+            log_verbose "Downloaded $url with curl"
+            return 0
+        fi
+        log_warning "curl was unable to download $url"
+    else
+        log_verbose "curl not found while attempting $url"
+    fi
+
+    if [[ -z "$tool" ]]; then
+        log_warning "Neither wget nor curl is available to download $url"
+    fi
+    return 1
+}
+
 fetch_list() {
 mkdir -p "$CACHE_DIR"
 log_info "Fetching remote User-Agent block lists"

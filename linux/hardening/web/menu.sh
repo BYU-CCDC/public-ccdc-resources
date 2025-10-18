@@ -22,9 +22,8 @@ function show_web_hardening_menu {
     echo "11) Manage Web Directory Immutability"
     echo "12) Disable phpMyAdmin"
     echo "13) Configure ModSecurity (block mode with OWASP CRS)"
-    echo "14) Advanced Web Hardening Menu"
-    echo "15) Exit Web Hardening Menu"
-    read -p "Enter your choice [1-15]: " web_menu_choice
+    echo "14) Exit Web Hardening Menu"
+    read -p "Enter your choice [1-14]: " web_menu_choice
     echo
 
     case $web_menu_choice in
@@ -41,7 +40,6 @@ function show_web_hardening_menu {
             disable_phpmyadmin
             kill_other_sessions
             configure_modsecurity
-            web_hardening_menu
             update_prestashop_shop_url
             manage_web_immutability_menu
             kill_other_sessions
@@ -95,10 +93,6 @@ function show_web_hardening_menu {
             configure_modsecurity
             ;;
         14)
-            print_banner "Advanced Web Hardening Configurations"
-            web_hardening_menu
-            ;;
-        15)
             log_info "Exiting Web Hardening Menu"
             ;;
         *)

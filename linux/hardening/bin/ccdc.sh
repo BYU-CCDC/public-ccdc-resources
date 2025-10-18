@@ -60,7 +60,6 @@ WEB_WORKFLOW_STEPS=(
     "disable_phpmyadmin"
     "kill_other_sessions"
     "configure_modsecurity"
-    "web_hardening_menu"
     "update_prestashop_shop_url"
     "manage_web_immutability_menu"
     "kill_other_sessions"
@@ -78,7 +77,6 @@ WEB_MENU_ACTIONS=(
     "update_prestashop_shop_url|Update PrestaShop shop URL"
     "manage_web_immutability_menu|Manage web immutability"
     "disable_phpmyadmin|Disable phpMyAdmin"
-    "web_hardening_menu|Legacy web hardening helper"
 )
 
 CONTINUOUS_WORKFLOW_STEPS=(
@@ -220,7 +218,7 @@ function run_web_menu {
             return 0
         fi
 
-        echo "1) Run full web hardening workflow (${#WEB_WORKFLOW_STEPS[@]} steps)"
+        echo "1) Run full web hardening workflow"
         echo "2) Install ModSecurity (manual packages)"
         echo "3) Install ModSecurity (Docker container)"
         echo "4) Configure ModSecurity ruleset"
@@ -229,12 +227,11 @@ function run_web_menu {
         echo "7) Configure Apache .htaccess"
         echo "8) Run MySQL secure installation"
         echo "9) Disable phpMyAdmin"
-        echo "10) Legacy web hardening helper"
-        echo "11) Update PrestaShop shop URL"
-        echo "12) Manage web immutability"
-        echo "13) Return to previous menu"
+        echo "10) Update PrestaShop shop URL"
+        echo "11) Manage web immutability"
+        echo "12) Return to previous menu"
 
-        read -r -p "Enter your choice [1-13]: " web_choice
+        read -r -p "Enter your choice [1-12]: " web_choice
         echo
 
         case "$web_choice" in
@@ -266,15 +263,12 @@ function run_web_menu {
                 run_if_exists disable_phpmyadmin
                 ;;
             10)
-                run_if_exists web_hardening_menu
-                ;;
-            11)
                 run_if_exists update_prestashop_shop_url
                 ;;
-            12)
+            11)
                 run_if_exists manage_web_immutability_menu
                 ;;
-            13)
+            12)
                 log_info "Returning to previous menu..."
                 break
                 ;;
