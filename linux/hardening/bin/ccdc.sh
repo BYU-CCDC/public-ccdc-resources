@@ -61,6 +61,7 @@ WEB_WORKFLOW_STEPS=(
     "kill_other_sessions"
     "configure_modsecurity"
     "web_hardening_menu"
+    "update_prestashop_shop_url"
     "manage_web_immutability_menu"
     "kill_other_sessions"
 )
@@ -74,6 +75,7 @@ WEB_MENU_ACTIONS=(
     "configure_apache_htaccess|Configure Apache global security policy"
     "install_apache_user_agent_blocker|Install Apache User-Agent blocker"
     "my_secure_sql_installation|Run MySQL secure installation"
+    "update_prestashop_shop_url|Update PrestaShop shop URL"
     "manage_web_immutability_menu|Manage web immutability"
     "disable_phpmyadmin|Disable phpMyAdmin"
     "web_hardening_menu|Legacy web hardening helper"
@@ -228,10 +230,11 @@ function run_web_menu {
         echo "8) Run MySQL secure installation"
         echo "9) Disable phpMyAdmin"
         echo "10) Legacy web hardening helper"
-        echo "11) Manage web immutability"
-        echo "12) Return to previous menu"
+        echo "11) Update PrestaShop shop URL"
+        echo "12) Manage web immutability"
+        echo "13) Return to previous menu"
 
-        read -r -p "Enter your choice [1-12]: " web_choice
+        read -r -p "Enter your choice [1-13]: " web_choice
         echo
 
         case "$web_choice" in
@@ -266,9 +269,12 @@ function run_web_menu {
                 run_if_exists web_hardening_menu
                 ;;
             11)
-                run_if_exists manage_web_immutability_menu
+                run_if_exists update_prestashop_shop_url
                 ;;
             12)
+                run_if_exists manage_web_immutability_menu
+                ;;
+            13)
                 log_info "Returning to previous menu..."
                 break
                 ;;

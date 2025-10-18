@@ -2,6 +2,26 @@
 
 CMS_CONFIG_HELPER="$(dirname "${BASH_SOURCE[0]}")/cms_config_updater.py"
 
+_DEFAULT_BACKUP_DIR="${HOME:-/root}"
+
+function _detect_primary_ipv4_address {
+    local candidate=""
+
+    if command -v hostname >/dev/null 2>&1; then
+        candidate=$(hostname -I 2>/dev/null | tr ' ' '\n' | awk 'NF && $1 !~ /^127\./ && $1 !~ /^169\.254\./ {print $1; exit}')
+    fi
+
+    if [ -z "$candidate" ] && command -v ip >/dev/null 2>&1; then
+        candidate=$(ip -4 addr show scope global 2>/dev/null | awk '/inet / {print $2}' | cut -d/ -f1 | head -n1)
+    fi
+
+    if [ -z "$candidate" ] && command -v ifconfig >/dev/null 2>&1; then
+        candidate=$(ifconfig 2>/dev/null | awk '/inet / && $2 != "127.0.0.1" {print $2; exit}')
+    fi
+
+    echo "$candidate"
+}
+
 function _mysql_exec_internal {
     local password="$1"
     local include_connect_expired="$2"
@@ -59,6 +79,140 @@ function _mysql_connection_ok {
         return 0
     fi
     return 1
+}
+
+function backup_databases {
+    if [ "$ANSIBLE" == "true" ]; then
+        log_warning "Ansible mode: Skipping interactive database backups."
+        return 0
+    fi
+
+    print_banner "Database Backup"
+
+    if ! command -v mysqldump >/dev/null 2>&1; then
+        log_error "mysqldump is not available on this system. Install the MySQL client tools and retry."
+        return 1
+    fi
+
+    local mysql_status=""
+    if command -v systemctl >/dev/null 2>&1; then
+        mysql_status=$(systemctl is-active mysql 2>/dev/null || systemctl is-active mariadb 2>/dev/null || true)
+    fi
+
+    if [ -z "$mysql_status" ]; then
+        if sudo service mysql status >/dev/null 2>&1 || sudo service mariadb status >/dev/null 2>&1; then
+            mysql_status="active"
+        fi
+    fi
+
+    if [ "$mysql_status" != "active" ]; then
+        log_warning "MySQL/MariaDB service does not appear to be running. Attempting to continue regardless."
+    else
+        log_success "MySQL/MariaDB service detected."
+    fi
+
+    local root_password
+    root_password=$(get_silent_input_string "Enter MySQL root password (leave blank to attempt socket authentication): ")
+    echo
+
+    local connection_password="$root_password"
+    if ! _mysql_connection_ok "$connection_password"; then
+        if _mysql_connection_ok ""; then
+            log_warning "Unable to authenticate with provided password. Falling back to socket/no-password authentication."
+            connection_password=""
+        else
+            log_error "Unable to connect to MySQL as root. Verify credentials and retry."
+            return 1
+        fi
+    fi
+
+    local backup_dir
+    backup_dir=$(get_input_string "Directory to store MySQL backup [${_DEFAULT_BACKUP_DIR}]: ")
+    if [ -z "$backup_dir" ]; then
+        backup_dir="${_DEFAULT_BACKUP_DIR}"
+    fi
+
+    if ! mkdir -p "$backup_dir" 2>/dev/null; then
+        log_error "Unable to create or access $backup_dir"
+        return 1
+    fi
+
+    local timestamp
+    timestamp=$(date +%Y%m%d_%H%M%S)
+    local dump_path="${backup_dir%/}/mysql-backup-${timestamp}.sql"
+
+    log_info "Creating MySQL dump at $dump_path"
+
+    local -a dump_cmd=(mysqldump --all-databases --single-transaction --routines --triggers --events)
+    local dump_status
+    if [ "$EUID" -ne 0 ] && command -v sudo >/dev/null 2>&1; then
+        dump_cmd=(sudo "${dump_cmd[@]}")
+    fi
+
+    if [ -n "$connection_password" ]; then
+        if MYSQL_PWD="$connection_password" "${dump_cmd[@]}" >"$dump_path" 2>"${dump_path}.err"; then
+            dump_status=0
+        else
+            dump_status=$?
+        fi
+    else
+        if "${dump_cmd[@]}" >"$dump_path" 2>"${dump_path}.err"; then
+            dump_status=0
+        else
+            dump_status=$?
+        fi
+    fi
+
+    if [ "$dump_status" -ne 0 ]; then
+        log_error "mysqldump failed. Review ${dump_path}.err for details."
+        rm -f "$dump_path"
+        return $dump_status
+    fi
+
+    rm -f "${dump_path}.err"
+    log_success "MySQL databases exported to $dump_path"
+
+    if command -v gpg >/dev/null 2>&1; then
+        local encryption_choice
+        encryption_choice=$(get_input_string "Encrypt backup with GPG symmetric encryption? (Y/n): ")
+        if [[ -z "$encryption_choice" || "$encryption_choice" =~ ^[Yy]$ ]]; then
+            local passphrase=""
+            if command -v openssl >/dev/null 2>&1; then
+                passphrase=$(openssl rand -hex 24)
+            else
+                passphrase=$(date +%s%N | sha256sum | awk '{print $1}')
+            fi
+
+            local enc_path="${dump_path}.gpg"
+            if gpg --batch --yes --pinentry-mode=loopback --passphrase "$passphrase" -c "$dump_path"; then
+                rm -f "$dump_path"
+                log_success "Encrypted backup saved to $enc_path"
+                log_info "Store this passphrase securely: $passphrase"
+            else
+                log_error "Failed to encrypt backup with GPG. Plaintext dump retained at $dump_path"
+            fi
+        else
+            log_info "Skipping GPG encryption as requested."
+        fi
+    else
+        log_warning "gpg not available; backup stored in plaintext at $dump_path"
+    fi
+
+    if command -v pg_dumpall >/dev/null 2>&1; then
+        local pg_status=""
+        if command -v systemctl >/dev/null 2>&1; then
+            pg_status=$(systemctl is-active postgresql 2>/dev/null || true)
+        fi
+        if [ -z "$pg_status" ] && sudo service postgresql status >/dev/null 2>&1; then
+            pg_status="active"
+        fi
+
+        if [ "$pg_status" == "active" ]; then
+            log_info "PostgreSQL is active. Consider running 'pg_dumpall' to export PostgreSQL databases."
+        fi
+    fi
+
+    log_success "Database backup routine completed."
 }
 
 function _escape_sql_string {
@@ -353,6 +507,121 @@ function rotate_db_passwords {
         update_cms_configs "$database_name" "$database_user" "$cms_host_update" "$new_password" "${search_dirs[@]}"
     else
         log_error "Skipping CMS configuration updates to avoid breaking connectivity. Verify credentials for ${database_user}@${database_host} and rerun the helper if needed."
+    fi
+}
+
+function update_prestashop_shop_url {
+    if [ "$ANSIBLE" == "true" ]; then
+        log_info "Ansible mode: Skipping PrestaShop shop URL update."
+        return 0
+    fi
+
+    print_banner "PrestaShop Shop URL Update"
+
+    local proceed
+    proceed=$(get_input_string "Would you like to update the PrestaShop shop URL records? (y/N): ")
+    if [[ ! "$proceed" =~ ^[Yy]$ ]]; then
+        log_info "Skipping PrestaShop shop URL update."
+        return 0
+    fi
+
+    local new_domain=""
+    while true; do
+        echo "1) Detect active IPv4 address"
+        echo "2) Specify address manually"
+        echo "3) Skip shop URL update"
+        local selection
+        selection=$(get_input_string "Select an option [1-3]: ")
+        case "$selection" in
+            1)
+                new_domain=$(_detect_primary_ipv4_address)
+                if [ -z "$new_domain" ]; then
+                    log_error "Unable to detect a non-loopback IPv4 address automatically."
+                    continue
+                fi
+                log_info "Detected host address: $new_domain"
+                break
+                ;;
+            2)
+                new_domain=$(get_input_string "Enter the IP address or hostname to use: ")
+                if [ -z "$new_domain" ]; then
+                    log_error "Value cannot be empty."
+                    continue
+                fi
+                break
+                ;;
+            3|"" )
+                log_info "Skipping PrestaShop shop URL update."
+                return 0
+                ;;
+            *)
+                log_warning "Invalid selection."
+                ;;
+        esac
+    done
+
+    local db_name
+    db_name=$(get_input_string "Enter the PrestaShop database name [prestashop]: ")
+    if [ -z "$db_name" ]; then
+        db_name="prestashop"
+    fi
+
+    local table_prefix
+    table_prefix=$(get_input_string "Enter the PrestaShop table prefix [ps_]: ")
+    if [ -z "$table_prefix" ]; then
+        table_prefix="ps_"
+    fi
+
+    if [[ ! "$table_prefix" =~ ^[A-Za-z0-9_]+$ ]]; then
+        log_error "Table prefix may only contain letters, numbers, and underscores."
+        return 1
+    fi
+
+    local root_password
+    root_password=$(get_silent_input_string "Enter MySQL root password (leave blank to attempt socket authentication): ")
+    echo
+
+    local connection_password="$root_password"
+    if ! _mysql_connection_ok "$connection_password"; then
+        if _mysql_connection_ok ""; then
+            log_warning "Unable to authenticate with provided password. Falling back to socket/no-password authentication."
+            connection_password=""
+        else
+            log_error "Unable to connect to MySQL as root. Verify credentials and retry."
+            return 1
+        fi
+    fi
+
+    local escaped_db
+    escaped_db=$(_escape_mysql_identifier "$db_name")
+    local table_name="${table_prefix}shop_url"
+    local escaped_table
+    escaped_table=$(_escape_mysql_identifier "$table_name")
+    local escaped_domain
+    escaped_domain=$(_escape_sql_string "$new_domain")
+
+    local like_pattern_raw
+    like_pattern_raw=${table_name//\\/\\\\}
+    like_pattern_raw=${like_pattern_raw//%/\\%}
+    like_pattern_raw=${like_pattern_raw//_/\\_}
+    local like_pattern
+    like_pattern=$(_escape_sql_string "$like_pattern_raw")
+    local table_exists
+    table_exists=$(_mysql_exec "$connection_password" -Nse "USE \`$escaped_db\`; SHOW TABLES LIKE '${like_pattern}';" 2>/dev/null)
+
+    if [ -z "$table_exists" ]; then
+        log_error "Table ${table_name} not found in database ${db_name}."
+        return 1
+    fi
+
+    local update_sql
+    update_sql="USE \`$escaped_db\`; UPDATE \`$escaped_table\` SET domain='${escaped_domain}', domain_ssl='${escaped_domain}';"
+
+    if _run_mysql_query "$connection_password" "Updating ${table_name} records" "$update_sql"; then
+        log_success "PrestaShop shop URL update complete."
+    else
+        log_error "Failed to update PrestaShop shop URL records."
+        return 1
     fi
 }
 function _cms_helper_check {

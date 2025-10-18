@@ -16,12 +16,13 @@ function show_web_hardening_menu {
     echo "7) Install Apache User-Agent Blocker"
     echo "8) Secure MySQL/MariaDB"
     echo "9) Rotate Database Passwords"
-    echo "10) Manage Web Directory Immutability"
-    echo "11) Disable phpMyAdmin"
-    echo "12) Configure ModSecurity (block mode with OWASP CRS)"
-    echo "13) Advanced Web Hardening Menu"
-    echo "14) Exit Web Hardening Menu"
-    read -p "Enter your choice [1-14]: " web_menu_choice
+    echo "10) Update PrestaShop Shop URL"
+    echo "11) Manage Web Directory Immutability"
+    echo "12) Disable phpMyAdmin"
+    echo "13) Configure ModSecurity (block mode with OWASP CRS)"
+    echo "14) Advanced Web Hardening Menu"
+    echo "15) Exit Web Hardening Menu"
+    read -p "Enter your choice [1-15]: " web_menu_choice
     echo
 
     case $web_menu_choice in
@@ -39,6 +40,7 @@ function show_web_hardening_menu {
             kill_other_sessions
             configure_modsecurity
             web_hardening_menu
+            update_prestashop_shop_url
             manage_web_immutability_menu
             kill_other_sessions
             ;;
@@ -75,22 +77,26 @@ function show_web_hardening_menu {
             rotate_db_passwords
             ;;
         10)
+            print_banner "Updating PrestaShop Shop URL"
+            update_prestashop_shop_url
+            ;;
+        11)
             print_banner "Managing Web Directory Immutability"
             manage_web_immutability_menu
             ;;
-        11)
+        12)
             print_banner "Disabling phpMyAdmin"
             disable_phpmyadmin
             ;;
-        12)
+        13)
             print_banner "Configuring ModSecurity (Block Mode + OWASP CRS)"
             configure_modsecurity
             ;;
-        13)
+        14)
             print_banner "Advanced Web Hardening Configurations"
             web_hardening_menu
             ;;
-        14)
+        15)
             log_info "Exiting Web Hardening Menu"
             ;;
         *)
