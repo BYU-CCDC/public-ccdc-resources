@@ -401,9 +401,41 @@ function secure_mysql {
     fi
 
     local plugin_output
+    local root_plugin=""
     if plugin_output=$(_mysql_exec "$post_password" -Nse "SELECT plugin FROM mysql.user WHERE user='root' AND host='localhost';" 2>&1); then
-        if [[ "$plugin_output" == "auth_socket" ]]; then
-            log_warning "Root user is configured with auth_socket. Password changes may not take effect until the plugin is changed manually."
+        root_plugin="${plugin_output//$'\n'/}"
+        if [[ "$root_plugin" == "auth_socket" || "$root_plugin" == "unix_socket" ]]; then
+            log_warning "Root user is configured with $root_plugin. Updating password authentication plugin to mysql_native_password."
+
+            local plugin_alter_output
+            if plugin_alter_output=$(_mysql_exec "$post_password" -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '${escaped_new_pass}';" 2>&1); then
+                log_success "Root authentication plugin switched to mysql_native_password."
+                set_password_success="true"
+                effective_root_pass="$new_root_pass"
+                post_password="$effective_root_pass"
+                root_plugin="mysql_native_password"
+            else
+                log_warning "Failed to update root authentication plugin: $plugin_alter_output"
+            fi
+        fi
+    fi
+
+    if [ "$root_plugin" != "mysql_native_password" ] && [ "$set_password_success" == "true" ]; then
+        local ensure_plugin_output
+        if ensure_plugin_output=$(_mysql_exec "$post_password" -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '${escaped_new_pass}';" 2>&1); then
+            log_info "Ensured root continues to use mysql_native_password authentication."
+        elif [ -n "$ensure_plugin_output" ]; then
+            log_warning "Unable to confirm mysql_native_password for root: $ensure_plugin_output"
+        fi
+    fi
+
+    if [ "$set_password_success" == "true" ] && ! _mysql_connection_ok "$post_password"; then
+        log_warning "Unable to verify MySQL access with the updated root password. Falling back to socket/no-password authentication."
+        if _mysql_connection_ok ""; then
+            post_password=""
+        else
+            log_error "Unable to connect to MySQL with either updated credentials or socket authentication."
+            return 1
         fi
     fi
     _run_mysql_query "$post_password" "Removing anonymous MySQL users" "DELETE FROM mysql.user WHERE User = '';"
