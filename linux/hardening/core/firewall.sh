@@ -228,7 +228,7 @@ function setup_ufw {
 }
 
 # =======================================
-# New: DSU-style interactive base policy
+# Interactive base policy
 # =======================================
 function yesno() {
     read YESNO
@@ -247,7 +247,7 @@ function genPortList() {
 }
 
 function iptables_base_policy_interactive {
-    print_banner "Interactive IPtables Base Policy (DSU-style)"
+    print_banner "Interactive IPtables Base Policy"
     if [ "$EUID" != 0 ]; then
         log_error "Please run with sudo/root"
         return 1

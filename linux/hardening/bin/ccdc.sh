@@ -2,7 +2,11 @@
 
 set -o pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+if [ -n "${BASH_SOURCE[0]:-}" ]; then
+    ROOT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+else
+    ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+fi
 
 LOG='/var/log/ccdc/harden.log'
 
@@ -118,7 +122,7 @@ function run_if_exists {
     local fn_name="$1"
     shift || true
     if declare -F "$fn_name" >/dev/null; then
-        log_debug "Running $fn_name"
+        log_verbose "Running $fn_name"
         "$fn_name" "$@"
     else
         log_warning "Skipping $fn_name — function not yet implemented in modular tree."
@@ -145,6 +149,11 @@ function run_workflow_sequence {
     fi
 
     for step in "${steps[@]}"; do
+        if [ -n "$label" ]; then
+            log_verbose "Executing step $step in $label workflow"
+        else
+            log_verbose "Executing step $step"
+        fi
         run_if_exists "$step"
     done
 
@@ -539,7 +548,15 @@ function parse_args {
         case "$arg" in
             --debug)
                 log_info "Debug mode enabled"
-                debug="true"
+                set_log_level DEBUG
+                ;;
+            --verbose|-v)
+                log_info "Verbose mode enabled"
+                set_log_level VERBOSE
+                ;;
+            --quiet)
+                log_info "Quiet mode enabled"
+                set_log_level WARNING
                 ;;
             -ansible)
                 log_info "Ansible mode enabled: Skipping interactive prompts."

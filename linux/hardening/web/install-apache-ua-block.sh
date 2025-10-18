@@ -17,6 +17,41 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+COMMON_LIB="$SCRIPT_DIR/../lib/common.sh"
+
+if [ -f "$COMMON_LIB" ]; then
+    # shellcheck source=/dev/null
+    source "$COMMON_LIB"
+fi
+
+if ! declare -F log_info >/dev/null 2>&1; then
+    LOG_LEVEL="${LOG_LEVEL:-INFO}"
+    NC='\033[0m'
+    RED='\033[0;31m'
+    GREEN='\033[0;32m'
+    ORANGE='\033[38;5;208m'
+    AQUA='\033[38;5;45m'
+    CYAN='\033[0;36m'
+
+    __ua_log_emit() {
+        local level="$1"
+        local color="$2"
+        shift 2 || true
+        printf '%b[%s]%b %s\n' "$color" "$level" "$NC" "$*"
+    }
+
+    log_info() { __ua_log_emit "INFO" "$AQUA" "$@"; }
+    log_success() { __ua_log_emit "SUCCESS" "$GREEN" "$@"; }
+    log_warning() { __ua_log_emit "WARNING" "$ORANGE" "$@"; }
+    log_error() { __ua_log_emit "ERROR" "$RED" "$@"; }
+    log_verbose() {
+        if [ "${LOG_LEVEL^^}" == "VERBOSE" ] || [ "${LOG_LEVEL^^}" == "DEBUG" ]; then
+            __ua_log_emit "VERBOSE" "$CYAN" "$@"
+        fi
+    }
+fi
+
 # ------------------------------------------------------------------
 # Tunables
 # ------------------------------------------------------------------
@@ -83,9 +118,11 @@ LOG_DIR="/var/log/httpd"
 RELOAD_CMD="systemctl reload httpd || service httpd reload"
 CTL="apachectl"
 else
-echo "Apache config dir not found" >&2; exit 1
+log_error "Apache configuration directory not found. Expected /etc/apache2 or /etc/httpd."
+exit 1
 fi
 mkdir -p "$CONF_DIR" "$LOG_DIR"
+log_verbose "Using Apache configuration directory $CONF_DIR"
 }
 
 enable_module() {
@@ -116,34 +153,38 @@ enable_module() {
 }
 
 safe_write() {
-local path="$1" tmp
-tmp="$(mktemp)"
-printf "%s\n" "$2" >"$tmp"
-local needs_write=0
-if [[ ! -f "$path" ]]; then
-needs_write=1
-elif ! cmp -s "$tmp" "$path"; then
-needs_write=1
-fi
-if (( needs_write )); then
-if [[ -f "$path" ]] && ! grep -qF "$CONF_TAG" "$path"; then
-cp -a "$path" "$path.bak.$(date +%Y%m%d_%H%M%S)"
-fi
-mv "$tmp" "$path"
-else
-rm -f "$tmp"
-fi
+    local path="$1" tmp
+    tmp="$(mktemp)"
+    printf "%s\n" "$2" >"$tmp"
+    local needs_write=0
+    if [[ ! -f "$path" ]]; then
+        needs_write=1
+    elif ! cmp -s "$tmp" "$path"; then
+        needs_write=1
+    fi
+    if (( needs_write )); then
+        if [[ -f "$path" ]] && ! grep -qF "$CONF_TAG" "$path"; then
+            local backup="$path.bak.$(date +%Y%m%d_%H%M%S)"
+            cp -a "$path" "$backup"
+            log_warning "Existing configuration at $path was not previously managed; backup saved to $backup"
+        fi
+        mv "$tmp" "$path"
+        log_success "Wrote updated configuration to $path"
+    else
+        rm -f "$tmp"
+        log_verbose "No changes required for $path"
+    fi
 }
 
 fetch_list() {
 mkdir -p "$CACHE_DIR"
-echo "Fetching UA lists..."
+log_info "Fetching remote User-Agent block lists"
 if curl -fsSL "$PRIMARY_URL" -o "$CACHE_LIST.tmp"; then
-echo "Fetched primary list"
+log_success "Fetched primary UA list"
 elif curl -fsSL "$FALLBACK_URL" -o "$CACHE_LIST.tmp"; then
-echo "Primary failed, using fallback list"
+log_warning "Primary UA list unavailable; using fallback list"
 else
-echo "Both remote lists unavailable, using built-in defaults"
+log_error "Both remote UA lists unavailable; using built-in defaults"
 printf "sqlmap\nnikto\nnmap\ncurl\npython\nmasscan\nwpscan\n" >"$CACHE_LIST.tmp"
 fi
 tr -d '\r' <"$CACHE_LIST.tmp" | grep -Ev '^(#|$)' >"$CACHE_LIST"
@@ -153,7 +194,10 @@ rm -f "$CACHE_LIST.tmp"
 build_chunks() {
 local joined
 joined="$(awk '{print}' "$CACHE_LIST" | escape_regex_literal | paste -sd'|' -)"
-[[ -z "$joined" ]] && { echo "Empty UA list"; exit 1; }
+if [[ -z "$joined" ]]; then
+    log_error "Downloaded UA list is empty"
+    exit 1
+fi
 echo "$joined" | split_chunks
 }
 
@@ -167,7 +211,11 @@ case "$1" in
 --whitelist-ua) WHITELIST_UA="$2"; shift 2;;
 --whitelist-ip) WHITELIST_IPS="$2"; shift 2;;
 -h|--help) usage; exit 0;;
-*) echo "Unknown option $1"; usage; exit 1;;
+*)
+    log_error "Unknown option $1"
+    usage
+    exit 1
+    ;;
 esac
 done
 
@@ -180,10 +228,14 @@ enable_module setenvif
 enable_module authz_core
 enable_module log_config
 
-[[ "$REFRESH_ONLY" == "true" || ! -s "$CACHE_LIST" ]] && fetch_list || echo "Using cached list: $CACHE_LIST"
+if [[ "$REFRESH_ONLY" == "true" || ! -s "$CACHE_LIST" ]]; then
+    fetch_list
+else
+    log_info "Using cached UA list at $CACHE_LIST"
+fi
 
 mapfile -t CHUNKS < <(build_chunks)
-echo "Prepared ${#CHUNKS[@]} UA regex chunk(s)"
+log_info "Prepared ${#CHUNKS[@]} User-Agent regex chunk(s)"
 
 # Whitelist IP
 
@@ -227,19 +279,22 @@ safe_write "$CONF_PATH" "$CONTENT"
 
 if command -v "$CTL" >/dev/null 2>&1; then
     if "$CTL" configtest; then
+        log_success "Apache configuration syntax check passed"
         if ! eval "$RELOAD_CMD"; then
-            echo "Warning: Unable to reload Apache using configured command: $RELOAD_CMD" >&2
+            log_warning "Unable to reload Apache automatically with: $RELOAD_CMD"
+        else
+            log_success "Apache reloaded with: $RELOAD_CMD"
         fi
     else
-        echo "Apache configuration test failed" >&2
+        log_error "Apache configuration test failed"
         exit 1
     fi
 else
-    echo "Warning: $CTL not found; skipping configtest and reload" >&2
+    log_warning "$CTL not found; skipping configtest and reload"
 fi
 
-echo "Installed at $CONF_PATH"
-echo "Block log: ${LOG_DIR}/ua_block.log"
-echo "Cache: $CACHE_LIST"
-echo "Whitelist IPs: ${WHITELIST_IPS:-none}"
-echo "Whitelist UAs: ${WHITELIST_UA:-none}"
+log_info "User-Agent block configuration installed at $CONF_PATH"
+log_info "Block log located at ${LOG_DIR}/ua_block.log"
+log_verbose "UA list cache stored at $CACHE_LIST"
+log_info "Whitelisted IPs: ${WHITELIST_IPS:-none}"
+log_info "Whitelisted UAs: ${WHITELIST_UA:-none}"

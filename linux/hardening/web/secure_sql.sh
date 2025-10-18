@@ -91,6 +91,58 @@ function _run_mysql_query {
         return 1
     fi
 }
+
+function _verify_mysql_application_login {
+    local user="$1"
+    local host="$2"
+    local password="$3"
+    local database="$4"
+
+    if ! command -v mysql >/dev/null 2>&1; then
+        log_warning "mysql client not available; skipping credential verification for ${user}@${host:-localhost}."
+        return 0
+    fi
+
+    local -a cmd=(mysql "-u" "$user")
+    if [ -n "$host" ]; then
+        cmd+=("-h" "$host")
+    fi
+    if [ -n "$database" ]; then
+        cmd+=("-D" "$database")
+    fi
+    cmd+=("-e" "SELECT 1;")
+
+    local -a runner=()
+    if [ "$EUID" -ne 0 ] && command -v sudo >/dev/null 2>&1; then
+        runner=(sudo -E)
+    fi
+
+    log_verbose "Verifying MySQL credentials for ${user}@${host:-localhost}"
+
+    local exit_code
+    if [ -n "$password" ]; then
+        if [ ${#runner[@]} -gt 0 ]; then
+            "${runner[@]}" env MYSQL_PWD="$password" "${cmd[@]}" >/dev/null 2>&1
+        else
+            MYSQL_PWD="$password" "${cmd[@]}" >/dev/null 2>&1
+        fi
+    else
+        if [ ${#runner[@]} -gt 0 ]; then
+            "${runner[@]}" "${cmd[@]}" >/dev/null 2>&1
+        else
+            "${cmd[@]}" >/dev/null 2>&1
+        fi
+    fi
+    exit_code=$?
+
+    if [ $exit_code -eq 0 ]; then
+        log_success "Verified MySQL connectivity for ${user}@${host:-localhost}"
+        return 0
+    fi
+
+    log_warning "Unable to verify MySQL connectivity for ${user}@${host:-localhost} (exit code $exit_code)"
+    return 1
+}
 function secure_mysql {
     print_banner "MySQL/MariaDB Hardening"
 
@@ -227,9 +279,20 @@ function rotate_db_passwords {
         return 1
     fi
 
-    read -r -p "Enter the database host [localhost]: " database_host
+    database_host=$(get_input_string "Enter the database host (leave blank to keep current CMS host values) [localhost]: ")
     if [ -z "$database_host" ]; then
         database_host="localhost"
+    fi
+
+    local cms_host_update="$database_host"
+    if [ "$ANSIBLE" != "true" ] && [[ "$database_host" != "localhost" && "$database_host" != "127.0.0.1" && "$database_host" != "::1" ]]; then
+        log_warning "Non-local database host $database_host specified. Ensure the CMS can reach this host before updating configuration files."
+        local confirm_host
+        confirm_host=$(get_input_string "Propagate ${database_host} to CMS configuration files? (y/N): ")
+        if [[ ! "$confirm_host" =~ ^[Yy]$ ]]; then
+            log_info "CMS configuration host entries will be left unchanged."
+            cms_host_update=""
+        fi
     fi
 
     new_password=$(get_silent_input_string "Enter the new password for $database_user@$database_host: ")
@@ -286,7 +349,11 @@ function rotate_db_passwords {
     dir_input=$(_prompt_web_directories)
     read -r -a search_dirs <<< "$dir_input"
 
-    update_cms_configs "$database_name" "$database_user" "$database_host" "$new_password" "${search_dirs[@]}"
+    if _verify_mysql_application_login "$database_user" "$database_host" "$new_password" "$database_name"; then
+        update_cms_configs "$database_name" "$database_user" "$cms_host_update" "$new_password" "${search_dirs[@]}"
+    else
+        log_error "Skipping CMS configuration updates to avoid breaking connectivity. Verify credentials for ${database_user}@${database_host} and rerun the helper if needed."
+    fi
 }
 function _cms_helper_check {
     if ! command -v python3 >/dev/null 2>&1; then
@@ -450,31 +517,35 @@ function update_cms_configs {
 
     for dir in "${search_dirs[@]}"; do
         if [ ! -d "$dir" ]; then
-            log_debug "Skipping non-existent directory $dir"
+            log_verbose "Skipping non-existent directory $dir"
             continue
         fi
         log_info "Scanning $dir for CMS configuration files."
         scanned_dirs=$((scanned_dirs + 1))
 
         while IFS= read -r -d '' wp_config; do
+            log_verbose "Discovered WordPress configuration at $wp_config"
             if update_wordpress_config "$wp_config" "$db_name" "$db_user" "$db_host" "$db_pass"; then
                 updated_count=$((updated_count + 1))
             fi
         done < <(find "$dir" -type f -name "wp-config.php" -print0 2>/dev/null)
 
         while IFS= read -r -d '' presta_config; do
+            log_verbose "Discovered PrestaShop configuration at $presta_config"
             if update_prestashop_config "$presta_config" "$db_name" "$db_user" "$db_host" "$db_pass"; then
                 updated_count=$((updated_count + 1))
             fi
         done < <(find "$dir" -type f \( -path "*/app/config/parameters.php" -o -path "*/config/settings.inc.php" \) -print0 2>/dev/null)
 
         while IFS= read -r -d '' env_file; do
+            log_verbose "Discovered environment file at $env_file"
             if update_env_file "$env_file" "$db_name" "$db_user" "$db_host" "$db_pass"; then
                 updated_count=$((updated_count + 1))
             fi
         done < <(find "$dir" -type f -name ".env" -print0 2>/dev/null)
 
         while IFS= read -r -d '' joomla_config; do
+            log_verbose "Discovered Joomla configuration at $joomla_config"
             if update_joomla_config "$joomla_config" "$db_name" "$db_user" "$db_host" "$db_pass"; then
                 updated_count=$((updated_count + 1))
             fi

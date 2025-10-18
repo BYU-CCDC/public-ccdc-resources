@@ -5,19 +5,68 @@
 # ---------------------------------------------------------------------------
 RED='\033[0;31m'
 GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
+ORANGE='\033[38;5;208m'
+AQUA='\033[38;5;45m'
 MAGENTA='\033[0;35m'
 CYAN='\033[0;36m'
 NC='\033[0m'
 
+LOG_LEVEL="${LOG_LEVEL:-INFO}"
+debug="${debug:-false}"
+
 # ---------------------------------------------------------------------------
 # Logging helpers
 # ---------------------------------------------------------------------------
+__log_level_rank() {
+    local level="${1^^}"
+    case "$level" in
+        ERROR) echo 0 ;;
+        WARNING) echo 1 ;;
+        SUCCESS|INFO) echo 2 ;;
+        VERBOSE) echo 3 ;;
+        DEBUG) echo 4 ;;
+        *) echo 2 ;;
+    esac
+}
+
+__log_should_emit() {
+    local message_level="${1^^}"
+    local current_level="${LOG_LEVEL^^}"
+
+    if [ "$message_level" == "DEBUG" ] && [ "$debug" == "true" ] && [ "$current_level" != "DEBUG" ]; then
+        current_level="DEBUG"
+    fi
+
+    local message_rank
+    local threshold_rank
+    message_rank=$(__log_level_rank "$message_level")
+    threshold_rank=$(__log_level_rank "$current_level")
+
+    if [ "$message_rank" -le "$threshold_rank" ]; then
+        return 0
+    fi
+    return 1
+}
+
+function set_log_level {
+    local new_level="${1:-INFO}"
+    LOG_LEVEL="${new_level^^}"
+    if [ "$LOG_LEVEL" == "DEBUG" ]; then
+        debug="true"
+    else
+        debug="false"
+    fi
+}
+
 function _log_with_color {
     local level="$1"
     local color="$2"
     shift 2 || true
+
+    if ! __log_should_emit "$level"; then
+        return 0
+    fi
+
     printf '%b[%s]%b %s - %s\n' "$color" "$level" "$NC" "$(date +"%Y-%m-%d %H:%M:%S")" "$*"
 }
 
@@ -36,7 +85,7 @@ function init_logging {
 }
 
 function log_info {
-    _log_with_color "INFO" "$BLUE" "$@"
+    _log_with_color "INFO" "$AQUA" "$@"
 }
 
 function log_success {
@@ -44,17 +93,19 @@ function log_success {
 }
 
 function log_warning {
-    _log_with_color "WARNING" "$YELLOW" "$@"
+    _log_with_color "WARNING" "$ORANGE" "$@"
 }
 
 function log_error {
     _log_with_color "ERROR" "$RED" "$@"
 }
 
+function log_verbose {
+    _log_with_color "VERBOSE" "$CYAN" "$@"
+}
+
 function log_debug {
-    if [ "$debug" == "true" ]; then
-        _log_with_color "DEBUG" "$MAGENTA" "$@"
-    fi
+    _log_with_color "DEBUG" "$MAGENTA" "$@"
 }
 
 function print_banner {
