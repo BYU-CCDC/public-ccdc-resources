@@ -94,7 +94,7 @@ SecAction \
   setvar:'tx.dos_block_timeout=600'"
 
 SecRule REQUEST_METHOD "!^(?:GET|POST|HEAD|OPTIONS)$" \
- "id:901100,\
+ "id:1101100,\
   phase:1,\
   log,\
   deny,\
@@ -103,7 +103,7 @@ SecRule REQUEST_METHOD "!^(?:GET|POST|HEAD|OPTIONS)$" \
   severity:WARNING"
 
 SecRule REQUEST_HEADERS:User-Agent "^\s*$" \
- "id:901110,\
+ "id:1101110,\
   phase:1,\
   log,\
   deny,\
@@ -112,7 +112,7 @@ SecRule REQUEST_HEADERS:User-Agent "^\s*$" \
   severity:WARNING"
 
 SecRule REQUEST_HEADERS:Content-Length "@gt 0" \
- "id:901120,\
+ "id:1101120,\
   phase:1,\
   log,\
   deny,\
@@ -122,7 +122,7 @@ SecRule REQUEST_HEADERS:Content-Length "@gt 0" \
     SecRule &REQUEST_HEADERS:Content-Type "@eq 0" "t:none"
 
 SecRule REQUEST_HEADERS:Content-Type "!@rx ^(?:application|text|image|multipart)/" \
- "id:901121,\
+ "id:1101121,\
   phase:1,\
   log,\
   deny,\
