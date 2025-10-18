@@ -1,19 +1,15 @@
 #!/usr/bin/env bash
-
 # [install-apache-ua-block.sh](http://install-apache-ua-block.sh/)
-
-# Purpose : Global, high-performance User-Agent blocking for Apache
-
-# Sources :
-
+#
+# Purpose: Global, high-performance User-Agent blocking for Apache
+#
+# Sources:
 # 1. https://raw.githubusercontent.com/mitchellkrogza/nginx-ultimate-bad-bot-blocker/refs/heads/master/_generator_lists/bad-user-agents.list
 # 2. https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/refs/heads/main/linux/bad_ua.txt
-
-# Apache : 2.4+
-
-# OS : Debian/Ubuntu (/etc/apache2) or RHEL/Amazon (/etc/httpd)
-
-# License : MIT
+#
+# Apache: 2.4+
+# OS: Debian/Ubuntu (/etc/apache2) or RHEL/Amazon (/etc/httpd)
+# License: MIT
 
 set -euo pipefail
 
@@ -41,12 +37,12 @@ if ! declare -F log_info >/dev/null 2>&1; then
         printf '%b[%s]%b %s\n' "$color" "$level" "$NC" "$*"
     }
 
-    log_info() { __ua_log_emit "INFO" "$AQUA" "$@"; }
+    log_info()    { __ua_log_emit "INFO" "$AQUA" "$@"; }
     log_success() { __ua_log_emit "SUCCESS" "$GREEN" "$@"; }
     log_warning() { __ua_log_emit "WARNING" "$ORANGE" "$@"; }
-    log_error() { __ua_log_emit "ERROR" "$RED" "$@"; }
+    log_error()   { __ua_log_emit "ERROR" "$RED" "$@"; }
     log_verbose() {
-        if [ "${LOG_LEVEL^^}" == "VERBOSE" ] || [ "${LOG_LEVEL^^}" == "DEBUG" ]; then
+        if [ "${LOG_LEVEL^^}" = "VERBOSE" ] || [ "${LOG_LEVEL^^}" = "DEBUG" ]; then
             __ua_log_emit "VERBOSE" "$CYAN" "$@"
         fi
     }
@@ -68,7 +64,6 @@ LOCAL_FALLBACK_LIST="$SCRIPT_DIR/data/bad-user-agents.defaults"
 MAX_REGEX_CHARS=3500
 
 # CLI defaults
-
 WHITELIST_UA=""
 WHITELIST_IPS=""
 REFRESH_ONLY="false"
@@ -82,10 +77,10 @@ cat <<EOF
 Usage: sudo $(basename "$0") [options]
 
 Options:
---refresh                    Force re-fetch of UA lists and reload Apache
---whitelist-ua "REGEX"       UA regex(es) to whitelist
---whitelist-ip "IP[,CIDR]"   Comma-separated IPs/CIDRs to whitelist
--h, --help                   Show this help
+  --refresh                    Force re-fetch of UA lists and reload Apache
+  --whitelist-ua "REGEX"       UA regex(es) to whitelist
+  --whitelist-ip "IP[,CIDR]"   Comma-separated IPs/CIDRs to whitelist
+  -h, --help                   Show this help
 EOF
 }
 
@@ -95,35 +90,35 @@ split_chunks() {
 awk -v max="$MAX_REGEX_CHARS" '
 BEGIN{c=""}
 {n=split($0,a,/\|/);
-for(i=1;i<=n;i++){
-if(c==""){c=a[i]; next}
-if(length(c)+1+length(a[i])<=max){c=c"|"a[i]; next}
-print c; c=a[i];
-}}
+ for(i=1;i<=n;i++){
+   if(c==""){c=a[i]; next}
+   if(length(c)+1+length(a[i])<=max){c=c"|"a[i]; next}
+   print c; c=a[i];
+ }}
 END{if(c!="")print c}'
 }
 
 detect_layout() {
-if [[ -d /etc/apache2 ]]; then
-APACHE_ETC="/etc/apache2"
-CONF_DIR="$APACHE_ETC/conf-available"
-CONF_PATH="$CONF_DIR/$CONF_BASENAME"
-LOG_DIR="${APACHE_LOG_DIR:-/var/log/apache2}"
-RELOAD_CMD="systemctl reload apache2 || service apache2 reload"
-CTL="apache2ctl"
-elif [[ -d /etc/httpd ]]; then
-APACHE_ETC="/etc/httpd"
-CONF_DIR="$APACHE_ETC/conf.d"
-CONF_PATH="$CONF_DIR/$CONF_BASENAME"
-LOG_DIR="/var/log/httpd"
-RELOAD_CMD="systemctl reload httpd || service httpd reload"
-CTL="apachectl"
-else
-log_error "Apache configuration directory not found. Expected /etc/apache2 or /etc/httpd."
-exit 1
-fi
-mkdir -p "$CONF_DIR" "$LOG_DIR"
-log_verbose "Using Apache configuration directory $CONF_DIR"
+    if [[ -d /etc/apache2 ]]; then
+        APACHE_ETC="/etc/apache2"
+        CONF_DIR="$APACHE_ETC/conf-available"
+        CONF_PATH="$CONF_DIR/$CONF_BASENAME"
+        LOG_DIR="${APACHE_LOG_DIR:-/var/log/apache2}"
+        RELOAD_CMD="systemctl reload apache2 || service apache2 reload"
+        CTL="apache2ctl"
+    elif [[ -d /etc/httpd ]]; then
+        APACHE_ETC="/etc/httpd"
+        CONF_DIR="$APACHE_ETC/conf.d"
+        CONF_PATH="$CONF_DIR/$CONF_BASENAME"
+        LOG_DIR="/var/log/httpd"
+        RELOAD_CMD="systemctl reload httpd || service httpd reload"
+        CTL="apachectl"
+    else
+        log_error "Apache configuration directory not found. Expected /etc/apache2 or /etc/httpd."
+        exit 1
+    fi
+    mkdir -p "$CONF_DIR" "$LOG_DIR"
+    log_verbose "Using Apache configuration directory $CONF_DIR"
 }
 
 enable_module() {
@@ -178,6 +173,8 @@ safe_write() {
 }
 
 download_to_file() {
+    # Prefer wget, fall back to curl. Log both attempts.
+    # Timeout and retry kept short to avoid blocking automation.
     local url="$1" dest="$2" tool=""
 
     if command -v wget >/dev/null 2>&1; then
@@ -186,7 +183,7 @@ download_to_file() {
             log_verbose "Downloaded $url with wget"
             return 0
         fi
-        log_warning "wget was unable to download $url"
+        log_warning "wget failed for $url"
     else
         log_verbose "wget not found; will try curl for $url"
     fi
@@ -197,7 +194,7 @@ download_to_file() {
             log_verbose "Downloaded $url with curl"
             return 0
         fi
-        log_warning "curl was unable to download $url"
+        log_warning "curl failed for $url"
     else
         log_verbose "curl not found while attempting $url"
     fi
@@ -209,40 +206,40 @@ download_to_file() {
 }
 
 fetch_list() {
-mkdir -p "$CACHE_DIR"
-log_info "Fetching remote User-Agent block lists"
-local tmp_file="$CACHE_LIST.tmp"
-rm -f "$tmp_file"
+    mkdir -p "$CACHE_DIR"
+    log_info "Fetching remote User-Agent block lists"
+    local tmp_file="$CACHE_LIST.tmp"
+    rm -f "$tmp_file"
 
-if curl --connect-timeout 5 --retry 2 --retry-delay 2 -fsSL "$PRIMARY_URL" -o "$tmp_file"; then
-    log_success "Fetched primary UA list"
-elif curl --connect-timeout 5 --retry 2 --retry-delay 2 -fsSL "$FALLBACK_URL" -o "$tmp_file"; then
-    log_warning "Primary UA list unavailable; using fallback mirror"
-elif [[ -f "$LOCAL_FALLBACK_LIST" ]]; then
-    log_warning "Remote UA lists unavailable; using bundled fallback list"
-    cp "$LOCAL_FALLBACK_LIST" "$tmp_file"
-else
-    log_error "No remote or local UA lists available; falling back to minimal defaults"
-    printf "sqlmap\nnikto\nnmap\ncurl\npython\nmasscan\nwpscan\n" >"$tmp_file"
-fi
+    if download_to_file "$PRIMARY_URL" "$tmp_file"; then
+        log_success "Fetched primary UA list"
+    elif download_to_file "$FALLBACK_URL" "$tmp_file"; then
+        log_warning "Primary UA list unavailable; using fallback mirror"
+    elif [[ -f "$LOCAL_FALLBACK_LIST" ]]; then
+        log_warning "Remote UA lists unavailable; using bundled fallback list"
+        cp "$LOCAL_FALLBACK_LIST" "$tmp_file"
+    else
+        log_error "No remote or local UA lists available; falling back to minimal defaults"
+        printf "sqlmap\nnikto\nnmap\ncurl\npython\nmasscan\nwpscan\n" >"$tmp_file"
+    fi
 
-if [[ -s "$tmp_file" ]]; then
-    tr -d '\r' <"$tmp_file" | grep -Ev '^(#|$)' >"$CACHE_LIST"
-else
-    log_error "Downloaded UA list is empty; writing minimal defaults"
-    printf "sqlmap\nnikto\nnmap\ncurl\npython\nmasscan\nwpscan\n" >"$CACHE_LIST"
-fi
-rm -f "$tmp_file"
+    if [[ -s "$tmp_file" ]]; then
+        tr -d '\r' <"$tmp_file" | grep -Ev '^(#|$)' >"$CACHE_LIST"
+    else
+        log_error "Downloaded UA list is empty; writing minimal defaults"
+        printf "sqlmap\nnikto\nnmap\ncurl\npython\nmasscan\nwpscan\n" >"$CACHE_LIST"
+    fi
+    rm -f "$tmp_file"
 }
 
 build_chunks() {
-local joined
-joined="$(awk '{print}' "$CACHE_LIST" | escape_regex_literal | paste -sd'|' -)"
-if [[ -z "$joined" ]]; then
-    log_error "Downloaded UA list is empty"
-    exit 1
-fi
-echo "$joined" | split_chunks
+    local joined
+    joined="$(awk '{print}' "$CACHE_LIST" | escape_regex_literal | paste -sd'|' -)"
+    if [[ -z "$joined" ]]; then
+        log_error "Downloaded UA list is empty"
+        exit 1
+    fi
+    echo "$joined" | split_chunks
 }
 
 # ------------------------------------------------------------------
@@ -250,17 +247,17 @@ echo "$joined" | split_chunks
 # ------------------------------------------------------------------
 
 while [[ $# -gt 0 ]]; do
-case "$1" in
---refresh) REFRESH_ONLY="true"; shift;;
---whitelist-ua) WHITELIST_UA="$2"; shift 2;;
---whitelist-ip) WHITELIST_IPS="$2"; shift 2;;
--h|--help) usage; exit 0;;
-*)
-    log_error "Unknown option $1"
-    usage
-    exit 1
-    ;;
-esac
+    case "$1" in
+        --refresh) REFRESH_ONLY="true"; shift;;
+        --whitelist-ua) WHITELIST_UA="$2"; shift 2;;
+        --whitelist-ip) WHITELIST_IPS="$2"; shift 2;;
+        -h|--help) usage; exit 0;;
+        *)
+            log_error "Unknown option $1"
+            usage
+            exit 1
+            ;;
+    esac
 done
 
 # ------------------------------------------------------------------
@@ -272,7 +269,7 @@ enable_module setenvif
 enable_module authz_core
 enable_module log_config
 
-if [[ "$REFRESH_ONLY" == "true" || ! -s "$CACHE_LIST" ]]; then
+if [[ "$REFRESH_ONLY" = "true" || ! -s "$CACHE_LIST" ]]; then
     fetch_list
 else
     log_info "Using cached UA list at $CACHE_LIST"
@@ -281,23 +278,21 @@ fi
 mapfile -t CHUNKS < <(build_chunks)
 log_info "Prepared ${#CHUNKS[@]} User-Agent regex chunk(s)"
 
-# Whitelist IP
-
+# Whitelist IPs
 IP_RULES=""
 if [[ -n "$WHITELIST_IPS" ]]; then
-IFS=',' read -ra IP_ARR <<<"$WHITELIST_IPS"
-for ip in "${IP_ARR[@]}"; do
-IP_RULES+="        Require ip $(echo "$ip"|xargs)\n"
-done
+    IFS=',' read -ra IP_ARR <<<"$WHITELIST_IPS"
+    for ip in "${IP_ARR[@]}"; do
+        IP_RULES+="        Require ip $(echo "$ip" | xargs)\n"
+    done
 fi
 
-# Whitelist UA
-
+# Whitelist UAs
 UA_ALLOW_BLOCK=""
 UA_EXPR="Require not env bad_ua"
 if [[ -n "$WHITELIST_UA" ]]; then
-UA_ALLOW_BLOCK=$'<IfModule mod_setenvif.c>\n    SetEnvIfNoCase User-Agent "'"$WHITELIST_UA"'" ua_allowed\n</IfModule>'
-UA_EXPR="Require expr ! env('bad_ua') || env('ua_allowed')"
+    UA_ALLOW_BLOCK=$'<IfModule mod_setenvif.c>\n    SetEnvIfNoCase User-Agent "'"$WHITELIST_UA"'" ua_allowed\n</IfModule>'
+    UA_EXPR="Require expr ! env('bad_ua') || env('ua_allowed')"
 fi
 
 CONTENT=$(cat <<EOF
@@ -306,9 +301,7 @@ $CONF_TAG
 # Generated on $(date -u)
 
 # Sources:
-
 # $PRIMARY_URL
-
 # $FALLBACK_URL
 
 ${UA_ALLOW_BLOCK}
@@ -316,7 +309,9 @@ ${UA_ALLOW_BLOCK}
 <IfModule mod_setenvif.c>
 EOF
 )
-for c in "${CHUNKS[@]}"; do CONTENT+="\n    SetEnvIfNoCase User-Agent \"$c\" bad_ua"; done
+for c in "${CHUNKS[@]}"; do
+    CONTENT+="\n    SetEnvIfNoCase User-Agent \"$c\" bad_ua"
+done
 CONTENT+="\n</IfModule>\n\n<IfModule mod_authz_core.c>\n    <Location \"/\">\n${IP_RULES}        Require all granted\n        $UA_EXPR\n    </Location>\n</IfModule>\n\nCustomLog ${LOG_DIR}/ua_block.log combined env=bad_ua\n"
 
 safe_write "$CONF_PATH" "$CONTENT"
