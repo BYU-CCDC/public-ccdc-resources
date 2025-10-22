@@ -6,19 +6,102 @@ $usersFile = "users.txt"
 $advancedAuditingFile = "advancedAuditing.ps1"
 $patchURLFile = "patchURLs.json"
 
+# Global variables for logging and context
+$log = @{}
+$functionNames = @(
+    "Initialize Context", "Get Competition Users", "Disable Users", "Enable Windows Defender", 
+    "Quick Harden", "Add Competition Users", "Remove RDP Users", "Configure Firewall", 
+    "Disable Unnecessary Services", "Enable Advanced Auditing", "Configure Splunk", 
+    "Install EternalBlue Patch", "Upgrade SMB", "Patch Mimikatz", "Run Windows Updates", 
+    "Run Stanford Harden", "Set Execution Policy"
+)
+
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-$neededFiles = @($portsFile, $advancedAuditingFile, $patchURLFile)
-foreach ($file in $neededFiles) {
-    $filename = $(Split-Path -Path $file -Leaf)
+
+# Lightweight logging helpers
+function Ensure-Logs {
+    if (-not (Test-Path ./logs)) { New-Item -Path ./logs -ItemType Directory | Out-Null }
+}
+
+function Log-Info {
+    param([string]$Message)
+    Ensure-Logs
+    "[{0}] {1}" -f (Get-Date), $Message | Add-Content -Path ./logs/script.log
+}
+
+# Function to update log
+function Update-Log {
+    param([string]$key, [string]$value)
+    $log[$key] = $value
+}
+
+# Initialize function log based on the loaded list
+function Initialize-Log {
+    foreach ($func in $functionNames) {
+        Update-Log $func "Not executed"
+    }
+}
+
+# Function to print log
+function Print-Log {
+    Write-Host "`n### Script Execution Summary ###`n" -ForegroundColor Green
+    foreach ($entry in $log.GetEnumerator()) {
+        Write-Host "$($entry.Key): $($entry.Value)"
+    }
+}
+
+# Initialize context function
+function Initialize-Context {
     try {
-        if (-not (Test-Path "$pwd\$filename")) {
-            Invoke-WebRequest -Uri "$ccdcRepoWindowsHardeningPath/$file" -OutFile "$pwd\$filename"
+        # Download needed files
+        $neededFiles = @($portsFile, $advancedAuditingFile, $patchURLFile)
+        foreach ($file in $neededFiles) {
+            $filename = $(Split-Path -Path $file -Leaf)
+            if (-not (Test-Path "$pwd\$filename")) {
+                Invoke-WebRequest -Uri "$ccdcRepoWindowsHardeningPath/$file" -OutFile "$pwd\$filename"
+            }
         }
+        
+        # Set global variables
+        $script:OSVersion = (Get-WmiObject -class Win32_OperatingSystem).Caption
+        $script:CurrentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+        
+        # Load userfile and portdata
+        if (Test-Path ".\users.txt") {
+            [string[]]$script:UserArray = Get-Content -Path ".\users.txt"
+        } else {
+            [string[]]$script:UserArray = @()
+        }
+        
+        if (Test-Path ".\ports.json") {
+            $script:PortsObject = Get-Content -Path ".\ports.json" -Raw | ConvertFrom-Json
+        } else {
+            # Fallback port definitions
+            $script:PortsObject = @{ ports = @{
+                '53'   = @{ description = 'DNS' }
+                '3389' = @{ description = 'RDP' }
+                '80'   = @{ description = 'HTTP' }
+                '445'  = @{ description = 'SMB' }
+                '139'  = @{ description = 'NetBIOS Session' }
+                '22'   = @{ description = 'SSH' }
+                '88'   = @{ description = 'Kerberos' }
+                '67'   = @{ description = 'DHCP Server' }
+                '68'   = @{ description = 'DHCP Client' }
+                '135'  = @{ description = 'RPC' }
+                '389'  = @{ description = 'LDAP' }
+                '636'  = @{ description = 'LDAPS' }
+                '3268' = @{ description = 'Global Catalog' }
+                '3269' = @{ description = 'Global Catalog SSL' }
+                '464'  = @{ description = 'Kerberos Change/Set Password' }
+            } }
+        }
+        
+        Update-Log "Initialize Context" "Executed successfully"
+        Write-Host "Context initialized successfully" -ForegroundColor Green
     } catch {
         Write-Host $_.Exception.Message -ForegroundColor Yellow
         Write-Host "Error Occurred..."
-        Write-Host "Download $file from $ccdcRepoWindowsHardeningPath"
-        exit
+        Update-Log "Initialize Context" "Failed with error: $($_.Exception.Message)"
     }
 }
 
@@ -38,22 +121,143 @@ function GetCompetitionUsers {
 
         # Notify the user that the file has been created
         Write-Host "The file users.txt has been created with the provided usernames." -ForegroundColor Green
+        Update-Log "Get Competition Users" "Executed successfully"
     } catch {
         Write-Host $_.Exception.Message -ForegroundColor Yellow
         Write-Host "Error Occurred..."
+        Update-Log "Get Competition Users" "Failed with error: $($_.Exception.Message)"
     }
 }
-Write-Host "Getting Competition Users" -ForegroundColor Magenta
-GetCompetitionUsers
-$usersFile = "users.txt"
 
-# Get OS version and current user
-$OSVersion = (Get-WmiObject -class Win32_OperatingSystem).Caption
-$CurrentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+# Main menu function
+function Show-Main-Menu {
+    Clear-Host
+    Write-Host "`n==== Local Windows Hardening Menu ====" -ForegroundColor Green
+    Write-Host "Prerequisites:"
+    Write-Host "  - (A) Initialize Context BEFORE running hardening tasks" -ForegroundColor Yellow
+    Write-Host "  - Configure Splunk (11) works best after Initialize Context (A)" -ForegroundColor Yellow
+    Write-Host "`nSelect an option by number (or Q to quit):" -ForegroundColor Cyan
+    Write-Host "  0) Print Execution Summary"
+    Write-Host "  A) Initialize Context (download files, set variables)"
+    Write-Host "  1) Run Full Flow (original y/n prompts)"
+    Write-Host "  2) Quick Harden (essential steps only)"
+    Write-Host "  3) Get Competition Users"
+    Write-Host "  4) Disable Users (except current user)"
+    Write-Host "  5) Enable Windows Defender"
+    Write-Host "  6) Add Competition Users"
+    Write-Host "  7) Remove RDP Users (harden access)"
+    Write-Host "  8) Configure Firewall"
+    Write-Host "  9) Disable Unnecessary Services"
+    Write-Host " 10) Enable Advanced Auditing + Firewall Logging"
+    Write-Host " 11) Configure Splunk"
+    Write-Host " 12) Install EternalBlue Patch"
+    Write-Host " 13) Upgrade SMB (enable v2/3, disable v1)"
+    Write-Host " 14) Patch Mimikatz (WDigest)"
+    Write-Host " 15) Run Windows Updates"
+    Write-Host " 16) Run Stanford Harden"
+    Write-Host " 17) Set Execution Policy to Restricted"
+}
 
-# Load userfile and portdata
-[string[]]$UserArray = Get-Content -Path ".\users.txt"
-$PortsObject = Get-Content -Path ".\ports.json" -Raw | ConvertFrom-Json
+# Run all function (original flow)
+function Run-All {
+    Initialize-Log
+    Initialize-Context
+
+    $confirmation = Prompt-Yes-No -Message "Disable every user but your own? (y/n)"
+    if ($confirmation.toLower() -eq "y") { 
+        Write-Host "`n***Disabling users***" -ForegroundColor Magenta; 
+        Disable-Users 
+    } else { 
+        Write-Host "Skipping..." -ForegroundColor Red 
+    }
+
+    $confirmation = Prompt-Yes-No -Message "Enter the 'Add Competition Users' function? (y/n)"
+    if ($confirmation.toLower() -eq "y") { 
+        Write-Host "`n***Adding Competition Users...***" -ForegroundColor Magenta; 
+        Add-Competition-Users 
+    } else { 
+        Write-Host "Skipping..." -ForegroundColor Red 
+    }
+
+    $confirmation = Prompt-Yes-No -Message "Enter the 'Remove users from RDP group except $($UserArray[0]) and $($UserArray[1])' function? (y/n)"
+    if ($confirmation.toLower() -eq "y") { 
+        Write-Host "`n***Removing every user from RDP group except $($UserArray[0]) and $($UserArray[1])...***" -ForegroundColor Magenta; 
+        Remove-RDP-Users 
+    } else { 
+        Write-Host "Skipping..." -ForegroundColor Red 
+    }
+
+    $confirmation = Prompt-Yes-No -Message "Enter the 'Configure Firewall' function? (y/n)"
+    if ($confirmation.toLower() -eq "y") { 
+        Write-Host "`n***Configuring firewall***" -ForegroundColor Magenta; 
+        Configure-Firewall 
+    } else { 
+        Write-Host "Skipping..." -ForegroundColor Red 
+    }
+
+    $confirmation = Prompt-Yes-No -Message "Enter the 'Disable unnecessary services (NetBIOS over TCP/IP, IPv6, closed port services)' function? (y/n)"
+    if ($confirmation.toLower() -eq "y") { 
+        Write-Host "`n***Disabling unnecessary services***" -ForegroundColor Magenta; 
+        Disable-Unnecessary-Services 
+    } else { 
+        Write-Host "Skipping..." -ForegroundColor Red 
+    }
+
+    Write-Host "`n***Enabling advanced auditing***" -ForegroundColor Magenta
+    if (Test-Path ".\advancedAuditing.ps1") {
+        .\advancedAuditing.ps1
+        Update-Log "Enable Advanced Auditing" "Executed successfully"
+    } else {
+        Write-Host "advancedAuditing.ps1 not found, skipping..." -ForegroundColor Yellow
+        Update-Log "Enable Advanced Auditing" "Skipped - file not found"
+    }
+    
+    Write-Host "Enabling Firewall logging successful and blocked connections" -ForegroundColor Green
+    Set-NetFirewallProfile -Profile Domain,Public,Private -LogAllowed True -LogBlocked True
+
+    $confirmation = Prompt-Yes-No -Message "Enter the 'Configure Splunk' function? (y/n)"
+    if ($confirmation.toLower() -eq "y") { 
+        Write-Host "`n***Configuring Splunk***" -ForegroundColor Magenta; 
+        $SplunkIP = Read-Host "`nInput IP address of Splunk Server"
+        $SplunkVersion = Read-Host "`nInput OS Version (7, 8, 10, 11, 2012, 2016, 2019, 2022): "
+        Download-Install-Setup-Splunk -Version $SplunkVersion -IP $SplunkIP
+    } else { 
+        Write-Host "Skipping..." -ForegroundColor Red 
+    }
+
+    Write-Host "`n***Installing EternalBlue Patch***" -ForegroundColor Magenta
+    Install-EternalBluePatch
+
+    Write-Host "`n***Upgrading SMB***" -ForegroundColor Magenta
+    Upgrade-SMB
+
+    Write-Host "`n***Patching Mimikatz***" -ForegroundColor Magenta
+    Patch-Mimikatz
+
+    $confirmation = Prompt-Yes-No -Message "Enter the 'Run Windows Updates' function? (y/n) This might take a while"
+    if ($confirmation.toLower() -eq "y") { 
+        Write-Host "`n***Running Windows Updater***" -ForegroundColor Magenta; 
+        Run-Windows-Updates 
+    } else { 
+        Write-Host "Skipping..." -ForegroundColor Red 
+    }
+
+    $confirmation = Prompt-Yes-No -Message "Enter the 'Stanford Harden' function? (y/n) This might take a while"
+    if ($confirmation.toLower() -eq "y") { 
+        Write-Host "`n***Running Stanford Harden***" -ForegroundColor Magenta; 
+        Run-StanfordHarden 
+    } else { 
+        Write-Host "Skipping..." -ForegroundColor Red 
+    }
+
+    Write-Host "***Setting Execution Policy back to Restricted***" -ForegroundColor Red
+    Set-ExecutionPolicy Restricted
+    Update-Log "Set Execution Policy" "Executed successfully"
+
+    $Error | Out-File $env:USERPROFILE\Desktop\hard.txt -Append -Encoding utf8
+    Write-Host "`n***Script Completed!!!***" -ForegroundColor Green
+    Print-Log
+}
 #
 # Generate a random password with a mix of characters
 function GeneratePassword {
@@ -80,31 +284,213 @@ function GeneratePassword {
     }
 }
 
-# Disable all AD users except the current one
+# Disable all local users except the current one
 function Disable-AllUsers {
     try {
-    $currentSamAccountName = $CurrentUser.Split('\')[-1]
+        $currentSamAccountName = $CurrentUser.Split('\')[-1]
 
-    Get-LocalUser | Where-Object SamAccountName -ne $currentSamAccountName |
-    ForEach-Object { $_ | Disable-LocalUser }
+        Get-LocalUser | Where-Object SamAccountName -ne $currentSamAccountName |
+        ForEach-Object { $_ | Disable-LocalUser }
+        Update-Log "Disable Users" "Executed successfully"
     } catch {
         Write-Host $_.Exception.Message -ForegroundColor Yellow
         Write-Host "Error Occurred..."
+        Update-Log "Disable Users" "Failed with error: $($_.Exception.Message)"
+    }
+}
+
+# Enable Windows Defender with comprehensive settings
+function Enable-Windows-Defender {
+    try {
+        Write-Host "Enabling Windows Defender..." -ForegroundColor Cyan
+        
+        # Start Defender Service
+        Start-Service -Name WinDefend -ErrorAction SilentlyContinue
+        Set-Service -Name WinDefend -StartupType Automatic -ErrorAction SilentlyContinue
+        
+        # Set Defender Policies
+        $defenderPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows Defender"
+        $defenderScanPath = "$defenderPath\Scan"
+        $defenderRealTimeProtectionPath = "$defenderPath\Real-Time Protection"
+        $defenderReportingPath = "$defenderPath\Reporting"
+        $defenderSpynetPath = "$defenderPath\Spynet"
+        $defenderFeaturesPath = "HKLM:\SOFTWARE\Microsoft\Windows Defender\Features"
+        
+        # Create or set registry values for Defender policies
+        New-ItemProperty -Path $defenderPath -Name "DisableAntiSpyware" -Value 0 -PropertyType DWORD -Force | Out-Null
+        New-ItemProperty -Path $defenderPath -Name "DisableAntiVirus" -Value 0 -PropertyType DWORD -Force | Out-Null
+        New-ItemProperty -Path $defenderPath -Name "ServiceKeepAlive" -Value 1 -PropertyType DWORD -Force | Out-Null
+        New-ItemProperty -Path $defenderScanPath -Name "DisableHeuristics" -Value 0 -PropertyType DWORD -Force | Out-Null
+        New-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Attachments" -Name "ScanWithAntiVirus" -Value 3 -PropertyType DWORD -Force | Out-Null
+        New-ItemProperty -Path $defenderRealTimeProtectionPath -Name "DisableRealtimeMonitoring" -Value 0 -PropertyType DWORD -Force | Out-Null
+        New-ItemProperty -Path $defenderScanPath -Name "CheckForSignaturesBeforeRunningScan" -Value 1 -PropertyType DWORD -Force | Out-Null
+        New-ItemProperty -Path $defenderRealTimeProtectionPath -Name "DisableBehaviorMonitoring" -Value 0 -PropertyType DWORD -Force | Out-Null
+        New-ItemProperty -Path $defenderReportingPath -Name "DisableGenericRePorts" -Value 1 -PropertyType DWORD -Force | Out-Null
+        New-ItemProperty -Path $defenderSpynetPath -Name "LocalSettingOverrideSpynetReporting" -Value 0 -PropertyType DWORD -Force | Out-Null
+        New-ItemProperty -Path $defenderSpynetPath -Name "SubmitSamplesConsent" -Value 2 -PropertyType DWORD -Force | Out-Null
+        New-ItemProperty -Path $defenderSpynetPath -Name "DisableBlockAtFirstSeen" -Value 0 -PropertyType DWORD -Force | Out-Null
+        New-ItemProperty -Path $defenderSpynetPath -Name "SpynetReporting" -Value 0 -PropertyType DWORD -Force | Out-Null
+        
+        # Enable Tamper Protection
+        Write-Host "Enabling Tamper Protection..." -ForegroundColor Yellow
+        New-ItemProperty -Path $defenderFeaturesPath -Name "TamperProtection" -Value 5 -PropertyType DWORD -Force | Out-Null
+        
+        # Enable Attack Surface Reduction Rules
+        try {
+            Add-MpPreference -AttackSurfaceReductionRules_Ids 75668C1F-73B5-4CF0-BB93-3ECF5CB7CC84 -AttackSurfaceReductionRules_Actions Enabled | Out-Null
+            Add-MpPreference -AttackSurfaceReductionRules_Ids 3B576869-A4EC-4529-8536-B80A7769E899 -AttackSurfaceReductionRules_Actions Enabled | Out-Null
+            Add-MpPreference -AttackSurfaceReductionRules_Ids D4F940AB-401B-4EfC-AADC-AD5F3C50688A -AttackSurfaceReductionRules_Actions Enabled | Out-Null
+            Add-MpPreference -AttackSurfaceReductionRules_Ids D3E037E1-3EB8-44C8-A917-57927947596D -AttackSurfaceReductionRules_Actions Enabled | Out-Null
+            Add-MpPreference -AttackSurfaceReductionRules_Ids 5BEB7EFE-FD9A-4556-801D-275E5FFC04CC -AttackSurfaceReductionRules_Actions Enabled | Out-Null
+            Add-MpPreference -AttackSurfaceReductionRules_Ids BE9BA2D9-53EA-4CDC-84E5-9B1EEEE46550 -AttackSurfaceReductionRules_Actions Enabled | Out-Null
+            Add-MpPreference -AttackSurfaceReductionRules_Ids 92E97FA1-2EDF-4476-BDD6-9DD0B4DDDC7B -AttackSurfaceReductionRules_Actions Enabled | Out-Null
+            Add-MpPreference -AttackSurfaceReductionRules_Ids D1E49AAC-8F56-4280-B9BA-993A6D77406C -AttackSurfaceReductionRules_Actions Enabled | Out-Null
+            Add-MpPreference -AttackSurfaceReductionRules_Ids B2B3F03D-6A65-4F7B-A9C7-1C7EF74A9BA4 -AttackSurfaceReductionRules_Actions Enabled | Out-Null
+            Add-MpPreference -AttackSurfaceReductionRules_Ids C1DB55AB-C21A-4637-BB3F-A12568109D35 -AttackSurfaceReductionRules_Actions Enabled | Out-Null
+            Add-MpPreference -AttackSurfaceReductionRules_Ids 01443614-CD74-433A-B99E-2ECDC07BFC25 -AttackSurfaceReductionRules_Actions Enabled | Out-Null
+            Add-MpPreference -AttackSurfaceReductionRules_Ids 9E6C4E1F-7D60-472F-BA1A-A39EF669E4B2 -AttackSurfaceReductionRules_Actions Enabled | Out-Null
+            Add-MpPreference -AttackSurfaceReductionRules_Ids 26190899-1602-49E8-8B27-EB1D0A1CE869 -AttackSurfaceReductionRules_Actions Enabled | Out-Null
+            Add-MpPreference -AttackSurfaceReductionRules_Ids 7674BA52-37EB-4A4F-A9A1-F0F9A1619A2C -AttackSurfaceReductionRules_Actions Enabled | Out-Null
+            Add-MpPreference -AttackSurfaceReductionRules_Ids E6DB77E5-3DF2-4CF1-B95A-636979351E5B -AttackSurfaceReductionRules_Actions Enabled | Out-Null
+            Write-Host "Attack Surface Reduction rules enabled" -ForegroundColor Green
+        } catch {
+            Write-Host "Could not enable all ASR rules (older Defender version)" -ForegroundColor Yellow
+        }
+        
+        # Remove exclusions
+        ForEach ($ExcludedASR in (Get-MpPreference).AttackSurfaceReductionOnlyExclusions) {
+            Remove-MpPreference -AttackSurfaceReductionOnlyExclusions $ExcludedASR | Out-Null
+        }
+        ForEach ($ExcludedExt in (Get-MpPreference).ExclusionExtension) {
+            Remove-MpPreference -ExclusionExtension $ExcludedExt | Out-Null
+        }
+        ForEach ($ExcludedIp in (Get-MpPreference).ExclusionIpAddress) {
+            Remove-MpPreference -ExclusionIpAddress $ExcludedIp | Out-Null
+        }
+        ForEach ($ExcludedDir in (Get-MpPreference).ExclusionPath) {
+            Remove-MpPreference -ExclusionPath $ExcludedDir | Out-Null
+        }
+        ForEach ($ExcludedProc in (Get-MpPreference).ExclusionProcess) {
+            Remove-MpPreference -ExclusionProcess $ExcludedProc | Out-Null
+        }
+        
+        Write-Host "Windows Defender enabled and configured successfully" -ForegroundColor Green
+        Update-Log "Enable Windows Defender" "Executed successfully"
+    } catch {
+        Write-Host $_.Exception.Message -ForegroundColor Yellow
+        Write-Host "Error Occurred..."
+        Update-Log "Enable Windows Defender" "Failed with error: $($_.Exception.Message)"
+    }
+}
+
+# Quick harden function that performs essential hardening steps
+function Quick-Harden {
+    try {
+        Write-Host "`n=== QUICK HARDENING STARTED ===" -ForegroundColor Green
+        Write-Host "This will perform essential hardening steps automatically..." -ForegroundColor Yellow
+        
+        # Step 1: Disable all users except current one
+        Write-Host "`n1. Disabling all users except current user..." -ForegroundColor Cyan
+        Disable-AllUsers
+        
+        # Step 2: Change current user password
+        Write-Host "`n2. Changing current user password..." -ForegroundColor Cyan
+        $currentSamAccountName = $CurrentUser.Split('\')[-1]
+        Write-Host "Please set a new password for user: $currentSamAccountName" -ForegroundColor Yellow
+        while ($true) {
+            Get-Set-Password -user $currentSamAccountName
+        }
+        
+        # Step 3: Create competition users
+        Write-Host "`n3. Creating competition users..." -ForegroundColor Cyan
+        if (-not (Test-Path .\users.txt)) { 
+            GetCompetitionUsers 
+        }
+        Add-Competition-Users
+        
+        # Step 4: Remove RDP users
+        Write-Host "`n4. Removing users from RDP group..." -ForegroundColor Cyan
+        Remove-RDP-Users
+        
+        # Step 5: Upgrade SMB
+        Write-Host "`n5. Upgrading SMB..." -ForegroundColor Cyan
+        Upgrade-SMB
+        
+        # Step 6: Enable Windows Defender
+        Write-Host "`n6. Enabling Windows Defender..." -ForegroundColor Cyan
+        Enable-Windows-Defender
+        
+        # Step 7: Configure Firewall (with common ports)
+        Write-Host "`n7. Configuring firewall with common ports..." -ForegroundColor Cyan
+        $commonPorts = @(53, 3389, 80, 22, 443)
+        try {
+            # Disable firewall temporarily
+            netsh advfirewall set allprofiles state off
+            
+            # Disable all existing rules
+            netsh advfirewall firewall set rule all dir=in new enable=no
+            netsh advfirewall firewall set rule all dir=out new enable=no
+            
+            # Add common port rules
+            foreach ($port in $commonPorts) {
+                $description = switch ($port) {
+                    53 { "DNS" }
+                    3389 { "RDP" }
+                    80 { "HTTP" }
+                    22 { "SSH" }
+                    443 { "HTTPS" }
+                }
+                
+                # Inbound rules
+                netsh advfirewall firewall add rule name="TCP Inbound $description" dir=in action=allow protocol=TCP localport=$port
+                netsh advfirewall firewall add rule name="UDP Inbound $description" dir=in action=allow protocol=UDP localport=$port
+                
+                # Outbound rules
+                netsh advfirewall firewall add rule name="TCP Outbound $description" dir=out action=allow protocol=TCP localport=$port
+                netsh advfirewall firewall add rule name="UDP Outbound $description" dir=out action=allow protocol=UDP localport=$port
+            }
+            
+            # Re-enable firewall
+            netsh advfirewall set allprofiles state on
+            Write-Host "Firewall configured with common ports: $($commonPorts -join ', ')" -ForegroundColor Green
+        } catch {
+            Write-Host "Firewall configuration failed: $($_.Exception.Message)" -ForegroundColor Red
+        }
+        
+        # Step 8: Disable unnecessary services
+        Write-Host "`n8. Disabling unnecessary services..." -ForegroundColor Cyan
+        Disable-Unnecessary-Services
+        
+        # Step 9: Run Windows Updates
+        Write-Host "`n9. Running Windows Updates..." -ForegroundColor Cyan
+        Write-Host "This may take a while..." -ForegroundColor Yellow
+        Run-Windows-Updates
+        
+        Write-Host "`n=== QUICK HARDENING COMPLETED ===" -ForegroundColor Green
+        Write-Host "Essential hardening steps have been completed successfully!" -ForegroundColor Green
+        Update-Log "Quick Harden" "Executed successfully"
+        
+    } catch {
+        Write-Host $_.Exception.Message -ForegroundColor Yellow
+        Write-Host "Error Occurred during quick hardening..."
+        Update-Log "Quick Harden" "Failed with error: $($_.Exception.Message)"
     }
 }
 
 function Disable-Users {
     try {
         $confirmation = Prompt-Yes-No -Message "Mass disable users (y/n)?"
-            if ($confirmation.toLower() -eq "y") {
-                Disable-AllUsers
-                Write-Host "All users disabled but your own" -ForegroundColor Red
-            } else {
-                Write-Host "Skipping..." -ForegroundColor Red
-            }
+        if ($confirmation.toLower() -eq "y") {
+            Disable-AllUsers
+            Write-Host "All users disabled but your own" -ForegroundColor Red
+        } else {
+            Write-Host "Skipping..." -ForegroundColor Red
+            Update-Log "Disable Users" "Skipped by user"
+        }
     } catch {
         Write-Host $_.Exception.Message
         Write-Host "Error disabling users. Revisit later." -ForegroundColor Yellow
+        Update-Log "Disable Users" "Failed with error: $($_.Exception.Message)"
     }
 }
 
@@ -203,9 +589,11 @@ function Add-Competition-Users {
 			$outputText | Out-File -FilePath "UserPerms.txt" -Encoding UTF8
 			Write-Host "`nUser permissions have been exported to .\UserPerms.txt" -ForegroundColor Green
 		}
+        Update-Log "Add Competition Users" "Executed successfully"
     } catch {
         Write-Host $_.Exception.Message -ForegroundColor Yellow
         Write-Host "Error Occurred..."
+        Update-Log "Add Competition Users" "Failed with error: $($_.Exception.Message)"
     }
 }
 
@@ -217,9 +605,11 @@ function Remove-RDP-Users {
         ForEach-Object {
             Remove-LocalGroupMember -Name "Remote Desktop Users" -Member $_ -Confirm:$false
         }
+        Update-Log "Remove RDP Users" "Executed successfully"
     } catch {
         Write-Host $_.Exception.Message -ForegroundColor Yellow
         Write-Host "Error Occurred..."
+        Update-Log "Remove RDP Users" "Failed with error: $($_.Exception.Message)"
     }
 }
 
@@ -391,10 +781,14 @@ function Configure-Firewall {
 
             # Re-enable the firewall profiles
             netsh advfirewall set allprofiles state on
+            Update-Log "Configure Firewall" "Executed successfully"
+        } else {
+            Update-Log "Configure Firewall" "Skipped by user"
         }
     } catch {
         Write-Host $_.Exception.Message -ForegroundColor Yellow
         Write-Host "Error Occurred..."
+        Update-Log "Configure Firewall" "Failed with error: $($_.Exception.Message)"
     }
 }
 
@@ -418,9 +812,11 @@ function Disable-Unnecessary-Services {
             # Disable NetBIOS over TCP/IP (NetbiosOptions = 2)
             $adapter.SetTcpipNetbios(2)
         }
+        Update-Log "Disable Unnecessary Services" "Executed successfully"
     } catch {
         Write-Host $_.Exception.Message -ForegroundColor Yellow
         Write-Host "Error Occurred..."
+        Update-Log "Disable Unnecessary Services" "Failed with error: $($_.Exception.Message)"
     }
 }
 function Download-Install-Setup-Splunk {
@@ -1020,94 +1416,572 @@ function Run-StanfordHarden {
 
 
 
-#Start of script
-Disable-Users
+# Add logging to remaining functions
+function Download-Install-Setup-Splunk {
+    param([string]$Version, [string]$IP)
 
+    $splunkBeta = $true #((Prompt-Yes-No -Message "Install Splunk from deltabluejay repo? (y/n)").toLower() -eq 'y')
+    #Write-Host $splunkBeta
+    try {
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        if ($splunkBeta) {
+            #$downloadURL = "https://raw.githubusercontent.com/deltabluejay/public-ccdc-resources/refs/heads/dev/splunk/splunk.ps1"
+            $downloadURL = "https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main/splunk/splunk.ps1"
+        }
+        if (-not $splunkBeta) {
+            $downloadURL = "https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main/splunk/splunk.ps1"
+        }
 
-$confirmation = Prompt-Yes-No -Message "Enter the 'Add Competition Users' function? (y/n)"
-if ($confirmation.toLower() -eq "y") {
-    Write-Host "`n***Adding Competition Users...***" -ForegroundColor Magenta
-    Add-Competition-Users
-} else {
-    Write-Host "Skipping..." -ForegroundColor Red
+        Invoke-WebRequest -Uri $downloadURL -OutFile ./splunk.ps1
+
+        $splunkServer = "$($IP):9997" # Replace with your Splunk server IP and receiving port
+
+        # Install splunk using downloaded script
+        if ((Get-ChildItem ./splunk.ps1).Length -lt 6000) {
+            ./splunk.ps1 $Version $SplunkServer
+        } else {
+            ./splunk.ps1 $Version $SplunkServer "member"
+        }
+        Update-Log "Configure Splunk" "Executed successfully"
+    } catch {
+        Write-Host $_.Exception.Message -ForegroundColor Yellow
+        Write-Host "Error Occurred..."
+        Update-Log "Configure Splunk" "Failed with error: $($_.Exception.Message)"
+    }
 }
 
+function Install-EternalBluePatch {
+    try {
+        $patchURLs = Get-Content -Raw -Path "patchURLs.json" | ConvertFrom-Json
+        # Determine patch URL based on OS version keywords
+        $patchURL = switch -Regex ($OSVersion) {
+            '(?i)Vista'  { $patchURLs.Vista; break }
+            'Windows 7'  { $patchURLs.'Windows 7'; break }
+            'Windows 8'  { $patchURLs.'Windows 8'; break }
+            '2008 R2'    { $patchURLs.'2008 R2'; break }
+            '2008'       { $patchURLs.'2008'; break }
+            '2012 R2'    { $patchURLs.'2012 R2'; break }
+            '2012'       { $patchURLs.'2012'; break }
+            default { throw "Unsupported OS version: $OSVersion" }
+        }
+		Write-Host $patchURL
 
-$confirmation = Prompt-Yes-No -Message "Enter the 'Remove users from RDP group except $($UserArray[0]) and $($UserArray[1])' function? (y/n)"
-if ($confirmation.toLower() -eq "y") {
-    Write-Host "`n***Removing every user from RDP group except $($UserArray[0]) and $($UserArray[1])...***" -ForegroundColor Magenta
-    Remove-RDP-Users
-} else {
-    Write-Host "Skipping..." -ForegroundColor Red
+        # Download the patch to a temporary location
+        $path = "$env:TEMP\eternalblue_patch.msu"
+
+        Write-Host "Grabbing the patch file. Downloading it to $path" -ForegroundColor Cyan
+        $wc = New-Object net.webclient
+        $wc.Downloadfile($patchURL, $path)
+
+        # Install the patch
+        Start-Process -Wait -FilePath "wusa.exe" -ArgumentList "$path /quiet /norestart"
+
+        # Cleanup
+        Remove-Item -Path $path -Force
+
+        Write-Host "Patch for $OSVersion installed successfully!" -ForegroundColor Green
+        Update-Log "Install EternalBlue Patch" "Executed successfully"
+    } catch {
+        Write-Host $_.Exception.Message -ForegroundColor Yellow
+        Write-Host "Error Occurred..."
+        Update-Log "Install EternalBlue Patch" "Failed with error: $($_.Exception.Message)"
+    }
 }
 
+function Upgrade-SMB {
+    try {
+        # Step 1: Detect the current SMB version
+        $smbv1Enabled = (Get-SmbServerConfiguration).EnableSMB1Protocol
+        $smbv2Enabled = (Get-SmbServerConfiguration).EnableSMB2Protocol
+        $restart = $false
 
-$confirmation = Prompt-Yes-No -Message "Enter the 'Configure Firewall' function? (y/n)"
-if ($confirmation.toLower() -eq "y") {
-    Write-Host "`n***Configuring firewall***" -ForegroundColor Magenta
-    Configure-Firewall
-} else {
-    Write-Host "Skipping..." -ForegroundColor Red
+        # Step 2: Decide on the upgrade path based on the detected version
+
+        # Enable SMBv2 (assuming that by enabling SMBv2, SMBv3 will also be enabled if supported)
+        if ($smbv2Enabled -eq $false) {
+            Set-SmbServerConfiguration -EnableSMB2Protocol $true -Force
+            Write-Host "Upgraded to SMBv2/SMBv3." -ForegroundColor Green
+            $restart = $true
+        } elseif ($smbv2Enabled -eq $true) {
+            Write-Host "SMBv2 detected. No upgrade required if SMBv3 is supported alongside." -ForegroundColor Cyan
+        }
+
+        if ($smbv1Enabled -eq $true) {
+            Write-Host "SMBv1 detected. disabling..." -ForegroundColor Yellow
+
+            # Disable SMBv1
+            Set-SmbServerConfiguration -EnableSMB1Protocol $false -Force
+            $restart = $true
+        }
+
+        # Restart might be required after these changes
+        if ($restart -eq $true) {
+            Write-Host "Please consider restarting the machine for changes to take effect." -ForegroundColor Red
+        }
+        Update-Log "Upgrade SMB" "Executed successfully"
+    } catch {
+        Write-Host $_.Exception.Message -ForegroundColor Yellow
+        Write-Host "Error Occurred..."
+        Update-Log "Upgrade SMB" "Failed with error: $($_.Exception.Message)"
+    }
 }
 
+function Patch-Mimikatz {
+    try {
+        # Define the registry key path
+        $registryPath = "HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\WDigest"
 
-$confirmation = Prompt-Yes-No -Message "Enter the 'Disable unnecessary services (NetBIOS over TCP/IP, IPv6, closed port services)' function? (y/n)"
-if ($confirmation.toLower() -eq "y") {
-    Write-Host "`n***Disabling unnecessary services***" -ForegroundColor Magenta
-    Disable-Unnecessary-Services
-} else {
-    Write-Host "Skipping..." -ForegroundColor Red
+        # Check if the registry key exists
+        if (Test-Path $registryPath) {
+            # Check if the UseLogonCredential value exists
+            $useLogonCredentialExists = Get-ItemProperty -Path $registryPath -Name "UseLogonCredential" -ErrorAction SilentlyContinue
+
+            if ($useLogonCredentialExists -eq $null) {
+                # Create the UseLogonCredential value and set it to 0
+                New-ItemProperty -Path $registryPath -Name "UseLogonCredential" -Value 0 -PropertyType DWord | Out-Null
+            } else {
+                # Set the UseLogonCredential value to 0
+                Set-ItemProperty -Path $registryPath -Name "UseLogonCredential" -Value 0 -Type DWord
+            }
+        } else {
+            Write-Host "Registry key path not found: $registryPath"
+        }
+        Update-Log "Patch Mimikatz" "Executed successfully"
+    } catch {
+        Write-Host $_.Exception.Message -ForegroundColor Yellow
+        Write-Host "Error Occurred..."
+        Update-Log "Patch Mimikatz" "Failed with error: $($_.Exception.Message)"
+    }
 }
 
+function Run-Windows-Updates {
+    try{
 
-Write-Host "`n***Enabling advanced auditing***" -ForegroundColor Magenta
-.\advancedAuditing.ps1
-Write-Host "Enabling Firewall logging successful and blocked connections" -ForegroundColor Green
-Set-NetFirewallProfile -Profile Domain,Public,Private -LogAllowed True -LogBlocked True
+        # Clear Windows Update cache
+	Write-Host "Clearing Cache"
+        Stop-Service -Name wuauserv
+        Remove-Item -Path C:\Windows\SoftwareDistribution\* -Recurse -Force
 
+        Start-Service -Name wuauserv
 
-$confirmation = Prompt-Yes-No -Message "Enter the 'Configure Splunk' function? (y/n)"
-if ($confirmation.toLower() -eq "y") {
-    Write-Host "`n***Configuring Splunk***" -ForegroundColor Magenta
-    $SplunkIP = Read-Host "`nInput IP address of Splunk Server"
-    $SplunkVersion = Read-Host "`nInput OS Version (7, 8, 10, 11, 2012, 2016, 2019, 2022): "
-    Download-Install-Setup-Splunk -Version $SplunkVersion -IP $SplunkIP
-} else {
-    Write-Host "Skipping..." -ForegroundColor Red
+        # Check for disk space
+        $diskSpace = Get-CimInstance -ClassName Win32_LogicalDisk -Filter "DeviceID='C:'" | Select-Object -ExpandProperty FreeSpace
+        if ($diskSpace -lt 1073741824) { # 1 GB in bytes
+            Write-Host "Insufficient disk space available on the system drive. Please free up disk space and try again."
+            exit
+        }
+
+        # Check Windows Update logs for errors
+        $updateLogPath = "C:\Windows\WindowsUpdate.log"
+        if (Test-Path $updateLogPath) {
+            $updateLogContent = Get-Content -Path $updateLogPath -Tail 50 # Read last 50 lines of the log
+            if ($updateLogContent -match "error") {
+                Write-Host "Error detected in Windows Update log. Please review the log for more details: $updateLogPath"
+                exit
+            }
+        }
+
+        # Check if updates are available
+        $wuSession = New-Object -ComObject Microsoft.Update.Session
+        $wuSearcher = $wuSession.CreateUpdateSearcher()
+        $updates = $wuSearcher.Search("IsInstalled=0")
+
+        # Install available updates
+        if ($updates.Updates.Count -gt 0) {
+            $totalUpdates = $updates.Updates.Count
+            $updateCounter = 0
+
+            # Initialize progress bar
+            Write-Progress -Activity "Installing updates" -Status "0% Complete" -PercentComplete 0
+
+            $updates.Updates | ForEach-Object {
+                $updateCounter++
+                $percentComplete = ($updateCounter / $totalUpdates) * 100
+                Write-Progress -Activity "Installing updates" -Status "$percentComplete% Complete" -PercentComplete $percentComplete
+
+                # Install update
+                $installResult = $wuSession.CreateUpdateInstaller().Install($_)
+                if ($installResult.ResultCode -ne 2) {
+                    Write-Host "Failed to install update $($_.Title). Result code: $($installResult.ResultCode)"
+                }
+            }
+            Write-Host "Updates successfully installed."
+        } else {
+            Write-Host "No updates available."
+        }
+        Update-Log "Run Windows Updates" "Executed successfully"
+    } catch {
+        Write-Host $_.Exception.Message -ForegroundColor Yellow
+        Write-Host "Error Occurred..."
+        Update-Log "Run Windows Updates" "Failed with error: $($_.Exception.Message)"
+    }
 }
 
+function Run-StanfordHarden {
+    try {
+        # Taken from Stanford Repo. Edited by BYU
+        # SCHOOL: DSU
 
-Write-Host "`n***Installing EternalBlue Patch***" -ForegroundColor Magenta
-Install-EternalBluePatch
+        # Start the Windows Firewall service
+        Invoke-Expression "net start mpssvc"
 
+        # Set multicastbroadcastresponse to disable for all profiles
+        Invoke-Expression "netsh advfirewall firewall set multicastbroadcastresponse disable"
+        Invoke-Expression "netsh advfirewall firewall set multicastbroadcastresponse mode=disable profile=all"
 
-Write-Host "`n***Upgrading SMB***" -ForegroundColor Magenta
-Upgrade-SMB
+        # Set logging settings for Domain, Private, and Public profiles
+        Invoke-Expression "netsh advfirewall set Domainprofile logging filename %systemroot%\system32\LogFiles\Firewall\pfirewall.log"
+        Invoke-Expression "netsh advfirewall set Domainprofile logging maxfilesize 20000"
+        Invoke-Expression "netsh advfirewall set Privateprofile logging filename %systemroot%\system32\LogFiles\Firewall\pfirewall.log"
+        Invoke-Expression "netsh advfirewall set Privateprofile logging maxfilesize 20000"
+        Invoke-Expression "netsh advfirewall set Publicprofile logging filename %systemroot%\system32\LogFiles\Firewall\pfirewall.log"
+        Invoke-Expression "netsh advfirewall set Publicprofile logging maxfilesize 20000"
+        Invoke-Expression "netsh advfirewall set Publicprofile logging droppedconnections enable"
+        Invoke-Expression "netsh advfirewall set Publicprofile logging allowedconnections enable"
+        Invoke-Expression "netsh advfirewall set currentprofile logging filename %systemroot%\system32\LogFiles\Firewall\pfirewall.log"
+        Invoke-Expression "netsh advfirewall set currentprofile logging maxfilesize 4096"
+        Invoke-Expression "netsh advfirewall set currentprofile logging droppedconnections enable"
+        Invoke-Expression "netsh advfirewall set currentprofile logging allowedconnections enable"
 
+        # Start Defender Service
+        Start-Service -Name WinDefend
 
-Write-Host "`n***Patching Mimikatz***" -ForegroundColor Magenta
-Patch-Mimikatz
+        # Set Defender Policies
+        $defenderPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows Defender"
+        $defenderScanPath = "$defenderPath\Scan"
+        $defenderRealTimeProtectionPath = "$defenderPath\Real-Time Protection"
+        $defenderReportingPath = "$defenderPath\Reporting"
+        $defenderSpynetPath = "$defenderPath\Spynet"
+        $defenderFeaturesPath = "HKLM:\SOFTWARE\Microsoft\Windows Defender\Features"
 
+        # Create or set registry values for Defender policies
+        New-ItemProperty -Path $defenderPath -Name "DisableAntiSpyware" -Value 0 -PropertyType DWORD -Force
+        New-ItemProperty -Path $defenderPath -Name "DisableAntiVirus" -Value 0 -PropertyType DWORD -Force
+        New-ItemProperty -Path $defenderPath -Name "ServiceKeepAlive" -Value 1 -PropertyType DWORD -Force
+        New-ItemProperty -Path $defenderScanPath -Name "DisableHeuristics" -Value 0 -PropertyType DWORD -Force
+        New-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Attachments" -Name "ScanWithAntiVirus" -Value 3 -PropertyType DWORD -Force
+        New-ItemProperty -Path $defenderRealTimeProtectionPath -Name "DisableRealtimeMonitoring" -Value 0 -PropertyType DWORD -Force
+        New-ItemProperty -Path $defenderScanPath -Name "CheckForSignaturesBeforeRunningScan" -Value 1 -PropertyType DWORD -Force
+        New-ItemProperty -Path $defenderRealTimeProtectionPath -Name "DisableBehaviorMonitoring" -Value 1 -PropertyType DWORD -Force
+        New-ItemProperty -Path $defenderReportingPath -Name "DisableGenericRePorts" -Value 1 -PropertyType DWORD -Force
+        New-ItemProperty -Path $defenderSpynetPath -Name "LocalSettingOverrideSpynetReporting" -Value 0 -PropertyType DWORD -Force
+        New-ItemProperty -Path $defenderSpynetPath -Name "SubmitSamplesConsent" -Value 2 -PropertyType DWORD -Force
+        New-ItemProperty -Path $defenderSpynetPath -Name "DisableBlockAtFirstSeen" -Value 1 -PropertyType DWORD -Force
+        New-ItemProperty -Path $defenderSpynetPath -Name "SpynetReporting" -Value 0 -PropertyType DWORD -Force
+        Write-Host "If the next command errors, it means tamper protection is already enabled:"
+        New-ItemProperty -Path $defenderFeaturesPath -Name "TamperProtection" -Value 5 -PropertyType DWORD -Force
 
-$confirmation = Prompt-Yes-No -Message "Enter the 'Run Windows Updates' function? (y/n) This might take a while"
-if ($confirmation.toLower() -eq "y") {
-    Write-Host "`n***Running Windows Updater***" -ForegroundColor Magenta
-    Run-Windows-Updates
-} else {
-    Write-Host "Skipping..." -ForegroundColor Red
+        # Start Windows Update Service and set startup type to automatic
+        Set-Service -Name wuauserv -StartupType Automatic
+        Start-Service -Name wuauserv
+
+        # Delete netlogon fullsecurechannelprotection then add a new key with it enabled
+        Remove-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Services\Netlogon\Parameters' -Name 'FullSecureChannelProtection' -Force
+        New-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Services\Netlogon\Parameters' -Name 'FullSecureChannelProtection' -Value 1 -PropertyType DWORD -Force
+
+        # Disable the print spooler and make it never start
+        Get-Service -Name Spooler | Stop-Service -Force
+        Set-Service -Name Spooler -StartupType Disabled -Status Stopped
+
+        # DISM commands to disable insecure and unnecessary features
+        # These commands are called within CMD from PowerShell
+        Invoke-Expression 'cmd /c "dism /online /disable-feature /featurename:TFTP /NoRestart"'
+        Invoke-Expression 'cmd /c "dism /online /disable-feature /featurename:TelnetClient /NoRestart"'
+        Invoke-Expression 'cmd /c "dism /online /disable-feature /featurename:TelnetServer /NoRestart"'
+        Invoke-Expression 'cmd /c "dism /online /disable-feature /featurename:SMB1Protocol /NoRestart"'
+
+        # Disables editing registry remotely
+        Get-Service -Name RemoteRegistry | Stop-Service -Force
+        Set-Service -Name RemoteRegistry -StartupType Disabled -Status Stopped -Confirm:$false
+
+        # Remove sticky keys
+        reg delete "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\sethc.exe" /f
+        Start-Process takeown.exe -ArgumentList "/f C:\Windows\System32\sethc.exe" -NoNewWindow -Wait
+        Start-Process icacls.exe -ArgumentList "C:\Windows\System32\sethc.exe /grant administrators:F" -NoNewWindow -Wait
+        Remove-Item -Path "C:\Windows\System32\sethc.exe" -Force
+
+        # Delete utility manager (backdoor)
+        Start-Process takeown.exe -ArgumentList "/f C:\Windows\System32\Utilman.exe" -NoNewWindow -Wait
+        Start-Process icacls.exe -ArgumentList "C:\Windows\System32\Utilman.exe /grant administrators:F" -NoNewWindow -Wait
+        Remove-Item -Path "C:\Windows\System32\Utilman.exe" -Force
+
+        # Delete on-screen keyboard (backdoor)
+        Start-Process takeown.exe -ArgumentList "/f C:\Windows\System32\osk.exe" -NoNewWindow -Wait
+        Start-Process icacls.exe -ArgumentList "C:\Windows\System32\osk.exe /grant administrators:F" -NoNewWindow -Wait
+        Remove-Item -Path "C:\Windows\System32\osk.exe" -Force
+
+        # Delete narrator (backdoor)
+        Start-Process takeown.exe -ArgumentList "/f C:\Windows\System32\Narrator.exe" -NoNewWindow -Wait
+        Start-Process icacls.exe -ArgumentList "C:\Windows\System32\Narrator.exe /grant administrators:F" -NoNewWindow -Wait
+        Remove-Item -Path "C:\Windows\System32\Narrator.exe" -Force
+
+        # Delete magnify (backdoor)
+        Start-Process takeown.exe -ArgumentList "/f C:\Windows\System32\Magnify.exe" -NoNewWindow -Wait
+        Start-Process icacls.exe -ArgumentList "C:\Windows\System32\Magnify.exe /grant administrators:F" -NoNewWindow -Wait
+        Remove-Item -Path "C:\Windows\System32\Magnify.exe" -Force
+
+        #Delete ScheduledTasks
+        Get-ScheduledTask | Unregister-ScheduledTask -Confirm:$false
+
+        #Disable Guest user
+        net user Guest /active:no
+
+        #Make sure DEP is allowed (Triple Negative)
+        reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\Explorer" /v "NoDataExecutionPrevention" /t REG_DWORD /d 0 /f
+        reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\System" /v "DisableHHDEP" /t REG_DWORD /d 0 /f
+
+        #Only privileged groups can add or delete printer drivers
+        reg ADD "HKLM\SYSTEM\CurrentControlSet\Control\Print\Providers\LanMan Print Services\Servers" /v AddPrinterDrivers /t REG_DWORD /d 1 /f
+
+        #Don't execute autorun commands
+        reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer" /v "NoAutorun" /t REG_DWORD /d 1 /f
+        reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer" /v "NoDriveTypeAutoRun" /t REG_DWORD /d 255 /f
+
+        #Don't allow empty password login
+        reg ADD "HKLM\SYSTEM\CurrentControlSet\Control\Lsa" /v LimitBlankPasswordUse /t REG_DWORD /d 1 /f
+
+        #Only local sessions can control the CD/Floppy
+        reg ADD "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v AllocateCDRoms /t REG_DWORD /d 1 /f
+
+        # Enable logging for EVERYTHING
+        auditpol /set /category:* /success:enable /failure:enable
+
+        # Set specific subcategory policies
+        $auditCategories = @(
+            "Security State Change", "Security System Extension", "System Integrity", "IPsec Driver", "Other System Events",
+            "Logon", "Logoff", "Account Lockout", "IPsec Main Mode", "IPsec Quick Mode", "IPsec Extended Mode", "Special Logon",
+            "Other Logon/Logoff Events", "Network Policy Server", "User / Device Claims", "Group Membership", "File System",
+            "Registry", "Kernel Object", "SAM", "Certification Services", "Application Generated", "Handle Manipulation",
+            "File Share", "Filtering Platform Packet Drop", "Filtering Platform Connection", "Other Object Access Events",
+            "Detailed File Share", "Removable Storage", "Central Policy Staging", "Sensitive Privilege Use",
+            "Non Sensitive Privilege Use", "Other Privilege Use Events", "Process Creation", "Process Termination", "DPAPI Activity",
+            "RPC Events", "Plug and Play Events", "Token Right Adjusted Events", "Audit Policy Change",
+            "Authentication Policy Change", "Authorization Policy Change", "MPSSVC Rule-Level Policy Change",
+            "Filtering Platform Policy Change", "Other Policy Change Events", "User Account Management", "Computer Account Management",
+            "Security Group Management", "Distribution Group Management", "Application Group Management",
+            "Other Account Management Events", "Directory Service Access", "Directory Service Changes",
+            "Directory Service Replication", "Detailed Directory Service Replication", "Credential Validation",
+            "Kerberos Service Ticket Operations", "Other Account Logon Events", "Kerberos Authentication Service"
+        )
+
+        foreach ($category in $auditCategories) {
+            auditpol /set /subcategory:"$category" /success:enable /failure:enable
+        }
+
+        #Flush DNS Lookup Cache
+        ipconfig /flushdns
+
+        #Enable UAC popups if software trys to make changes
+        reg ADD HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System /v EnableLUA /t REG_DWORD /d 1 /f
+
+        #Require admin authentication for operations that requires elevation of privileges
+        reg add HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System /V ConsentPromptBehaviorAdmin /T REG_DWORD /D 1 /F
+        #Does not allow user to run elevates privileges
+        reg add HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System /V ConsentPromptBehaviorUser /T REG_DWORD /D 0 /F
+        #Built-in administrator account is placed into Admin Approval Mode, admin approval is required for administrative tasks
+        reg add HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System /V FilterAdministratorToken /T REG_DWORD /D 1 /F
+
+        #Disable Multiple Avenues for Backdoors
+        reg ADD "HKU\.DEFAULT\Control Panel\Accessibility\StickyKeys" /v Flags /t REG_SZ /d 506 /f
+        reg ADD "HKU\.DEFAULT\Control Panel\Accessibility\Keyboard Response" /v Flags /t REG_SZ /d 122 /f
+        reg ADD "HKU\.DEFAULT\Control Panel\Accessibility\ToggleKeys" /v Flags /t REG_SZ /d 58 /f
+
+        #Don't allow Windows Search and Cortana to search cloud sources (OneDrive, SharePoint, etc.)
+        reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Search" /v "AllowCloudSearch" /t REG_DWORD /d 0 /f
+        #Disable Cortana
+        reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Search" /v "AllowCortana" /t REG_DWORD /d 0 /f
+        #Disable Cortana when locked
+        reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Search" /v "AllowCortanaAboveLock" /t REG_DWORD /d 0 /f
+        #Disable location permissions for windows search
+        reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Search" /v "AllowSearchToUseLocation" /t REG_DWORD /d 0 /f
+
+        # Additional hardening steps from the original script
+        sc.exe config trustedinstaller start= auto
+        DISM /Online /Cleanup-Image /RestoreHealth
+        sfc /scannow
+
+        # Remove sticky keys (duplicate check)
+        if (Test-Path "C:\Windows\System32\setch.exe") {
+            Start-Process takeown.exe -ArgumentList "/f C:\Windows\System32\sethc.exe" -NoNewWindow -Wait
+            Start-Process icacls.exe -ArgumentList "C:\Windows\System32\sethc.exe /grant administrators:F" -NoNewWindow -Wait
+            Remove-Item -Path "C:\Windows\System32\sethc.exe" -Force
+        }
+
+        # Delete utility manager (backdoor) (duplicate check)
+        if (Test-Path "C:\Windows\System32\Utilman.exe") {
+            Start-Process takeown.exe -ArgumentList "/f C:\Windows\System32\Utilman.exe" -NoNewWindow -Wait
+            Start-Process icacls.exe -ArgumentList "C:\Windows\System32\Utilman.exe /grant administrators:F" -NoNewWindow -Wait
+            Remove-Item -Path "C:\Windows\System32\Utilman.exe" -Force
+        }
+
+        # Delete on-screen keyboard (backdoor) (duplicate check)
+        if (Test-Path "C:\Windows\System32\osk.exe") {
+            Start-Process takeown.exe -ArgumentList "/f C:\Windows\System32\osk.exe" -NoNewWindow -Wait
+            Start-Process icacls.exe -ArgumentList "C:\Windows\System32\osk.exe /grant administrators:F" -NoNewWindow -Wait
+            Remove-Item -Path "C:\Windows\System32\osk.exe" -Force
+        }
+
+        # Delete narrator (backdoor) (duplicate check)
+        if (Test-Path "C:\Windows\System32\Narrator.exe") {
+            Start-Process takeown.exe -ArgumentList "/f C:\Windows\System32\Narrator.exe" -NoNewWindow -Wait
+            Start-Process icacls.exe -ArgumentList "C:\Windows\System32\Narrator.exe /grant administrators:F" -NoNewWindow -Wait
+            Remove-Item -Path "C:\Windows\System32\Narrator.exe" -Force
+        }
+
+        # Delete magnify (backdoor) (duplicate check)
+        if (Test-Path "C:\Windows\System32\Magnify.exe") {
+            Start-Process takeown.exe -ArgumentList "/f C:\Windows\System32\Magnify.exe" -NoNewWindow -Wait
+            Start-Process icacls.exe -ArgumentList "C:\Windows\System32\Magnify.exe /grant administrators:F" -NoNewWindow -Wait
+            Remove-Item -Path "C:\Windows\System32\Magnify.exe" -Force
+        }
+
+        # Additional hardening from the original script
+        $Error.Clear()
+        $ErrorActionPreference = "Continue"
+
+        Write-Output "#########################"
+        Write-Output "#                       #"
+        Write-Output "#         Hard          #"
+        Write-Output "#                       #"
+        Write-Output "#########################"
+
+        Write-Output "#########################"
+        Write-Output "#    Hostname/Domain    #"
+        Write-Output "#########################"
+        Get-WmiObject -Namespace root\cimv2 -Class Win32_ComputerSystem | Select-Object Name, Domain
+        Write-Output "#########################"
+        Write-Output "#          IP           #"
+        Write-Output "#########################"
+        Get-WmiObject Win32_NetworkAdapterConfiguration | ? {$_.IpAddress -ne $null} | % {$_.ServiceName + "`n" + $_.IPAddress + "`n"}
+
+        # Disable storage of the LM hash for passwords less than 15 characters
+        reg add "HKLM\SYSTEM\CurrentControlSet\Control\Lsa" /v NoLmHash /t REG_DWORD /d 1 /f | Out-Null
+        # https://learn.microsoft.com/en-us/troubleshoot/windows-client/windows-security/enable-ntlm-2-authentication
+        reg add "HKLM\SYSTEM\CurrentControlSet\Control\Lsa" /v LmCompatibilityLevel /t REG_DWORD /d 5 /f | Out-Null
+        # Disable storage of plaintext creds in WDigest
+        reg add "HKLM\SYSTEM\CurrentControlSet\Control\SecurityProviders\WDigest" /v UseLogonCredential /t REG_DWORD /d 0 /f | Out-Null
+        # Enable remote UAC for Local accounts
+        reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" /v LocalAccountTokenFilterPolicy /t REG_DWORD /d 0 /f | Out-Null
+        # Enable LSASS Protection
+        reg add "HKLM\SYSTEM\CurrentControlSet\Control\Lsa" /v RunAsPPL /t REG_DWORD /d 1 /f | Out-Null
+        # Enable LSASSS process auditing
+        reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\LSASS.exe" /v AuditLevel /t REG_DWORD /d 8 /f | Out-Null
+        Write-Output "$Env:ComputerName [INFO] PTH Mitigation complete"
+
+        # Defender settings
+        reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows Defender\Spynet" /v SpyNetReporting /t REG_DWORD /d 2 /f | Out-Null
+        reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows Defender\Spynet" /v SubmitSamplesConsent /t REG_DWORD /d 3 /f | Out-Null
+        reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows Defender\Spynet" /v DisableBlockAtFirstSeen /t REG_DWORD /d 0 /f | Out-Null
+        reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows Defender\MpEngine" /v MpCloudBlockLevel /t REG_DWORD /d 6 /f | Out-Null
+        reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows Defender\Real-Time Protection" /v "DisableBehaviorMonitoring" /t REG_DWORD /d 0 /f | Out-Null
+        reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows Defender\Real-Time Protection" /v "DisableRealtimeMonitoring" /t REG_DWORD /d 0 /f | Out-Null
+        reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows Defender\Real-Time Protection" /v "DisableIOAVProtection" /t REG_DWORD /d 0 /f | Out-Null
+        reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows Defender" /v "DisableAntiSpyware" /t REG_DWORD /d 0 /f | Out-Null
+        reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows Defender" /v "ServiceKeepAlive" /t REG_DWORD /d 1 /f | Out-Null
+        reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows Defender\Scan" /v "CheckForSignaturesBeforeRunningScan" /t REG_DWORD /d 1 /f | Out-Null
+        reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows Defender\Scan" /v "DisableHeuristics" /t REG_DWORD /d 0 /f | Out-Null
+        reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows Defender\Scan" /v "DisableArchiveScanning" /t REG_DWORD /d 0 /f | Out-Null
+        reg add "HKLM\SOFTWARE\Microsoft\Windows Advanced Threat Protection" /v "ForceDefenderPassiveMode" /t REG_DWORD /d 0 /f | Out-Null
+        Write-Output "$Env:ComputerName [INFO] Set Defender options"
+
+        # Service Lockdown
+        # RDP NLA
+        reg add "HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-TCP" /v UserAuthentication /t REG_DWORD /d 1 /f | Out-Null
+        reg add "HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server" /v AllowTSConnections /t REG_DWORD /d 1 /f | Out-Null
+        reg add "HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server" /v fDenyTSConnections /t REG_DWORD /d 0 /f | Out-Null
+
+        net stop spooler | Out-Null
+        sc.exe config spooler start=disabled | Out-Null
+        Write-Output "$Env:ComputerName [INFO] Services locked down"
+
+        # CVE-2021-34527 (PrintNightmare)
+        reg add "HKLM\Software\Policies\Microsoft\Windows NT\Printers" /v RegisterSpoolerRemoteRpcEndPoint /t REG_DWORD /d 2 /f | Out-Null
+        reg delete "HKLM\Software\Policies\Microsoft\Windows NT\Printers\PointAndPrint" /v NoWarningNoElevationOnInstall /f | Out-Null
+        reg delete "HKLM\Software\Policies\Microsoft\Windows NT\Printers\PointAndPrint" /v UpdatePromptSettings /f | Out-Null
+        reg add "HKLM\Software\Policies\Microsoft\Windows NT\Printers\PointAndPrint" /v RestrictDriverInstallationToAdministrators /t REG_DWORD /d 1 /f | Out-Null
+        # Network security: LDAP client signing requirements
+        reg add "HKLM\SYSTEM\CurrentControlSet\Services\LDAP" /v LDAPClientIntegrity /t REG_DWORD /d 2 /f | Out-Null
+        # Disable BITS transfers
+        reg add "HKLM\Software\Policies\Microsoft\Windows\BITS" /v EnableBITSMaxBandwidth /t REG_DWORD /d 0 /f | Out-Null
+        reg add "HKLM\Software\Policies\Microsoft\Windows\BITS" /v MaxDownloadTime /t REG_DWORD /d 1 /f | Out-Null
+        Write-Output "$Env:ComputerName [INFO] BITS locked down"
+        # UAC
+        reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" /v EnableLUA /t REG_DWORD /d 1 /f | Out-Null
+        reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" /v ConsentPromptBehaviorAdmin /t REG_DWORD /d 2 /f | Out-Null
+        reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" /v ConsentPromptBehaviorUser /t REG_DWORD /d 0 /f | Out-Null
+        reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" /v PromptOnSecureDesktop /t REG_DWORD /d 1 /f | Out-Null
+        reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" /v EnableInstallerDetection /t REG_DWORD /d 1 /f | Out-Null
+        Write-Output "$Env:ComputerName [INFO] UAC enabled"
+
+        Update-Log "Run Stanford Harden" "Executed successfully"
+    } catch {
+        Write-Host $_.Exception.Message -ForegroundColor Yellow
+        Write-Host "Error Occurred..."
+        Update-Log "Run Stanford Harden" "Failed with error: $($_.Exception.Message)"
+    }
 }
 
+###################################### MAIN EXECUTION ######################################
 
-$confirmation = Prompt-Yes-No -Message "Enter the 'Stanford Harden' function? (y/n) This might take a while"
-if ($confirmation.toLower() -eq "y") {
-    Write-Host "`n***Running Stanford Harden***" -ForegroundColor Magenta
-    Run-StanfordHarden
-} else {
-    Write-Host "Skipping..." -ForegroundColor Red
+Initialize-Log
+
+while ($true) {
+    Show-Main-Menu
+    $choice = Read-Host "Selection"
+    if ($choice -match '^(?i)q$') { break }
+    try {
+        switch ($choice) {
+            '0' { Print-Log }
+            'A' { Initialize-Context }
+            '1' { Run-All }
+            '2' { Write-Host "`n***Quick Hardening (Essential Steps Only)...***" -ForegroundColor Magenta; Quick-Harden }
+            '3' { Write-Host "`n***Getting Competition Users...***" -ForegroundColor Magenta; GetCompetitionUsers }
+            '4' { Write-Host "`n***Disabling users (except current user)...***" -ForegroundColor Magenta; Disable-Users }
+            '5' { Write-Host "`n***Enabling Windows Defender...***" -ForegroundColor Magenta; Enable-Windows-Defender }
+            '6' { Write-Host "`n***Adding Competition Users...***" -ForegroundColor Magenta; Add-Competition-Users }
+            '7' { Write-Host "`n***Removing users from RDP group (except first two competition users)...***" -ForegroundColor Magenta; Remove-RDP-Users }
+            '8' { Write-Host "`n***Configuring firewall...***" -ForegroundColor Magenta; Configure-Firewall }
+            '9' { Write-Host "`n***Disabling unnecessary services...***" -ForegroundColor Magenta; Disable-Unnecessary-Services }
+            '10' { 
+                Write-Host "`n***Enabling Advanced Auditing and Firewall logging...***" -ForegroundColor Magenta
+                if (Test-Path ".\advancedAuditing.ps1") {
+                    .\advancedAuditing.ps1
+                    Update-Log "Enable Advanced Auditing" "Executed successfully"
+                } else {
+                    Write-Host "advancedAuditing.ps1 not found, skipping..." -ForegroundColor Yellow
+                    Update-Log "Enable Advanced Auditing" "Skipped - file not found"
+                }
+                Write-Host "Enabling Firewall logging successful and blocked connections" -ForegroundColor Green
+                Set-NetFirewallProfile -Profile Domain,Public,Private -LogAllowed True -LogBlocked True
+            }
+            '11' {
+                Write-Host "`n***Configuring Splunk...***" -ForegroundColor Magenta
+                $SplunkIP = Read-Host "`nInput IP address of Splunk Server"
+                $SplunkVersion = Read-Host "`nInput OS Version (7, 8, 10, 11, 2012, 2016, 2019, 2022): "
+                Download-Install-Setup-Splunk -Version $SplunkVersion -IP $SplunkIP
+            }
+            '12' { Write-Host "`n***Installing EternalBlue Patch...***" -ForegroundColor Magenta; Install-EternalBluePatch }
+            '13' { Write-Host "`n***Upgrading SMB...***" -ForegroundColor Magenta; Upgrade-SMB }
+            '14' { Write-Host "`n***Patching Mimikatz (WDigest)...***" -ForegroundColor Magenta; Patch-Mimikatz }
+            '15' { Write-Host "`n***Running Windows Updates...***" -ForegroundColor Magenta; Run-Windows-Updates }
+            '16' { Write-Host "`n***Running Stanford Harden...***" -ForegroundColor Magenta; Run-StanfordHarden }
+            '17' { 
+                Write-Host "`n***Setting Execution Policy back to Restricted...***" -ForegroundColor Magenta
+                Set-ExecutionPolicy Restricted
+                Update-Log "Set Execution Policy" "Executed successfully"
+            }
+            Default { Write-Host "Invalid selection." -ForegroundColor Yellow }
+        }
+    } catch {
+        Write-Host $_.Exception.Message -ForegroundColor Yellow
+        Write-Host "Error Occurred..."
+    }
+    Write-Host "`nPress Enter to return to menu..." -ForegroundColor DarkGray
+    Read-Host | Out-Null
 }
 
-Write-Host "***Setting Execution Policy back to Restricted***" -ForegroundColor Red
-Set-ExecutionPolicy Restricted
+Write-Host "`n***Script Completed!!!***" -ForegroundColor Green
+Print-Log
 
 $Error | Out-File $env:USERPROFILE\Desktop\hard.txt -Append -Encoding utf8
 #Stop-Transcript
