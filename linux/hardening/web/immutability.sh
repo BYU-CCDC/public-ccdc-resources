@@ -4,6 +4,7 @@ function manage_web_immutability_menu {
     # A list of “candidate” directories that you believe should normally be immutable.
     # Adjust this list to suit your environment. 
     # Typically these are config directories or static content directories.
+    # This script is subject for removal
     local default_web_dirs=(
         "/etc/nginx" 
         "/etc/apache2" 
@@ -30,7 +31,6 @@ function manage_web_immutability_menu {
         fi
     done
 
-    # -------------------------
     # Helper function to set +i
     function set_immutable {
         local path="$1"
@@ -46,11 +46,10 @@ function manage_web_immutability_menu {
             log_success "Immutable removed (recursively) from: $path" || \
             log_warning "Failed to remove immutable on: $path"
     }
-    # -------------------------
 
     # Sub-functions for each menu option
 
-    # Option 1: Detect & set discovered directories immutable
+    # Detect & set discovered directories immutable
     function detect_and_set_immutable {
         # Show what we found
         log_info "The following directories have been detected:"
@@ -88,7 +87,7 @@ function manage_web_immutability_menu {
         fi
     }
 
-    # Option 2: Reverse discovered immutability
+    # Reverse discovered immutability
     function reverse_discovered_immutable {
         if [ ${#discovered_dirs[@]} -eq 0 ]; then
             log_warning "No discovered directories found to un-set."
@@ -100,7 +99,7 @@ function manage_web_immutability_menu {
         done
     }
 
-    # Option 3: Specify custom dirs to set +i
+    # Specify custom dirs to set +i
     function custom_set_immutable {
         log_info "Enter the directories you'd like to set as immutable (one per line)."
         echo "    Press ENTER on a blank line to finish."
@@ -118,7 +117,7 @@ function manage_web_immutability_menu {
         done
     }
 
-    # Option 4: Specify custom dirs to remove immutability
+    # Specify custom dirs to remove immutability
     function custom_remove_immutable {
         log_info "Enter the directories you'd like to remove immutability from (one per line)."
         echo "    Press ENTER on a blank line to finish."
@@ -136,7 +135,7 @@ function manage_web_immutability_menu {
         done
     }
 
-    # The actual sub-menu loop
+    # sub-menu loop
     while true; do
         echo
         echo "========== WEB DIRECTORY IMMUTABILITY MENU =========="
@@ -163,6 +162,7 @@ function handle_non_immutable_dirs {
     # These are the paths that failed or are known to fail with chattr
     # or for which "Operation not supported/permitted" was reported.
     # Adjust as needed for your environment.
+    # Needs to be expanded 
     local non_immutable_paths=(
         "/etc/apache2/conf-enabled"
         "/etc/apache2/sites-enabled"
@@ -197,7 +197,7 @@ function handle_non_immutable_dirs {
 
     print_banner "Manage Non-Immutable Directories"
 
-    # Simple sub-menu
+    # Another sub-menu
     while true; do
         echo "These directories/files cannot be made immutable."
         echo "1) Backup (rename) them with a .bak extension"
@@ -208,7 +208,7 @@ function handle_non_immutable_dirs {
 
         case "$sub_choice" in
             1)
-                # Backup step: rename each path -> path.bak
+                # Rename each path -> path.bak
                 log_info "Backing up directories/files (renaming -> .bak)..."
                 for path in "${non_immutable_paths[@]}"; do
                     if [ -e "$path" ] && [ ! -e "${path}.bak" ]; then
@@ -222,7 +222,7 @@ function handle_non_immutable_dirs {
                 log_info "Backup (rename) complete."
                 ;;
             2)
-                # Restore step: rename each .bak -> original
+                # Rename each .bak -> original
                 log_info "Restoring directories/files from .bak -> original..."
                 for path in "${non_immutable_paths[@]}"; do
                     if [ -e "${path}.bak" ] && [ ! -e "$path" ]; then
