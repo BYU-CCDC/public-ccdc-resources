@@ -1,15 +1,9 @@
 #!/usr/bin/env bash
-# [install-apache-ua-block.sh](http://install-apache-ua-block.sh/)
-#
-# Purpose: Global, high-performance User-Agent blocking for Apache
-#
+
 # Sources:
 # 1. https://raw.githubusercontent.com/mitchellkrogza/nginx-ultimate-bad-bot-blocker/refs/heads/master/_generator_lists/bad-user-agents.list
 # 2. https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/refs/heads/main/linux/bad_ua.txt
-#
 # Apache: 2.4+
-# OS: Debian/Ubuntu (/etc/apache2) or RHEL/Amazon (/etc/httpd)
-# License: MIT
 
 set -euo pipefail
 
@@ -48,9 +42,7 @@ if ! declare -F log_info >/dev/null 2>&1; then
     }
 fi
 
-# ------------------------------------------------------------------
 # Tunables
-# ------------------------------------------------------------------
 
 PRIMARY_URL="https://raw.githubusercontent.com/mitchellkrogza/nginx-ultimate-bad-bot-blocker/refs/heads/master/_generator_lists/bad-user-agents.list"
 FALLBACK_URL="https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/refs/heads/main/linux/bad_ua.txt"
@@ -68,9 +60,7 @@ WHITELIST_UA=""
 WHITELIST_IPS=""
 REFRESH_ONLY="false"
 
-# ------------------------------------------------------------------
 # Helpers
-# ------------------------------------------------------------------
 
 usage() {
 cat <<EOF
@@ -242,9 +232,7 @@ build_chunks() {
     echo "$joined" | split_chunks
 }
 
-# ------------------------------------------------------------------
 # Parse CLI
-# ------------------------------------------------------------------
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -260,9 +248,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# ------------------------------------------------------------------
 # Main
-# ------------------------------------------------------------------
 
 detect_layout
 enable_module setenvif
