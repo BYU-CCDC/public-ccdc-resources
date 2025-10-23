@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 set -o pipefail
 
-# =========================
 # Helper: persistence & PM
-# =========================
+
 PACKAGE_CACHE_UPDATED="false"
 
 function detect_system_info {
@@ -86,9 +85,8 @@ function update_package_cache {
     PACKAGE_CACHE_UPDATED="true"
 }
 
-# =========================
 # iptables persistence
-# =========================
+
 function ensure_iptables_persistence {
     if grep -qi 'debian\|ubuntu' /etc/os-release; then
         if ! command -v netfilter-persistent >/dev/null 2>&1; then
@@ -140,9 +138,7 @@ function verify_iptables_restored_sample {
     sudo iptables -S | head -n 25 || sudo iptables -L -n -v | head -n 25
 }
 
-# =========================
 # Save helpers (no auto-add)
-# =========================
 function backup_current_iptables_rules {
     if grep -qi 'fedora\|centos\|rhel' /etc/os-release; then
         sudo iptables-save | sudo tee /etc/sysconfig/iptables > /dev/null
@@ -168,9 +164,8 @@ function save_iptables_rules_persistent {
     log_info "Saved and configured for boot-time restore."
 }
 
-# =========================
-# UFW helpers (unchanged)
-# =========================
+# UFW helpers
+
 function ensure_ufw_persistence {
     if systemctl list-unit-files | awk '{print $1}' | grep -qx "ufw.service"; then
         sudo systemctl enable ufw >/dev/null 2>&1 || true
@@ -227,9 +222,7 @@ function setup_ufw {
     backup_current_ufw_rules
 }
 
-# =======================================
-# New: DSU-style interactive base policy
-# =======================================
+# FastFW type
 function yesno() {
     read YESNO
     YESNO="$(tr '[:upper:]' '[:lower:]' <<<"$YESNO" | head -c1)"
@@ -282,7 +275,7 @@ function iptables_base_policy_interactive {
         yesno y && sudo iptables -A INPUT -s "$(cut -f1 -d' ' <<<"$SSH_CLIENT")" -p tcp --dport 22 -j ACCEPT
     fi
 
-    # DNS servers (UDP 53 out)
+    # DNS servers 
     echo 'DNS Server IPs: (OUTPUT udp/53)'
     read DNS_IPS
     for ip in $DNS_IPS; do
@@ -334,9 +327,8 @@ function iptables_base_policy_interactive {
     yesno y && save_iptables_rules_persistent
 }
 
-# =========================
 # Other iptables utilities
-# =========================
+
 function apply_established_only_rules {
     print_banner "Applying Established/Related Only Rules"
     sudo iptables -F; sudo iptables -X; sudo iptables -Z
@@ -405,9 +397,8 @@ function reset_iptables {
     log_info "IPtables firewall has been reset (not persisted yet)."
 }
 
-# =========================
 # Firewall menus
-# =========================
+
 function firewall_configuration_menu {
     if declare -F initialize_environment >/dev/null; then
         initialize_environment
@@ -489,7 +480,7 @@ function firewall_configuration_menu {
                 echo " 10) Enable default deny (restore outbound blocking)"
                 echo " 11) Open OSSEC Ports (UDP 1514 & 1515)"
                 echo " 12) Allow only Established/Related Traffic"
-                echo " 13) Save & Persist iptables rules  <-- NEW"
+                echo " 13) Save & Persist iptables rules"
                 echo " 14) Exit IPtables menu"
                 read -p "Enter your choice [1-14]: " ipt_choice
                 echo
@@ -514,7 +505,7 @@ function firewall_configuration_menu {
                     10) iptables_enable_default_deny ;;
                     11) open_ossec_ports ;;
                     12) apply_established_only_rules ;;
-                    13) save_iptables_rules_persistent ;;   # <= dedicated save action
+                    13) save_iptables_rules_persistent ;;   
                     14) break ;;
                     *)
                         log_error "Invalid option."
