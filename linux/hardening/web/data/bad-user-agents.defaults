@@ -1,0 +1,19 @@
+# Bundled fallback User-Agent patterns for offline installations
+apachebench
+acunetix
+awesom
+dirg
+dirbuster
+fimap
+havij
+hydra
+java
+libwww-perl
+masscan
+nessus
+nikto
+nmap
+python
+sqlmap
+wpscan
+zmeu
