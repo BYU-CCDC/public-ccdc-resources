@@ -265,8 +265,6 @@ function iptables_base_policy_interactive {
     read SPLUNK_IP
     if [[ -n "$SPLUNK_IP" ]]; then
         sudo iptables -A OUTPUT -d "$SPLUNK_IP" -p tcp --dport 9997 -j ACCEPT
-        sudo iptables -A OUTPUT -d "$SPLUNK_IP" -p udp --dport 1514 -j ACCEPT
-        sudo iptables -A OUTPUT -d "$SPLUNK_IP" -p udp --dport 1515 -j ACCEPT
     fi
 
     # SSH client detection
