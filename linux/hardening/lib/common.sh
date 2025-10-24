@@ -155,6 +155,24 @@ function get_input_list {
     fi
 }
 
+function prompt_space_separated_list {
+    local prompt="$1"
+    if [ "$ANSIBLE" == "true" ]; then
+        echo ""
+        return 0
+    fi
+
+    local raw="" normalized=""
+    # Enable readline editing so the caller can fix mistakes before submission.
+    read -e -p "$prompt" raw
+
+    if [[ -n "$raw" ]]; then
+        normalized=$(printf '%s\n' "$raw" | tr ',;' ' ' | awk '{$1=$1; print}')
+    fi
+
+    echo "$normalized"
+}
+
 function exclude_users {
     if [ "$ANSIBLE" == "true" ]; then
         echo "$@"

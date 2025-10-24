@@ -233,10 +233,94 @@ function yesno() {
 }
 
 function genPortList() {
-    read PORT_LIST
-    for port in $PORT_LIST; do
-        sudo iptables -A "$1" -p "$2" --dport "$port" $3 -j ACCEPT
+    local chain="$1" proto="$2" extra_opts="$3" prompt="$4"
+
+    if [ "$ANSIBLE" == "true" ]; then
+        return 0
+    fi
+
+    local ports
+    ports=$(prompt_space_separated_list "$prompt")
+    if [[ -z "$ports" ]]; then
+        return 0
+    fi
+
+    local extra=()
+    if [[ -n "$extra_opts" ]]; then
+        # shellcheck disable=SC2206
+        extra=($extra_opts)
+    fi
+
+    for port in $ports; do
+        local cmd=(sudo iptables -A "$chain" -p "$proto")
+        if ((${#extra[@]})); then
+            cmd+=("${extra[@]}")
+        fi
+        cmd+=(--dport "$port" -j ACCEPT)
+        "${cmd[@]}"
+        if [[ -n "$extra_opts" ]]; then
+            log_info "Rule added: $chain $proto $port (${extra_opts})"
+        else
+            log_info "Rule added: $chain $proto $port"
+        fi
     done
+}
+
+function disable_conflicting_firewalls() {
+    log_info "Checking for other firewall managers to disable"
+
+    if command -v ufw >/dev/null 2>&1; then
+        log_info "Disabling and resetting UFW"
+        sudo ufw --force disable >/dev/null 2>&1 || true
+        sudo ufw --force reset >/dev/null 2>&1 || true
+    fi
+
+    if command -v firewall-cmd >/dev/null 2>&1; then
+        log_info "Stopping firewalld and clearing configuration"
+        if command -v systemctl >/dev/null 2>&1; then
+            sudo systemctl stop firewalld >/dev/null 2>&1 || true
+            sudo systemctl disable firewalld >/dev/null 2>&1 || true
+            sudo systemctl mask firewalld >/dev/null 2>&1 || true
+        fi
+        sudo firewall-cmd --state >/dev/null 2>&1 && sudo firewall-cmd --panic-on >/dev/null 2>&1 || true
+        sudo firewall-cmd --permanent --reload >/dev/null 2>&1 || true
+        sudo rm -f /etc/firewalld/zones/*.xml >/dev/null 2>&1 || true
+    fi
+
+    if command -v nft >/dev/null 2>&1; then
+        log_info "Flushing nftables ruleset"
+        sudo nft flush ruleset >/dev/null 2>&1 || true
+        if command -v systemctl >/dev/null 2>&1; then
+            sudo systemctl stop nftables >/dev/null 2>&1 || true
+            sudo systemctl disable nftables >/dev/null 2>&1 || true
+            sudo systemctl mask nftables >/dev/null 2>&1 || true
+        fi
+        sudo rm -f /etc/nftables.conf >/dev/null 2>&1 || true
+    fi
+
+    if command -v iptables >/dev/null 2>&1; then
+        log_info "Flushing existing iptables rules"
+        sudo iptables -F >/dev/null 2>&1 || true
+        sudo iptables -X >/dev/null 2>&1 || true
+        sudo iptables -t nat -F >/dev/null 2>&1 || true
+        sudo iptables -t nat -X >/dev/null 2>&1 || true
+        sudo iptables -t mangle -F >/dev/null 2>&1 || true
+        sudo iptables -t mangle -X >/dev/null 2>&1 || true
+        sudo iptables -t raw -F >/dev/null 2>&1 || true
+        sudo iptables -t raw -X >/dev/null 2>&1 || true
+    fi
+
+    if command -v ip6tables >/dev/null 2>&1; then
+        log_info "Flushing existing ip6tables rules"
+        sudo ip6tables -F >/dev/null 2>&1 || true
+        sudo ip6tables -X >/dev/null 2>&1 || true
+        sudo ip6tables -t nat -F >/dev/null 2>&1 || true
+        sudo ip6tables -t nat -X >/dev/null 2>&1 || true
+        sudo ip6tables -t mangle -F >/dev/null 2>&1 || true
+        sudo ip6tables -t mangle -X >/dev/null 2>&1 || true
+        sudo ip6tables -t raw -F >/dev/null 2>&1 || true
+        sudo ip6tables -t raw -X >/dev/null 2>&1 || true
+    fi
 }
 
 function iptables_base_policy_interactive {
@@ -245,6 +329,8 @@ function iptables_base_policy_interactive {
         log_error "Please run with sudo/root"
         return 1
     fi
+
+    disable_conflicting_firewalls
 
     # Optional flush if rules already exist
     if [ "$(sudo iptables --list-rules | wc -l)" -gt 3 ]; then
@@ -283,8 +369,7 @@ function iptables_base_policy_interactive {
     # Free-form port additions before policy change
     for CHAIN in INPUT OUTPUT; do
         for PROTO in tcp udp; do
-            echo "Space-separated list of $CHAIN $PROTO ports/services (press Enter for none):"
-            genPortList "$CHAIN" "$PROTO"
+            genPortList "$CHAIN" "$PROTO" "" "Space-separated list of $CHAIN $PROTO ports/services (press Enter for none): "
         done
     done
 
@@ -294,12 +379,10 @@ function iptables_base_policy_interactive {
         echo 'IP or subnet: '
         read IP
         for PROTO in tcp udp; do
-            echo "Space-separated list of INPUT $PROTO ports/services from whitelisted IP/subnet:"
-            genPortList INPUT "$PROTO" "-s $IP"
+            genPortList INPUT "$PROTO" "-s $IP" "Space-separated list of INPUT $PROTO ports/services from whitelisted IP/subnet: "
         done
         for PROTO in tcp udp; do
-            echo "Space-separated list of OUTPUT $PROTO ports/services to whitelisted IP/subnet:"
-            genPortList OUTPUT "$PROTO" "-d $IP"
+            genPortList OUTPUT "$PROTO" "-d $IP" "Space-separated list of OUTPUT $PROTO ports/services to whitelisted IP/subnet: "
         done
     }
 
@@ -476,11 +559,10 @@ function firewall_configuration_menu {
                 echo "  8) Show Running Services"
                 echo "  9) Disable default deny (temporarily allow outbound)"
                 echo " 10) Enable default deny (restore outbound blocking)"
-                echo " 11) Open OSSEC Ports (UDP 1514 & 1515)"
-                echo " 12) Allow only Established/Related Traffic"
-                echo " 13) Save & Persist iptables rules"
-                echo " 14) Exit IPtables menu"
-                read -p "Enter your choice [1-14]: " ipt_choice
+                echo " 11) Allow only Established/Related Traffic"
+                echo " 12) Save & Persist iptables rules"
+                echo " 13) Exit IPtables menu"
+                read -p "Enter your choice [1-13]: " ipt_choice
                 echo
                 case $ipt_choice in
                     1)  iptables_base_policy_interactive ;;
@@ -501,10 +583,9 @@ function firewall_configuration_menu {
                     8)  audit_running_services ;;
                     9)  iptables_disable_default_deny ;;
                     10) iptables_enable_default_deny ;;
-                    11) open_ossec_ports ;;
-                    12) apply_established_only_rules ;;
-                    13) save_iptables_rules_persistent ;;   
-                    14) break ;;
+                    11) apply_established_only_rules ;;
+                    12) save_iptables_rules_persistent ;;
+                    13) break ;;
                     *)
                         log_error "Invalid option."
                         ;;
