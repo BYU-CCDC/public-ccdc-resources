@@ -1065,7 +1065,7 @@ function install_auditd {
     # Install auditd
     debug "Installing auditd package"
     sudo $PM install -qq -y auditd
-    if $? -ne 0; then
+    if [ $? -ne 0 ]; then
         sudo $PM install -qq -y audit
         if [ $? -ne 0 ]; then
             error "auditd installation failed"
@@ -1194,7 +1194,7 @@ function install_sysmon {
         ./sysmon.sh -g "$GITHUB_URL"
     fi
 
-    if [[ $? -eq 0 ]]; then
+    if [ $? -eq 0 ]; then
         info "Sysmon installed successfully"
         install_sysmon_add_on
         SYSMON_SUCCESSFUL=true
@@ -1224,7 +1224,7 @@ function install_ossec {
 
     eval $cmd
 
-    if [[ $? -eq 0 ]]; then
+    if [ $? -eq 0 ]; then
         info "OSSEC installed successfully"
         OSSEC_DIR="/var/ossec"
         if [[ "$INDEXER" == true ]]; then
@@ -1291,7 +1291,7 @@ function main {
         install_auditd
 
         sudo $PM install -qq -y snoopy
-        if $? -ne 0; then
+        if [ $? -ne 0 ]; then
             debug "Could not find snoopy in package repos; attempting manual installation"
             if ! install_snoopy "2.5.2"; then
                 if ! install_snoopy "2.4.15"; then
