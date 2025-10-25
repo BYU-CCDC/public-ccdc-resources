@@ -688,7 +688,7 @@ function setup_splunk {
     create_splunk_user
 
     if [ "$INDEXER" == true ]; then
-        sudo -H -u splunk $SPLUNK_HOME/bin/splunk createssl web-cert
+        sudo -H -u splunk $SPLUNK_HOME/bin/splunk createssl web-cert    # TODO: broken?
     fi
 
     info "Starting splunk"
@@ -1124,9 +1124,12 @@ function install_auditd {
 
 function install_snoopy {
     version="$1"
+    SNOOPY_LOG='/var/log/snoopy.log'
+    
     info "Installing Snoopy (trying version $version)"
     if sudo [ -e /usr/local/lib/libsnoopy.so ]; then
         info "Snoopy is already installed"
+        sudo -H -u splunk $SPLUNK_HOME/bin/splunk add monitor "$SNOOPY_LOG" -index "snoopy" -sourcetype "snoopy"
         return 0
     fi
 
@@ -1159,7 +1162,6 @@ function install_snoopy {
         if sudo [ -f $SNOOPY_CONFIG ]; then
             sudo touch /var/log/snoopy.log
             # Unfortunately required by snoopy in order to use a log file other than syslog/messages
-            SNOOPY_LOG='/var/log/snoopy.log'
             sudo chmod 622 $SNOOPY_LOG
             sudo setfacl -m g:splunk:r /var/log/snoopy.log
             sudo setfacl -dm g:splunk:r /var/log/snoopy.log
@@ -1171,13 +1173,13 @@ function install_snoopy {
             # TODO: these commands aren't consistent across all systems
             sudo /usr/local/sbin/snoopy-disable
             sudo /usr/local/sbin/snoopy-enable
-            sudo -H -u splunk $SPLUNK_HOME/bin/splunk add monitor "$SNOOPY_LOG" -index "snoopy" -sourcetype "snoopy"
         else
             error "Could not find Snoopy config file. Please add \`output = file:/var/log/snoopy.log\` to the end of the config."
         fi
         info "Snoopy installed successfully."
         warn "NOTE: Unless you restart the server, Snoopy may not pick up on commands from existing processes."
         # see https://github.com/a2o/snoopy/issues/212
+        sudo -H -u splunk $SPLUNK_HOME/bin/splunk add monitor "$SNOOPY_LOG" -index "snoopy" -sourcetype "snoopy"
         SNOOPY_SUCCESSFUL=true
         return 0
     fi
@@ -1290,9 +1292,9 @@ function main {
 
         install_auditd
 
-        sudo $PM install -qq -y snoopy
-        if [ $? -ne 0 ]; then
-            debug "Could not find snoopy in package repos; attempting manual installation"
+        # sudo $PM install -qq -y snoopy 2>/dev/null
+        # if [ $? -ne 0 ]; then
+            # debug "Could not find snoopy in package repos; attempting manual installation"
             if ! install_snoopy "2.5.2"; then
                 if ! install_snoopy "2.4.15"; then
                     if ! install_snoopy "2.3.2"; then
@@ -1300,9 +1302,11 @@ function main {
                     fi
                 fi
             fi
-        else
-            info "Snoopy installed successfully from package repos"
-        fi
+        # else
+            # sudo -H -u splunk $SPLUNK_HOME/bin/splunk add monitor "$SNOOPY_LOG" -index "snoopy" -sourcetype "snoopy"
+            # SNOOPY_SUCCESSFUL=true
+            # info "Snoopy installed successfully from package repos"
+        # fi
         install_sysmon
         # install_ossec
     else
@@ -1318,7 +1322,7 @@ function main {
     # info "Add future additional scripted inputs with 'sudo -H -u splunk $SPLUNK_HOME/bin/splunk add exec $SPLUNK_HOME/etc/apps/ccdc-add-on/bin/<SCRIPT> -interval <SECONDS> -index <INDEX>'"
     echo
     echo "Summary of installation:"
-    echo "   Auditd successful? $AUDITD_SUCCESSFUL"
+    echo "   Auditd successful? $AUDITD_SUCCESSFUL" # TODO: colors
     echo "   Snoopy successful? $SNOOPY_SUCCESSFUL"
     echo "   Sysmon successful? $SYSMON_SUCCESSFUL"
     # echo "   OSSEC successful? $OSSEC_SUCCESSFUL"
