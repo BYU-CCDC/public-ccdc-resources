@@ -46,7 +46,6 @@ FILES=(
     "linux/hardening/core/pii.sh"
     "linux/hardening/core/ssh.sh"
     "linux/hardening/core/security_modules.sh"
-    "linux/hardening/web/immutability.sh"
     "linux/hardening/web/menu.sh"
     "linux/hardening/web/apache.sh"
     "linux/hardening/web/modsec_docker.sh"
@@ -234,7 +233,6 @@ execute_ccdc_workflow() {
         "kill_other_sessions"
         "configure_modsecurity"
         "update_prestashop_shop_url"
-        "manage_web_immutability_menu"
         "kill_other_sessions"
     )
 
@@ -248,7 +246,6 @@ execute_ccdc_workflow() {
         "install_apache_user_agent_blocker|Install Apache User-Agent blocker"
         "my_secure_sql_installation|Run MySQL secure installation"
         "update_prestashop_shop_url|Update PrestaShop shop URL"
-        "manage_web_immutability_menu|Manage web immutability"
         "disable_phpmyadmin|Disable phpMyAdmin"
     )
 
@@ -406,10 +403,9 @@ execute_ccdc_workflow() {
             echo "8) Run MySQL secure installation"
             echo "9) Disable phpMyAdmin"
             echo "10) Update PrestaShop shop URL"
-            echo "11) Manage web immutability"
-            echo "12) Return to previous menu"
+            echo "11) Return to previous menu"
 
-            read -r -p "Enter your choice [1-12]: " web_choice
+            read -r -p "Enter your choice [1-11]: " web_choice
             echo
 
             case "$web_choice" in
@@ -444,9 +440,6 @@ execute_ccdc_workflow() {
                     run_if_exists update_prestashop_shop_url
                     ;;
                 11)
-                    run_if_exists manage_web_immutability_menu
-                    ;;
-                12)
                     log_info "Returning to previous menu..."
                     break
                     ;;

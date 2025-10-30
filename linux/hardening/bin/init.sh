@@ -47,7 +47,6 @@ FILES=(
     "linux/hardening/core/pii.sh"
     "linux/hardening/core/ssh.sh"
     "linux/hardening/core/security_modules.sh"
-    "linux/hardening/web/immutability.sh"
     "linux/hardening/web/menu.sh"
     "linux/hardening/web/apache.sh"
     "linux/hardening/web/modsec_docker.sh"
