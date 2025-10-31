@@ -22,6 +22,7 @@ INDEXES=( 'system' 'web' 'network' 'windows' 'misc' 'snoopy' 'ossec' )
 PM=""
 IP=""
 INDEXER=false
+REINSTALL=false
 NOCOLOR=false
 VERBOSE=false
 PACKAGE="auto"
@@ -233,6 +234,7 @@ function print_usage {
   $(set_ansi $YELLOW $BOLD)-f <ip>       $(set_ansi)Install the forwarder (-f is required unless -i or -a are used)
   $(set_ansi $YELLOW $BOLD)-i            $(set_ansi)Install the indexer
   $(set_ansi $YELLOW $BOLD)-p <type>     $(set_ansi)Package type (defaults to auto - see below)
+  $(set_ansi $YELLOW $BOLD)-r            $(set_ansi)Reinstall Splunk
   $(set_ansi $YELLOW $BOLD)-u            $(set_ansi)Print Splunk package URLs
   $(set_ansi $YELLOW $BOLD)-S            $(set_ansi)Install Splunk only (no additional logging)
   $(set_ansi $YELLOW $BOLD)-L            $(set_ansi)Install additional logging sources only (no Splunk)
@@ -390,38 +392,84 @@ function check_prereqs {
     fi
 }
 
-function download_and_install_package {
-    if [[ "$1" == *.deb ]]; then
-        if [[ -z "$LOCAL_PACKAGE" ]]; then
-            download "$1" splunk.deb
+function prep_install {
+    link="$1"
+    filename="$2"
+
+    info "Downloading package from $link"
+    download "$link" "./$filename"
+
+    if [ $REINSTALL == true ]; then
+        info "Reinstall flag set, removing existing installation"
+        info "Backing up existing installation to $SPLUNK_HOME-bak"
+        sudo cp -r -p $SPLUNK_HOME $SPLUNK_HOME-bak &>/dev/null
+        info "Would you like to remove any existing Splunk packages?"
+        option=$(get_input_string "(Y/n): " | tr -d ' ')
+        if [[ $option != "n" ]]; then
+            info "Removing any existing Splunk packages"
+            case "$PM" in
+                apt-get )
+                    sudo apt purge -y splunk
+                    sudo apt purge -y splunkforwarder
+                ;;
+                dnf|yum|zypper )
+                    sudo $PM remove -y splunk
+                    sudo $PM remove -y splunkforwarder
+                ;;
+                * )
+                    error "Unknown package manager: $PM"
+                    exit 1
+                ;;
+            esac
         fi
-        sudo dpkg -i ./splunk.deb
-    elif [[ "$1" == *.rpm ]]; then
-        if [[ -z "$LOCAL_PACKAGE" ]]; then
-            download "$1" splunk.rpm
-        fi
-        if command -v zypper &>/dev/null; then
-            sudo zypper --no-gpg-checks install -y ./splunk.rpm
-        else
-            sudo yum install --nogpgcheck ./splunk.rpm -y
-        fi
-    elif [[ "$1" == *.tgz ]]; then
-        if [[ -z "$LOCAL_PACKAGE" ]]; then
-            download "$1" splunk.tgz
-        fi
-        info "Extracting to $SPLUNK_HOME"
-        sudo tar -xvf splunk.tgz -C /opt/ &> /dev/null
-        # TODO: make sure it actually extracts to $SPLUNK_HOME
-        sudo chown -R splunk:splunk $SPLUNK_HOME
-    else
-        error "Unknown package type. Please install Splunk manually to $SPLUNK_HOME, then run this script again to configure it."
-        exit
+        sudo rm -rf $SPLUNK_HOME
+        sudo pkill -f $SPLUNK_HOME/bin/
     fi
+}
+
+function install_package {
+    link="$1"
+
+    case "$link" in
+        *.deb )
+            prep_install "$link" splunk.deb
+            sudo dpkg -i ./splunk.deb
+        ;;
+        *.rpm )
+            prep_install "$link" splunk.rpm
+            case "$PM" in
+                zypper )
+                    sudo zypper --no-gpg-checks install -y ./splunk.rpm
+                ;;
+                dnf )
+                    sudo dnf install --nogpgcheck ./splunk.rpm -y
+                ;;
+                yum )
+                    sudo yum install --nogpgcheck ./splunk.rpm -y
+                ;;
+                *)
+                    error "Unknown package manager: $PM"
+                    exit 1
+                ;;
+            esac
+        ;;
+        *.tgz|*.tar.gz )
+            prep_install "$link" splunk.tgz
+            info "Extracting to $SPLUNK_HOME"
+            sudo tar -xvf splunk.tgz -C /opt/ &> /dev/null
+            # TODO: make sure it actually extracts to $SPLUNK_HOME
+            sudo chown -R splunk:splunk $SPLUNK_HOME
+        ;;
+        *)
+            error "Could not determine package type: $link"
+            exit 1
+        ;;
+    esac
 }
 
 function install_splunk {
     # If Splunk does not already exist:
-    if sudo [ ! -e $SPLUNK_HOME/bin/splunk ]; then
+    if [[ sudo [ ! -e $SPLUNK_HOME/bin/splunk ] || "$REINSTALL" == true ]]; then
         # Determine package type and install
         case "$PACKAGE" in
             auto )
@@ -448,10 +496,10 @@ function install_splunk {
                 echo
                 if [ "$INDEXER" == true ]; then
                     info "Downloading and installing indexer package"
-                    download_and_install_package "$indexer_deb"
+                    link="$indexer_deb"
                 else
                     info "Downloading and installing forwarder package"
-                    download_and_install_package "$deb"
+                    link="$deb"
                 fi
             ;;
             rpm )
@@ -459,10 +507,10 @@ function install_splunk {
                 echo
                 if [ "$INDEXER" == true ]; then
                     info "Downloading and installing indexer package"
-                    download_and_install_package "$indexer_rpm"
+                    link="$indexer_rpm"
                 else
                     info "Downloading and installing forwarder package"
-                    download_and_install_package "$rpm"
+                    link="$rpm"
                 fi
             ;;
             tgz|tar|linux )
@@ -470,26 +518,26 @@ function install_splunk {
                 echo
                 if [ "$INDEXER" == true ]; then
                     info "Downloading and installing indexer package"
-                    download_and_install_package "$indexer_tgz"
+                    link="$indexer_tgz"
                 else
                     info "Downloading and installing forwarder package"
-                    download_and_install_package "$tgz"
+                    link="$tgz"
                 fi
             ;;
             *)
                 # catch-all statement for unknown packages
-                eval "pkg=\$$PACKAGE"
-                if [[ -z $pkg ]]; then
+                eval "link=\$$PACKAGE"
+                if [[ -z $link ]]; then
                     error "Unknown package: $PACKAGE"
                     print_usage
                     exit 1
                 else
                     info "Installing $PACKAGE"
-                    echo
-                    download_and_install_package "$pkg"
                 fi
             ;;
         esac
+
+        install_package "$link"
     else
         info "Install already exists. Proceeding to configure Splunk."
     fi
@@ -1333,8 +1381,7 @@ function main {
     echo
 }
 
-# TODO: add a reinstall option
-while getopts "hp:P:f:ig:uSa:Ll:vn" opt; do
+while getopts "hp:P:f:irg:uSa:Ll:vn" opt; do
     case $opt in
         h)
             print_usage
@@ -1376,6 +1423,9 @@ while getopts "hp:P:f:ig:uSa:Ll:vn" opt; do
             INDEXER=true
             SPLUNK_HOME="/opt/splunk"
             # IP=$OPTARG
+            ;;
+        r)
+            REINSTALL=true
             ;;
         g)
             GITHUB_URL=$OPTARG
