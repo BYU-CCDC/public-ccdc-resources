@@ -400,9 +400,15 @@ function prep_install {
     download "$link" "./$filename"
 
     if [ $REINSTALL == true ]; then
-        info "Reinstall flag set, removing existing installation"
+        # TODO: detect existing splunk version
+        info "Reinstall flag set. Preparing to reinstall..."
         info "Backing up existing installation to $SPLUNK_HOME-bak"
         sudo cp -r -p $SPLUNK_HOME $SPLUNK_HOME-bak &>/dev/null
+
+        info "Stopping existing Splunk services"
+        sudo /opt/splunk/bin/splunk stop -f
+        sudo /opt/splunk/bin/splunkforwarder stop -f
+
         info "Would you like to remove any existing Splunk packages?"
         option=$(get_input_string "(Y/n): " | tr -d ' ')
         if [[ $option != "n" ]]; then
@@ -423,7 +429,6 @@ function prep_install {
             esac
         fi
         sudo rm -rf $SPLUNK_HOME
-        sudo pkill -f $SPLUNK_HOME/bin/
     fi
 }
 
@@ -469,7 +474,7 @@ function install_package {
 
 function install_splunk {
     # If Splunk does not already exist:
-    if [[ sudo [ ! -e $SPLUNK_HOME/bin/splunk ] || "$REINSTALL" == true ]]; then
+    if ! sudo test -e "$SPLUNK_HOME/bin/splunk" || [[ "$REINSTALL" == true ]]; then
         # Determine package type and install
         case "$PACKAGE" in
             auto )
