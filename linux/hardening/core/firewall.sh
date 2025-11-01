@@ -432,7 +432,7 @@ function iptables_base_policy_interactive {
     sudo iptables -P FORWARD DROP
 
     sleep 0.5
-    log_info "Policies set to DROP. Press Ctrl+C if connectivity is lost. Reverting in 5 seconds..."
+    log_info "Policies set to DROP. Press Ctrl+C within 5 seconds if connectivity is lost in order to revert changes to the base, default policy."
     sleep 5
 
     sudo iptables -P INPUT ACCEPT
