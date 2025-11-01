@@ -6,15 +6,6 @@ function audit_running_services {
     ss -tuln
 }
 
-function disable_other_firewalls {
-    print_banner "Disabling existing firewalls"
-    if sudo command -v firewalld &>/dev/null; then
-        log_info "Disabling firewalld"
-        sudo systemctl stop firewalld
-        sudo systemctl disable firewalld
-    fi
-}
-
 function disable_unnecessary_services {
     print_banner "Disabling Unnecessary Services"
     if [ "$ANSIBLE" == "true" ]; then
