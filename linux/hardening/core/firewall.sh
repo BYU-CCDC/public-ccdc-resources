@@ -108,9 +108,7 @@ function update_package_cache {
     PACKAGE_CACHE_UPDATED="true"
 }
 
-# =========================
 # iptables persistence
-# =========================
 function ensure_iptables_persistence {
     if grep -qi 'debian\|ubuntu' /etc/os-release; then
         if ! command -v netfilter-persistent >/dev/null 2>&1; then
