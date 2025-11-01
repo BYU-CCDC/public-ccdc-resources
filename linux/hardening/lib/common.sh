@@ -12,6 +12,7 @@ NC='\033[0m'
 
 LOG_LEVEL="${LOG_LEVEL:-INFO}"
 debug="${debug:-false}"
+: "${ANSIBLE:=false}"
 
 # Logging helpers
 
@@ -119,16 +120,16 @@ function debug_print {
 }
 
 function get_input_string {
-    if [ "$ANSIBLE" == "true" ]; then
+    if [ "${ANSIBLE:-false}" == "true" ]; then
         echo ""
     else
-        read -r -p "$1" input
+        read -e -r -p "$1" input
         echo "$input"
     fi
 }
 
 function get_silent_input_string {
-    if [ "$ANSIBLE" == "true" ]; then
+    if [ "${ANSIBLE:-false}" == "true" ]; then
         echo "DefaultPass123!"
     else
         read -r -s -p "$1" input
@@ -137,7 +138,7 @@ function get_silent_input_string {
 }
 
 function get_input_list {
-    if [ "$ANSIBLE" == "true" ]; then
+    if [ "${ANSIBLE:-false}" == "true" ]; then
         echo ""
     else
         local input_list=()
@@ -157,7 +158,7 @@ function get_input_list {
 
 function prompt_space_separated_list {
     local prompt="$1"
-    if [ "$ANSIBLE" == "true" ]; then
+    if [ "${ANSIBLE:-false}" == "true" ]; then
         echo ""
         return 0
     fi
@@ -174,7 +175,7 @@ function prompt_space_separated_list {
 }
 
 function exclude_users {
-    if [ "$ANSIBLE" == "true" ]; then
+    if [ "${ANSIBLE:-false}" == "true" ]; then
         echo "$@"
     else
         local users=()

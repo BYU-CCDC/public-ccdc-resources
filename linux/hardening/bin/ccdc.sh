@@ -4,8 +4,19 @@ set -euo pipefail
 
 REPO_BASE_URL="https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/refs/heads/main"
 REPO_ROOT="linux"
-WORKDIR="$(pwd)"
+
+SCRIPT_PATH="$(readlink -f "$0" 2>/dev/null || realpath "$0" 2>/dev/null || printf '%s' "$0")"
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
+
+if [[ "$SCRIPT_DIR" == */linux/hardening/bin ]]; then
+    WORKDIR="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+else
+    WORKDIR="$(pwd)"
+fi
+
 TARGET_ROOT="$WORKDIR/$REPO_ROOT"
+MANIFEST_PATH="$TARGET_ROOT/asset-manifest.txt"
+SCRIPT_DIFF_PATH="$TARGET_ROOT/script-diff.txt"
 
 DIRECTORIES=(
     "linux"
@@ -96,6 +107,7 @@ FILES=(
 )
 
 DOWNLOADER=""
+MISSING_FILES=()
 
 log() {
     local level="$1"; shift
@@ -150,23 +162,116 @@ create_directories() {
 
 copy_self_into_repo() {
     local source_path
-    source_path="$(readlink -f "$0" 2>/dev/null || true)"
+    local destination_path
+    local source_real=""
+    local destination_real=""
+
+    source_path="$(readlink -f "$0" 2>/dev/null || realpath "$0" 2>/dev/null || printf '%s' "$0")"
+    destination_path="$TARGET_ROOT/hardening/bin/ccdc.sh"
 
     if [ -n "$source_path" ] && [ -f "$source_path" ]; then
-        cp "$source_path" "$TARGET_ROOT/hardening/bin/ccdc.sh"
-        chmod +x "$TARGET_ROOT/hardening/bin/ccdc.sh"
+        source_real="$(readlink -f "$source_path" 2>/dev/null || printf '%s' "$source_path")"
+        destination_real="$(readlink -f "$destination_path" 2>/dev/null || printf '%s' "$destination_path")"
+
+        if [ "$source_real" != "$destination_real" ]; then
+            cp "$source_path" "$destination_path"
+            chmod +x "$destination_path"
+        else
+            log INFO "Installer already running from target location; skipping self-copy"
+        fi
     else
         log WARN "Could not determine current script path for copying"
     fi
 }
 
-download_files() {
+summarize_existing_assets() {
+    log INFO "Using working directory $WORKDIR"
+    if [ -d "$TARGET_ROOT" ]; then
+        log INFO "Detected existing asset directory at $TARGET_ROOT"
+    else
+        log INFO "Asset directory $TARGET_ROOT not found; it will be created."
+    fi
+}
+
+determine_missing_files() {
+    MISSING_FILES=()
     local file
     for file in "${FILES[@]}"; do
+        if [ ! -f "$WORKDIR/$file" ]; then
+            MISSING_FILES+=("$file")
+        fi
+    done
+}
+
+ensure_executable_permissions() {
+    local file
+    for file in "${FILES[@]}"; do
+        if [ -f "$WORKDIR/$file" ]; then
+            chmod +x "$WORKDIR/$file" 2>/dev/null || true
+        fi
+    done
+}
+
+write_asset_manifest() {
+    mkdir -p "$TARGET_ROOT"
+    printf '%s\n' "${FILES[@]}" | sort > "$MANIFEST_PATH"
+    log INFO "Wrote asset manifest to $MANIFEST_PATH"
+}
+
+verify_asset_inventory() {
+    local expected actual
+    expected="$(mktemp)"
+    actual="$(mktemp)"
+
+    printf '%s\n' "${FILES[@]}" | sort > "$expected"
+
+    local path
+    for path in "${FILES[@]}"; do
+        if [ -f "$WORKDIR/$path" ]; then
+            printf '%s\n' "$path"
+        fi
+    done | sort > "$actual"
+
+    if diff -u "$expected" "$actual" > "$SCRIPT_DIFF_PATH"; then
+        log SUCCESS "Local asset inventory matches manifest"
+        rm -f "$SCRIPT_DIFF_PATH"
+    else
+        log WARN "Discrepancies detected between expected and local assets; review $SCRIPT_DIFF_PATH"
+        while IFS= read -r line; do
+            case "$line" in
+                ---*|+++*|@@*)
+                    continue
+                    ;;
+                -*)
+                    log WARN "Missing asset: ${line#-}"
+                    ;;
+                +*)
+                    log WARN "Unexpected local entry: ${line#+}"
+                    ;;
+            esac
+        done < "$SCRIPT_DIFF_PATH"
+    fi
+
+    rm -f "$expected" "$actual"
+}
+
+download_files() {
+    determine_missing_files
+
+    if [ ${#MISSING_FILES[@]} -eq 0 ]; then
+        log INFO "All required files already present; skipping download step."
+        ensure_executable_permissions
+        return
+    fi
+
+    local file
+    for file in "${MISSING_FILES[@]}"; do
         log INFO "Downloading $file"
         fetch "$file"
         chmod +x "$WORKDIR/$file"
     done
+
+    ensure_executable_permissions
 }
 
 execute_ccdc_workflow() {
@@ -782,9 +887,12 @@ execute_ccdc_workflow() {
 
 main() {
     ensure_downloader
+    summarize_existing_assets
     create_directories
     copy_self_into_repo
     download_files
+    write_asset_manifest
+    verify_asset_inventory
     execute_ccdc_workflow "$@"
 }
 
