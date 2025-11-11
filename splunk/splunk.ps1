@@ -1,3 +1,20 @@
+# splunk.ps1 -version <7|8|2012|2016|10|11|2019|2022|2025> -ip <indexer_ip> -type <dc|member>
+#
+# Copyright (C) 2025 deltabluejay
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 ################## SCRIPT ARGUMENTS #################
 param (
     [Parameter(Mandatory=$true)]
@@ -109,7 +126,7 @@ function detect_version {
             "8" { return $7_3_9_x64 }
             "2012" { return $9_1_6_x64 }
             "2016" { return $9_2_10_x64 }
-            {$_ -in "10", "11", "2019", "2022"} { return $newest_x64 }
+            {$_ -in "10", "11", "2019", "2022", "2025"} { return $newest_x64 }
             default { error "Invalid option"; exit 1 }
         }
     }
@@ -119,7 +136,7 @@ function detect_version {
             "8" { return = $7_3_9_x86 }
             "2012" { return = $9_1_6_x86 }
             "2016" { return = $9_2_10_x86 }
-            {$_ -in "10", "11", "2019", "2022"} { return = $newest_x86 }
+            {$_ -in "10", "11", "2019", "2022", "2025"} { return = $newest_x86 }
             default { error "Invalid option"; exit 1 }
         }
     } else {
@@ -276,14 +293,6 @@ if ($ip -eq "indexer" -or $ip -eq "i") {
     error "Indexer installation not implemented yet"
 } else {
     $SPLUNKDIR = "C:\Program Files\SplunkUniversalForwarder"
-    # $ip = $ip + ":9997"
-
-    # Check that the IP is valid
-    $regex = '\b(([01]?\d?\d|2[0-4]\d|25[0-5])\.){3}([01]?\d?\d|2[0-4]\d|25[0-5])\b'
-    if (-not ($ip -match $regex)) {
-        Write-Output "Invalid IP"
-        exit 1
-    }
 }
 
 install_splunk
@@ -302,7 +311,7 @@ if ($version -eq "7" -or $version -eq "8") {
 }
 
 print "Adding web logs..."
-add_monitor "C:\inetpub\logs\LogFiles\" "web"
+add_monitor "C:\inetpub\logs\LogFiles\" "web" # this also includes FTP
 
 print "Installing OSSEC..."
 print "You do not need to provide a key or server IP (just close the window when it asks for it)"

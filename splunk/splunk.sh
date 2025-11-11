@@ -453,26 +453,16 @@ function check_prereqs {
             log_error "Please provide the IP of the splunk indexer (-h for help)"
             exit 1
         fi
-        if [[ ! $IP =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            log_error "Invalid IP address format: $IP"
-            exit 1
-        fi
     fi
 
-    # user should not be root or run `sudo ./splunk.sh` since doing so makes the splunk install be owned by root
-    # TODO: test if this actually matters anymore
-    if [ "$EUID" == 0 ]; then
-        log_error "Please run script without sudo prefix/not as root"
+    # Check that user has sudo privileges
+    if [ "$(id -u)" -eq 0 ]; then
+        log_debug "Script is being run as root"
+    elif sudo -l &> /dev/null; then
+        log_debug "User has sudo privileges"
+    else
+        log_error "User does not have sudo privileges. Please run script as root or a user that has sudo privileges."
         exit 1
-    fi
-
-    # user needs sudo privileges to be able to run script
-    user_groups=$(groups)
-    if [[ $user_groups != *sudo* && $user_groups != *wheel* && $PM != "zypper" ]]; then
-        if ! sudo grep -q '^Defaults targetpw' /etc/sudoers; then
-            log_error "User needs sudo privileges. User not found in sudo/wheel group"
-            exit 1
-        fi
     fi
 
     # Check if home directory exists for current user. Home directory is needed for running splunk commands
@@ -1452,7 +1442,7 @@ function main {
             # SNOOPY_SUCCESSFUL=true
             # log_info "Snoopy installed successfully from package repos"
         # fi
-        install_sysmon
+        # install_sysmon
         # install_ossec
     else
         log_info "Skipping installation of additional logging sources"
@@ -1469,7 +1459,7 @@ function main {
     echo "Summary of installation:"
     echo "   Auditd successful? $AUDITD_SUCCESSFUL" # TODO: colors
     echo "   Snoopy successful? $SNOOPY_SUCCESSFUL"
-    echo "   Sysmon successful? $SYSMON_SUCCESSFUL"
+    # echo "   Sysmon successful? $SYSMON_SUCCESSFUL"
     # echo "   OSSEC successful? $OSSEC_SUCCESSFUL"
     echo "   Added monitors for: "
     for item in "${SUCCESSFUL_MONITORS[@]}"; do
