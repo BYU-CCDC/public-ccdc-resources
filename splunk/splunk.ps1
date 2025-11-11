@@ -313,11 +313,11 @@ if ($version -eq "7" -or $version -eq "8") {
 print "Adding web logs..."
 add_monitor "C:\inetpub\logs\LogFiles\" "web" # this also includes FTP
 
-print "Installing OSSEC..."
-print "You do not need to provide a key or server IP (just close the window when it asks for it)"
-install_ossec
-Start-Service OssecSvc
-Get-Service OssecSvc
+# print "Installing OSSEC..."
+# print "You do not need to provide a key or server IP (just close the window when it asks for it)"
+# install_ossec
+# Start-Service OssecSvc
+# Get-Service OssecSvc
 
 print "End of script"
 #####################################################
