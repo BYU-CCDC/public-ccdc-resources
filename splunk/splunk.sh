@@ -34,8 +34,8 @@ LOCAL=false
 SYSTEMD_SYSTEM=false
 
 # Special variables recognized by Splunk CLI for authentication
-SPLUNK_OWNER="splunk"
-SPLUNK_USERNAME="splunk"
+SPLUNK_OWNER="splunkfwd"
+SPLUNK_USERNAME="splunkfwd"
 SPLUNK_PASSWORD=""
 
 # Indexer
@@ -551,7 +551,7 @@ function install_package {
             log_info "Extracting to $SPLUNK_HOME"
             sudo tar -xvf splunk.tgz -C /opt/ &> /dev/null
             # TODO: make sure it actually extracts to $SPLUNK_HOME
-            sudo chown -R splunk:splunk $SPLUNK_HOME
+            sudo chown -R $SPLUNK_USERNAME:$SPLUNK_USERNAME $SPLUNK_HOME
         ;;
         *)
             log_error "Could not determine package type: $link"
@@ -640,45 +640,30 @@ function create_splunk_user {
     set_pass=true
 
     # Create splunk user/group
-    if id "splunk" &>/dev/null; then
-        option=$(get_input_string "Splunk user already exists. Would you like to reset the password for the splunk user? You'll need to do this if you're reinstalling splunk or setting it up for the first time. (Y/n): " | tr -d ' ')
+    if id $SPLUNK_USERNAME &>/dev/null; then
+        option=$(get_input_string "Splunk user already exists. Would you like to reset the password for the $SPLUNK_USERNAME user? You'll need to do this if you're reinstalling Splunk or setting it up for the first time. (Y/n): " | tr -d ' ')
         if [ "$option" == "n" ]; then
             set_pass=false
         fi
     else
-        log_info "Creating splunk user"
-        sudo useradd splunk -d $SPLUNK_HOME
+        log_info "Creating $SPLUNK_USERNAME user"
+        sudo useradd $SPLUNK_USERNAME -d $SPLUNK_HOME
     fi
 
-    # Allow package verification
-    # log_info "Giving splunk user limited sudo privileges for package verification"
-    # if sudo [ -e /etc/sudoers.d ]; then
-    #     SUDOERS_FILE="/etc/sudoers.d/splunk"
-    #     if [[ "$PM" == "apt-get" ]]; then
-    #         echo "splunk ALL=(ALL) NOPASSWD: $(which debsums) -as" | sudo tee "$SUDOERS_FILE" > /dev/null
-    #     else
-    #         echo "splunk ALL=(ALL) NOPASSWD: $(which rpm) -Va" | sudo tee "$SUDOERS_FILE" > /dev/null
-    #     fi
-    #     sudo chown root:root "$SUDOERS_FILE"
-    #     sudo chmod 440 "$SUDOERS_FILE"
-    # else
-    #     log_error "Warning: /etc/sudoers.d does not exist. Splunk user will not have the sudo privileges needed for package verification."
-    # fi
-
-    if ! getent group "splunk" > /dev/null; then
-        sudo groupadd splunk
-        sudo usermod -aG splunk splunk
+    if ! getent group $SPLUNK_USERNAME > /dev/null; then
+        sudo groupadd $SPLUNK_USERNAME
+        sudo usermod -aG $SPLUNK_USERNAME $SPLUNK_USERNAME
     fi
 
     if [ "$set_pass" == true ]; then
         # Set splunk password
-        log_info "Setting password for the splunk user"
+        log_info "Setting password for the $SPLUNK_USERNAME user"
         while true; do
             password=""
             confirm_password=""
 
             # Ask for password
-            password=$(get_silent_input_string "Enter password for splunk user: ")
+            password=$(get_silent_input_string "Enter password for $SPLUNK_USERNAME user: ")
             echo
 
             # Confirm password
@@ -695,10 +680,10 @@ function create_splunk_user {
                 continue
             fi
 
-            if ! echo "splunk:$password" | sudo chpasswd; then
-                log_error "Failed to set password for splunk user"
+            if ! echo "$SPLUNK_USERNAME:$password" | sudo chpasswd; then
+                log_error "Failed to set password for $SPLUNK_USERNAME user"
             else
-                log_info "Password for splunk user has been set."
+                log_info "Password for $SPLUNK_USERNAME user has been set."
                 break
             fi
         done
@@ -706,23 +691,23 @@ function create_splunk_user {
         SPLUNK_PASSWORD=$password
         
         # Add splunk user as forwarder/indexer admin
-        log_info "Adding splunk user to user-seed.conf"
-        sudo sh -c "printf '[user_info]\nUSERNAME = splunk\nPASSWORD = $password' > $SPLUNK_HOME/etc/system/local/user-seed.conf"
+        log_info "Adding $SPLUNK_USERNAME user to user-seed.conf"
+        sudo sh -c "printf '[user_info]\nUSERNAME = $SPLUNK_USERNAME\nPASSWORD = $password' > $SPLUNK_HOME/etc/system/local/user-seed.conf"
         # log_info "Please remember these credentials for when Splunk asks for them later during the configuration process"
     fi
     # Set ACL to allow splunk to read any log files (execute needed for directories)
-    log_info "Giving splunk user access to /var/log/"
-    sudo setfacl -Rm g:splunk:rx /var/log/
-    sudo setfacl -Rdm g:splunk:rx /var/log/
+    log_info "Giving $SPLUNK_USERNAME user access to /var/log/"
+    sudo setfacl -Rm g:$SPLUNK_USERNAME:rx /var/log/
+    sudo setfacl -Rdm g:$SPLUNK_USERNAME:rx /var/log/
 
     # chown splunk installation directory
-    sudo chown -R splunk:splunk $SPLUNK_HOME
+    sudo chown -R $SPLUNK_USERNAME:$SPLUNK_USERNAME $SPLUNK_HOME
 }
 
 function install_app {
     download "$1" /tmp/app.spl
-    sudo chown splunk:splunk "/tmp/app.spl"
-    sudo -H -u splunk $SPLUNK_HOME/bin/splunk install app "/tmp/app.spl" -update 1
+    sudo chown $SPLUNK_USERNAME:$SPLUNK_USERNAME "/tmp/app.spl"
+    sudo -H -u $SPLUNK_USERNAME $SPLUNK_HOME/bin/splunk install app "/tmp/app.spl" -update 1
     sudo rm /tmp/app.spl
 }
 
@@ -739,9 +724,9 @@ function install_sysmon_add_on {
     log_debug "Setting monitor index to sysmon"
     local dir="$SPLUNK_HOME/etc/apps/Splunk_TA_sysmon-for-linux/local/"
     sudo mkdir $dir
-    sudo chown -R splunk:splunk $dir
+    sudo chown -R $SPLUNK_USERNAME:$SPLUNK_USERNAME $dir
     download "$GITHUB_URL/splunk/linux/sysmon-inputs.conf" inputs.conf
-    sudo chown splunk:splunk inputs.conf
+    sudo chown $SPLUNK_USERNAME:$SPLUNK_USERNAME inputs.conf
     sudo mv inputs.conf "$dir"
 }
 
@@ -773,8 +758,8 @@ function install_palo_alto_apps {
     sudo mv /tmp/palo-apps/Splunk-Apps-8.1.3/Splunk_TA_paloalto/ $SPLUNK_HOME/etc/apps/
     sudo mv /tmp/palo-apps/Splunk-Apps-8.1.3/SplunkforPaloAltoNetworks/ $SPLUNK_HOME/etc/apps/
     
-    sudo chown -R splunk:splunk "$SPLUNK_HOME/etc/apps/Splunk_TA_paloalto/"
-    sudo chown -R splunk:splunk "$SPLUNK_HOME/etc/apps/SplunkforPaloAltoNetworks/"
+    sudo chown -R $SPLUNK_USERNAME:$SPLUNK_USERNAME "$SPLUNK_HOME/etc/apps/Splunk_TA_paloalto/"
+    sudo chown -R $SPLUNK_USERNAME:$SPLUNK_USERNAME "$SPLUNK_HOME/etc/apps/SplunkforPaloAltoNetworks/"
 
     sudo rm /tmp/palo.zip
     sudo rm -rf /tmp/palo-apps/
@@ -784,16 +769,16 @@ function setup_indexer {
     log_info "Configuring Indexer"
 
     log_info "Adding listening port 9997"
-    sudo -H -u splunk $SPLUNK_HOME/bin/splunk enable listen 9997
-    # sudo -H -u splunk $SPLUNK_HOME/bin/splunk enable deploy-server
+    sudo -H -u $SPLUNK_USERNAME $SPLUNK_HOME/bin/splunk enable listen 9997
+    # sudo -H -u $SPLUNK_USERNAME $SPLUNK_HOME/bin/splunk enable deploy-server
     
     log_info "Adding indexes"
     for i in "${INDEXES[@]}"; do
-        sudo -H -u splunk $SPLUNK_HOME/bin/splunk add index "$i"
+        sudo -H -u $SPLUNK_USERNAME $SPLUNK_HOME/bin/splunk add index "$i"
     done
 
-    log_info "Giving splunk user can_delete role"
-    sudo -H -u splunk $SPLUNK_HOME/bin/splunk edit user splunk -role admin -role can_delete
+    log_info "Giving $SPLUNK_USERNAME user can_delete role"
+    sudo -H -u $SPLUNK_USERNAME $SPLUNK_HOME/bin/splunk edit user $SPLUNK_USERNAME -role admin -role can_delete
 
     log_info "Installing indexer apps"
     sudo rm /tmp/app.spl &>/dev/null
@@ -810,7 +795,7 @@ function setup_splunk {
 
     if [ "$INDEXER" != true ]; then
         if [[ $IP == "" ]]; then 
-            log_error "Please provide the IP of the central splunk instance"
+            log_error "Please provide the IP of the central Splunk instance"
             exit 1
         fi
     fi
@@ -826,13 +811,13 @@ function setup_splunk {
     create_splunk_user
 
     if [ "$INDEXER" == true ]; then
-        sudo -H -u splunk $SPLUNK_HOME/bin/splunk createssl web-cert    # TODO: broken?
-    fi
+        sudo -H -u $SPLUNK_USERNAME $SPLUNK_HOME/bin/splunk createssl web-cert    # TODO: broken?
+        sudo -H -u $SPLUNK_USERNAME $SPLUNK_HOME/bin/splunk enable web-ssl
 
     log_info "Starting splunk"
     # For some reason, splunk start doesn't work on Ubuntu 14 without a tty...
     # faketty sudo -H -u splunk $SPLUNK_HOME/bin/splunk start --accept-license --no-prompt
-    sudo -H -u splunk $SPLUNK_HOME/bin/splunk start --accept-license --no-prompt
+    sudo -H -u $SPLUNK_USERNAME $SPLUNK_HOME/bin/splunk start --accept-license --no-prompt
 
     # Make sure the correct username/password is provided before continuing
     # (this will do nothing if already logged in)
@@ -841,9 +826,9 @@ function setup_splunk {
         if [ "$SPLUNK_PASSWORD" == "" ]; then
             # TODO: verify this twice
             # TODO: also try passing -auth to every splunk command
-            SPLUNK_PASSWORD=$(get_silent_input_string "Enter the password for splunk user: ")
+            SPLUNK_PASSWORD=$(get_silent_input_string "Enter the password for $SPLUNK_USERNAME user: ")
         fi
-        sudo -H -u splunk $SPLUNK_HOME/bin/splunk login -auth "$SPLUNK_USERNAME:$SPLUNK_PASSWORD"
+        sudo -H -u $SPLUNK_USERNAME $SPLUNK_HOME/bin/splunk login -auth "$SPLUNK_USERNAME:$SPLUNK_PASSWORD"
         res=$?
     done
 
@@ -855,7 +840,7 @@ function setup_splunk {
     else
         setup_forward_server "$IP"
     fi
-    sudo chown -R splunk:splunk $SPLUNK_HOME
+    sudo chown -R $SPLUNK_USERNAME:$SPLUNK_USERNAME $SPLUNK_HOME
 }
 
 # Checks for existence of a file or directory and add it as a monitor if it exists
@@ -869,9 +854,9 @@ function add_monitor {
     sourcetype=$3
     if sudo [ -e "$source" ]; then
         if [ "$sourcetype" != "" ]; then
-            sudo -H -u splunk $SPLUNK_HOME/bin/splunk add monitor "$source" -index "$index" -sourcetype "$sourcetype" &> /dev/null
+            sudo -H -u $SPLUNK_USERNAME $SPLUNK_HOME/bin/splunk add monitor "$source" -index "$index" -sourcetype "$sourcetype" &> /dev/null
         else
-            sudo -H -u splunk $SPLUNK_HOME/bin/splunk add monitor "$source" -index "$index" &> /dev/null
+            sudo -H -u $SPLUNK_USERNAME $SPLUNK_HOME/bin/splunk add monitor "$source" -index "$index" &> /dev/null
         fi
         if [ $? -ne 0 ]; then
             log_error "Failed to add monitor for $source"
@@ -896,7 +881,7 @@ function add_script {
     interval=$3
     sourcetype=$4
     if sudo [ -e "$source" ]; then
-        sudo -H -u splunk $SPLUNK_HOME/bin/splunk add exec "$source" -index "$index" -interval "$interval" -sourcetype "$sourcetype" &> /dev/null
+        sudo -H -u $SPLUNK_USERNAME $SPLUNK_HOME/bin/splunk add exec "$source" -index "$index" -interval "$interval" -sourcetype "$sourcetype" &> /dev/null
         if [ $? -ne 0 ]; then
             log_error "Failed to add scripted input for $source"
             return
@@ -1123,7 +1108,7 @@ function add_scripts {
     log_debug "Adding user sessions script"
     add_script $SPLUNK_HOME/etc/apps/ccdc-add-on/bin/sessions.sh "system" "180" "ccdc-sessions"
     log_debug "Adding package integrity verification"
-    sudo chown root:splunk $SPLUNK_HOME/etc/apps/ccdc-add-on/bin/package-check.sh
+    sudo chown root:$SPLUNK_USERNAME $SPLUNK_HOME/etc/apps/ccdc-add-on/bin/package-check.sh
     sudo chmod 750 $SPLUNK_HOME/etc/apps/ccdc-add-on/bin/package-check.sh
     sudo chmod u+s $SPLUNK_HOME/etc/apps/ccdc-add-on/bin/package-check.sh
     add_script $SPLUNK_HOME/etc/apps/ccdc-add-on/bin/package-check.sh "system" "600" "ccdc-package-integrity"
@@ -1190,9 +1175,9 @@ function setup_monitors {
 
 function setup_forward_server {
     log_info "Adding Forward Server"
-    sudo -H -u splunk $SPLUNK_HOME/bin/splunk add forward-server "$1":9997
-    # sudo -H -u splunk $SPLUNK_HOME/bin/splunk enable deploy-client
-    # sudo -H -u splunk $SPLUNK_HOME/bin/splunk set deploy-poll "$1":8089
+    sudo -H -u $SPLUNK_USERNAME $SPLUNK_HOME/bin/splunk add forward-server "$1":9997
+    # sudo -H -u $SPLUNK_USERNAME $SPLUNK_HOME/bin/splunk enable deploy-client
+    # sudo -H -u $SPLUNK_USERNAME $SPLUNK_HOME/bin/splunk set deploy-poll "$1":8089
 }
 
 function install_auditd {
@@ -1252,8 +1237,8 @@ function install_auditd {
         sudo auditctl -l
     fi
 
-    sudo setfacl -Rm g:splunk:rx /var/log/audit/
-    sudo setfacl -Rdm g:splunk:rx /var/log/audit/
+    sudo setfacl -Rm g:$SPLUNK_USERNAME:rx /var/log/audit/
+    sudo setfacl -Rdm g:$SPLUNK_USERNAME:rx /var/log/audit/
     add_monitor "/var/log/audit/audit.log" "system"
     AUDITD_SUCCESSFUL=true
 }
@@ -1265,7 +1250,7 @@ function install_snoopy {
     log_info "Installing Snoopy (trying version $version)"
     if sudo [ -e /usr/local/lib/libsnoopy.so ]; then
         log_info "Snoopy is already installed"
-        sudo -H -u splunk $SPLUNK_HOME/bin/splunk add monitor "$SNOOPY_LOG" -index "snoopy" -sourcetype "snoopy"
+        sudo -H -u $SPLUNK_USERNAME $SPLUNK_HOME/bin/splunk add monitor "$SNOOPY_LOG" -index "snoopy" -sourcetype "snoopy"
         return 0
     fi
 
@@ -1299,7 +1284,7 @@ function install_snoopy {
             sudo touch /var/log/snoopy.log
             # Unfortunately required by snoopy in order to use a log file other than syslog/messages
             sudo chmod 622 $SNOOPY_LOG
-            sudo setfacl -m g:splunk:r /var/log/snoopy.log
+            sudo setfacl -m g:$SPLUNK_USERNAME:r /var/log/snoopy.log
             echo "filter_chain = \"exclude_spawns_of:splunkd,btool\"" | sudo tee -a $SNOOPY_CONFIG > /dev/null
             echo "output = file:$SNOOPY_LOG" | sudo tee -a $SNOOPY_CONFIG > /dev/null
             echo
@@ -1314,7 +1299,7 @@ function install_snoopy {
         log_info "Snoopy installed successfully."
         log_warning "NOTE: Unless you restart the server, Snoopy may not pick up on commands from existing processes."
         # see https://github.com/a2o/snoopy/issues/212
-        sudo -H -u splunk $SPLUNK_HOME/bin/splunk add monitor "$SNOOPY_LOG" -index "snoopy" -sourcetype "snoopy"
+        sudo -H -u $SPLUNK_USERNAME $SPLUNK_HOME/bin/splunk add monitor "$SNOOPY_LOG" -index "snoopy" -sourcetype "snoopy"
         SNOOPY_SUCCESSFUL=true
         return 0
     fi
@@ -1365,12 +1350,12 @@ function install_ossec {
         log_info "OSSEC installed successfully"
         OSSEC_DIR="/var/ossec"
         if [[ "$INDEXER" == true ]]; then
-            sudo setfacl -Rm g:splunk:rx $OSSEC_DIR/
-            sudo setfacl -Rm g:splunk:rx $OSSEC_DIR/logs/
-            sudo setfacl -Rm g:splunk:rx $OSSEC_DIR/logs/alerts/
-            sudo setfacl -Rdm g:splunk:rx $OSSEC_DIR/logs/alerts/
-            sudo setfacl -Rm g:splunk:rx $OSSEC_DIR/logs/firewall/
-            sudo setfacl -Rdm g:splunk:rx $OSSEC_DIR/logs/firewall/
+            sudo setfacl -Rm g:$SPLUNK_USERNAME:rx $OSSEC_DIR/
+            sudo setfacl -Rm g:$SPLUNK_USERNAME:rx $OSSEC_DIR/logs/
+            sudo setfacl -Rm g:$SPLUNK_USERNAME:rx $OSSEC_DIR/logs/alerts/
+            sudo setfacl -Rdm g:$SPLUNK_USERNAME:rx $OSSEC_DIR/logs/alerts/
+            sudo setfacl -Rm g:$SPLUNK_USERNAME:rx $OSSEC_DIR/logs/firewall/
+            sudo setfacl -Rdm g:$SPLUNK_USERNAME:rx $OSSEC_DIR/logs/firewall/
             add_monitor "$OSSEC_DIR/logs/ossec.log" "ossec" "ossec_log"
             add_monitor "$OSSEC_DIR/logs/alerts/alerts.log" "ossec" "ossec_alert"
             add_monitor "$OSSEC_DIR/logs/firewall/firewall.log" "ossec" "ossec_firewall"
@@ -1399,10 +1384,10 @@ function main {
         # add_additional_logs
 
         print_banner "Finalizing Setup"
-        sudo -H -u splunk $SPLUNK_HOME/bin/splunk stop
+        sudo -H -u $SPLUNK_USERNAME $SPLUNK_HOME/bin/splunk stop
         if command -v systemctl &> /dev/null; then
             log_debug "Enabling start on boot with systemd"
-            sudo $SPLUNK_HOME/bin/splunk enable boot-start -systemd-managed 1 -user splunk
+            sudo $SPLUNK_HOME/bin/splunk enable boot-start -systemd-managed 1 -user $SPLUNK_USERNAME
             if [ "$INDEXER" == true ]; then
                 sudo systemctl enable Splunkd
                 sudo systemctl start Splunkd
@@ -1412,7 +1397,7 @@ function main {
             fi
         else
             log_debug "Not a systemd machine; using splunk start"
-            sudo -H -u splunk $SPLUNK_HOME/bin/splunk start
+            sudo -H -u $SPLUNK_USERNAME $SPLUNK_HOME/bin/splunk start
         fi
 
         echo
@@ -1438,7 +1423,7 @@ function main {
                 fi
             fi
         # else
-            # sudo -H -u splunk $SPLUNK_HOME/bin/splunk add monitor "$SNOOPY_LOG" -index "snoopy" -sourcetype "snoopy"
+            # sudo -H -u $SPLUNK_USERNAME $SPLUNK_HOME/bin/splunk add monitor "$SNOOPY_LOG" -index "snoopy" -sourcetype "snoopy"
             # SNOOPY_SUCCESSFUL=true
             # log_info "Snoopy installed successfully from package repos"
         # fi
@@ -1454,7 +1439,7 @@ function main {
     log_info "A debug log is located at $LOG"
     log_info "You can add additional monitors with this script."
     echo "   Usage: ./splunk.sh -a <LOG_PATH>"
-    # log_info "Add future additional scripted inputs with 'sudo -H -u splunk $SPLUNK_HOME/bin/splunk add exec $SPLUNK_HOME/etc/apps/ccdc-add-on/bin/<SCRIPT> -interval <SECONDS> -index <INDEX>'"
+    # log_info "Add future additional scripted inputs with 'sudo -H -u $SPLUNK_USERNAME $SPLUNK_HOME/bin/splunk add exec $SPLUNK_HOME/etc/apps/ccdc-add-on/bin/<SCRIPT> -interval <SECONDS> -index <INDEX>'"
     echo
     echo "Summary of installation:"
     echo "   Auditd successful? $AUDITD_SUCCESSFUL" # TODO: colors
@@ -1509,6 +1494,8 @@ while getopts "hp:P:f:irg:uSa:Ll:vn" opt; do
         i)
             INDEXER=true
             SPLUNK_HOME="/opt/splunk"
+            SPLUNK_OWNER="splunk"
+            SPLUNK_USERNAME="splunk"
             # IP=$OPTARG
             ;;
         r)
