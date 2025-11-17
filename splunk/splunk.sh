@@ -38,22 +38,40 @@ SPLUNK_OWNER="splunkfwd"
 SPLUNK_USERNAME="splunkfwd"
 SPLUNK_PASSWORD=""
 
+### Latest ###
+PACKAGE_TYPES=("indexer_deb" "indexer_rpm" "indexer_tgz" "deb" "rpm" "tgz" "arm_deb" "arm_rpm" "arm_tgz")
+
 # Indexer
-indexer_deb="https://download.splunk.com/products/splunk/releases/9.2.10/linux/splunk-9.2.10-37c0a7e2ccbd-linux-2.6-amd64.deb"
-indexer_rpm="https://download.splunk.com/products/splunk/releases/9.2.10/linux/splunk-9.2.10-37c0a7e2ccbd.x86_64.rpm"
-indexer_tgz="https://download.splunk.com/products/splunk/releases/9.2.10/linux/splunk-9.2.10-37c0a7e2ccbd-Linux-x86_64.tgz"
+indexer_deb="https://download.splunk.com/products/splunk/releases/10.0.2/linux/splunk-10.0.2-e2d18b4767e9-linux-amd64.deb"
+indexer_rpm="https://download.splunk.com/products/splunk/releases/10.0.2/linux/splunk-10.0.2-e2d18b4767e9.x86_64.rpm"
+indexer_tgz="https://download.splunk.com/products/splunk/releases/10.0.2/linux/splunk-10.0.2-e2d18b4767e9-linux-amd64.tgz"
 
 # Forwarder
-deb="https://download.splunk.com/products/universalforwarder/releases/9.2.10/linux/splunkforwarder-9.2.10-37c0a7e2ccbd-linux-2.6-amd64.deb"
-rpm="https://download.splunk.com/products/universalforwarder/releases/9.2.10/linux/splunkforwarder-9.2.10-37c0a7e2ccbd.x86_64.rpm"
-tgz="https://download.splunk.com/products/universalforwarder/releases/9.2.10/linux/splunkforwarder-9.2.10-37c0a7e2ccbd-Linux-x86_64.tgz"
-arm_deb="https://download.splunk.com/products/universalforwarder/releases/9.2.10/linux/splunkforwarder-9.2.10-37c0a7e2ccbd-Linux-armv8.deb"
-arm_rpm="https://download.splunk.com/products/universalforwarder/releases/9.2.10/linux/splunkforwarder-9.2.10-37c0a7e2ccbd.aarch64.rpm"
-arm_tgz="https://download.splunk.com/products/universalforwarder/releases/9.2.10/linux/splunkforwarder-9.2.10-37c0a7e2ccbd-Linux-armv8.tgz"
+deb="https://download.splunk.com/products/universalforwarder/releases/10.0.2/linux/splunkforwarder-10.0.2-e2d18b4767e9-linux-amd64.deb"
+rpm="https://download.splunk.com/products/universalforwarder/releases/10.0.2/linux/splunkforwarder-10.0.2-e2d18b4767e9.x86_64.rpm"
+tgz="https://download.splunk.com/products/universalforwarder/releases/10.0.2/linux/splunkforwarder-10.0.2-e2d18b4767e9-linux-amd64.tgz"
+arm_deb="https://download.splunk.com/products/universalforwarder/releases/10.0.2/linux/splunkforwarder-10.0.2-e2d18b4767e9-linux-arm64.deb"
+arm_rpm="https://download.splunk.com/products/universalforwarder/releases/10.0.2/linux/splunkforwarder-10.0.2-e2d18b4767e9.aarch64.rpm"
+arm_tgz="https://download.splunk.com/products/universalforwarder/releases/10.0.2/linux/splunkforwarder-10.0.2-e2d18b4767e9-linux-arm64.tgz"
 
-old_deb="https://download.splunk.com/products/universalforwarder/releases/9.0.9/linux/splunkforwarder-9.0.9-6315942c563f-linux-2.6-amd64.deb"
-old_rpm="https://download.splunk.com/products/universalforwarder/releases/9.0.9/linux/splunkforwarder-9.0.9-6315942c563f.x86_64.rpm"
-old_tgz="https://download.splunk.com/products/universalforwarder/releases/9.0.9/linux/splunkforwarder-9.0.9-6315942c563f-Linux-x86_64.tgz"
+### 9.2.10 ###
+# Indexer
+indexer_deb_9_2_10="https://download.splunk.com/products/splunk/releases/9.2.10/linux/splunk-9.2.10-37c0a7e2ccbd-linux-2.6-amd64.deb"
+indexer_rpm_9_2_10="https://download.splunk.com/products/splunk/releases/9.2.10/linux/splunk-9.2.10-37c0a7e2ccbd.x86_64.rpm"
+indexer_tgz_9_2_10="https://download.splunk.com/products/splunk/releases/9.2.10/linux/splunk-9.2.10-37c0a7e2ccbd-Linux-x86_64.tgz"
+
+# Forwarder
+deb_9_2_10="https://download.splunk.com/products/universalforwarder/releases/9.2.10/linux/splunkforwarder-9.2.10-37c0a7e2ccbd-linux-2.6-amd64.deb"
+rpm_9_2_10="https://download.splunk.com/products/universalforwarder/releases/9.2.10/linux/splunkforwarder-9.2.10-37c0a7e2ccbd.x86_64.rpm"
+tgz_9_2_10="https://download.splunk.com/products/universalforwarder/releases/9.2.10/linux/splunkforwarder-9.2.10-37c0a7e2ccbd-Linux-x86_64.tgz"
+arm_deb_9_2_10="https://download.splunk.com/products/universalforwarder/releases/9.2.10/linux/splunkforwarder-9.2.10-37c0a7e2ccbd-Linux-armv8.deb"
+arm_rpm_9_2_10="https://download.splunk.com/products/universalforwarder/releases/9.2.10/linux/splunkforwarder-9.2.10-37c0a7e2ccbd.aarch64.rpm"
+arm_tgz_9_2_10="https://download.splunk.com/products/universalforwarder/releases/9.2.10/linux/splunkforwarder-9.2.10-37c0a7e2ccbd-Linux-armv8.tgz"
+
+### 9.0.9 ###
+deb_9_0_9="https://download.splunk.com/products/universalforwarder/releases/9.0.9/linux/splunkforwarder-9.0.9-6315942c563f-linux-2.6-amd64.deb"
+rpm_9_0_9="https://download.splunk.com/products/universalforwarder/releases/9.0.9/linux/splunkforwarder-9.0.9-6315942c563f.x86_64.rpm"
+tgz_9_0_9="https://download.splunk.com/products/universalforwarder/releases/9.0.9/linux/splunkforwarder-9.0.9-6315942c563f-Linux-x86_64.tgz"
 
 AUDITD_SUCCESSFUL=false
 SNOOPY_SUCCESSFUL=false
@@ -295,6 +313,7 @@ function print_usage {
   $(set_ansi $YELLOW $BOLD)-f <ip>       $(set_ansi)Install the forwarder (-f is required unless -i or -a are used)
   $(set_ansi $YELLOW $BOLD)-i            $(set_ansi)Install the indexer
   $(set_ansi $YELLOW $BOLD)-p <type>     $(set_ansi)Package type (defaults to auto - see below)
+  $(set_ansi $YELLOW $BOLD)-v <version>  $(set_ansi)Install a specific Splunk version other than the latest (supported old versions: 9.2.10, 9.0.9)
   $(set_ansi $YELLOW $BOLD)-r            $(set_ansi)Reinstall Splunk
   $(set_ansi $YELLOW $BOLD)-u            $(set_ansi)Print Splunk package URLs
   $(set_ansi $YELLOW $BOLD)-S            $(set_ansi)Install Splunk only (no additional logging)
@@ -303,7 +322,7 @@ function print_usage {
   $(set_ansi $YELLOW $BOLD)-g <url>      $(set_ansi)Change the GitHub URL for downloading files (for local network hosting)
   $(set_ansi $YELLOW $BOLD)-a <path>     $(set_ansi)Add a new monitor (use only after installation)
   $(set_ansi $YELLOW $BOLD)-n            $(set_ansi)Disable colored output
-  $(set_ansi $YELLOW $BOLD)-v            $(set_ansi)Show verbose output"
+  $(set_ansi $YELLOW $BOLD)-V            $(set_ansi)Show verbose output"
     echo
     echo "$(set_ansi $GREEN $BOLD)Available packages:$(set_ansi)
   $(set_ansi $MAGENTA $BOLD)auto $(set_ansi)(default; autodetects best package format based on package manager)
@@ -316,9 +335,6 @@ function print_usage {
     $(set_ansi $MAGENTA $BOLD)arm_debian $(set_ansi)(deb for ARM machines)
     $(set_ansi $MAGENTA $BOLD)arm_rpm $(set_ansi)(rpm for ARM machines)
     $(set_ansi $MAGENTA $BOLD)arm_tgz $(set_ansi)(tgz for ARM machines)
-    $(set_ansi $MAGENTA $BOLD)old_deb $(set_ansi)(compatibility package- try if you're getting glibc errors)
-    $(set_ansi $MAGENTA $BOLD)old_rpm $(set_ansi)(compatibility package- try if you're getting glibc errors)
-    $(set_ansi $MAGENTA $BOLD)old_tgz $(set_ansi)(compatibility package- try if you're getting glibc errors)
 
   $(set_ansi $GREEN $BOLD)Indexer:
     $(set_ansi $MAGENTA $BOLD)indexer_deb $(set_ansi)(Debian-based distros)
@@ -783,8 +799,8 @@ function setup_indexer {
     log_info "Installing indexer apps"
     sudo rm /tmp/app.spl &>/dev/null
     install_ccdc_app
-    install_windows_soc_app
-    install_sysmon_security_monitoring_app
+    # install_windows_soc_app
+    # install_sysmon_security_monitoring_app
     install_audit_parse_app
     install_palo_alto_apps
 }
@@ -813,7 +829,7 @@ function setup_splunk {
     if [ "$INDEXER" == true ]; then
         sudo -H -u $SPLUNK_USERNAME $SPLUNK_HOME/bin/splunk createssl web-cert    # TODO: broken?
         sudo -H -u $SPLUNK_USERNAME $SPLUNK_HOME/bin/splunk enable web-ssl
-
+    fi
     log_info "Starting splunk"
     # For some reason, splunk start doesn't work on Ubuntu 14 without a tty...
     # faketty sudo -H -u splunk $SPLUNK_HOME/bin/splunk start --accept-license --no-prompt
@@ -1453,7 +1469,7 @@ function main {
     echo
 }
 
-while getopts "hp:P:f:irg:uSa:Ll:vn" opt; do
+while getopts "hp:P:f:irg:uSa:Ll:Vv:n" opt; do
     case $opt in
         h)
             print_usage
@@ -1484,6 +1500,15 @@ while getopts "hp:P:f:irg:uSa:Ll:vn" opt; do
             ;;
         p)
             PACKAGE=$OPTARG
+            ;;
+        v)
+            # Override package variables with provided version
+            new_version="${OPTARG//./_}"
+            for package in "${PACKAGE_TYPES[@]}"; do
+                new_package="${package}_${new_version}"
+                printf -v "$package" '%s' "${!new_package}"
+                echo "${!new_package}"
+            done
             ;;
         P)
             LOCAL_PACKAGE=$OPTARG
@@ -1535,7 +1560,7 @@ while getopts "hp:P:f:irg:uSa:Ll:vn" opt; do
         n)
             NOCOLOR=true
             ;;
-        v)
+        V)
             VERBOSE=true
             ;;
         \?)
