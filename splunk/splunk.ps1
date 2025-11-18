@@ -66,7 +66,7 @@ if ($local -ne "") {
 }
 
 $SPLUNKDIR = ""
-$10_0_2_x64 = "https://download.splunk.com/products/universalforwarder/releases/10.0.2/windows/splunkforwarder-10.0.2-6293d562290e-windows-x86.msi"
+$10_0_2_x64 = "https://download.splunk.com/products/universalforwarder/releases/10.0.2/windows/splunkforwarder-10.0.2-e2d18b4767e9-windows-x64.msi"
 $9_2_10_x64 = "https://download.splunk.com/products/universalforwarder/releases/9.2.10/windows/splunkforwarder-9.2.10-37c0a7e2ccbd-x64-release.msi"
 $9_2_10_x86 = "https://download.splunk.com/products/universalforwarder/releases/9.2.10/windows/splunkforwarder-9.2.10-37c0a7e2ccbd-x86-release.msi"
 $9_1_6_x64 = "https://download.splunk.com/products/universalforwarder/releases/9.1.6/windows/splunkforwarder-9.1.6-a28f08fac354-x64-release.msi"
