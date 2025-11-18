@@ -66,13 +66,14 @@ if ($local -ne "") {
 }
 
 $SPLUNKDIR = ""
+$10_0_2_x64 = "https://download.splunk.com/products/splunk/releases/10.0.2/windows/splunk-10.0.2-e2d18b4767e9-windows-x64.msi"
 $9_2_10_x64 = "https://download.splunk.com/products/universalforwarder/releases/9.2.10/windows/splunkforwarder-9.2.10-37c0a7e2ccbd-x64-release.msi"
 $9_2_10_x86 = "https://download.splunk.com/products/universalforwarder/releases/9.2.10/windows/splunkforwarder-9.2.10-37c0a7e2ccbd-x86-release.msi"
 $9_1_6_x64 = "https://download.splunk.com/products/universalforwarder/releases/9.1.6/windows/splunkforwarder-9.1.6-a28f08fac354-x64-release.msi"
 $9_1_6_x86 = "https://download.splunk.com/products/universalforwarder/releases/9.1.6/windows/splunkforwarder-9.1.6-a28f08fac354-x86-release.msi"
 $7_3_9_x64 = "https://download.splunk.com/products/universalforwarder/releases/7.3.9/windows/splunkforwarder-7.3.9-39a78bf1bc5b-x64-release.msi"
 $7_3_9_x86 = "https://download.splunk.com/products/universalforwarder/releases/7.3.9/windows/splunkforwarder-7.3.9-39a78bf1bc5b-x86-release.msi"
-$newest_x64 = $9_2_10_x64
+$newest_x64 = $10_0_2_x64
 $newest_x86 = $9_2_10_x86
 
 $OSSECDIR="C:\Program Files (x86)\ossec-agent"
@@ -125,7 +126,7 @@ function detect_version {
             "7" { return $7_3_9_x64 } # technically this is not supported for 7
             "8" { return $7_3_9_x64 }
             "2012" { return $9_1_6_x64 }
-            "2016" { return $9_2_10_x64 }
+            "2016" { return $10_0_2_x64 }
             {$_ -in "10", "11", "2019", "2022", "2025"} { return $newest_x64 }
             default { error "Invalid option"; exit 1 }
         }
@@ -179,7 +180,7 @@ function install_splunk {
 
     print "The installation will now continue in the background. This may take a few minutes."
     # TODO: create splunk service user
-    Start-Process msiexec.exe -ArgumentList "/i $installer_path SPLUNKUSERNAME=splunk SPLUNKPASSWORD=$password USE_LOCAL_SYSTEM=1 RECEIVING_INDEXER="$ip:9997" AGREETOLICENSE=yes LAUNCHSPLUNK=1 SERVICESTARTTYPE=auto /L*v splunk_log.txt /quiet" -Wait -NoNewWindow
+    Start-Process msiexec.exe -ArgumentList "/i $installer_path SPLUNKUSERNAME=splunk SPLUNKPASSWORD=$password USE_LOCAL_SYSTEM=1 RECEIVING_INDEXER=`"$($ip):9997`" AGREETOLICENSE=yes LAUNCHSPLUNK=1 SERVICESTARTTYPE=auto /L*v splunk_log.txt /quiet" -Wait -NoNewWindow
 
     if (Test-Path "C:\Program Files\SplunkUniversalForwarder\bin\splunk.exe") {
         print "Splunk installed successfully"
