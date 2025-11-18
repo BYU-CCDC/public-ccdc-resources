@@ -180,6 +180,7 @@ function install_splunk {
 
     print "The installation will now continue in the background. This may take a few minutes."
     # TODO: create splunk service user
+    write-host "Installer path: $installer_path"
     Start-Process msiexec.exe -ArgumentList "/i $installer_path SPLUNKUSERNAME=splunk SPLUNKPASSWORD=$password USE_LOCAL_SYSTEM=1 RECEIVING_INDEXER=`"$($ip):9997`" AGREETOLICENSE=yes LAUNCHSPLUNK=1 SERVICESTARTTYPE=auto /L*v splunk_log.txt /quiet" -Wait -NoNewWindow
 
     if (Test-Path "C:\Program Files\SplunkUniversalForwarder\bin\splunk.exe") {
