@@ -29,6 +29,7 @@ PACKAGE="auto"
 LOCAL_PACKAGE=""
 SPLUNK_HOME="/opt/splunkforwarder"
 SPLUNK_ONLY=false
+DOWNLOAD_ONLY=false
 ADDITIONAL_LOGGING_ONLY=false
 LOCAL=false
 SYSTEMD_SYSTEM=false
@@ -307,6 +308,7 @@ function print_usage {
     echo "  $(set_ansi $BLUE $BOLD)./splunk.sh -f <INDEXER IP> [flags]         $(set_ansi)# Install the forwarder"
     echo "  $(set_ansi $BLUE $BOLD)./splunk.sh -i [flags]                      $(set_ansi)# Install the indexer"
     echo "  $(set_ansi $BLUE $BOLD)./splunk.sh -a <LOG_PATH>                   $(set_ansi)# Add a new monitor"
+    echo "  $(set_ansi $BLUE $BOLD)./splunk.sh -D                              $(set_ansi)# Debug installation if it's not working"
     echo
     echo "$(set_ansi $GREEN $BOLD)Flags:$(set_ansi)
   $(set_ansi $YELLOW $BOLD)-h            $(set_ansi)Show this help message
@@ -314,6 +316,7 @@ function print_usage {
   $(set_ansi $YELLOW $BOLD)-i            $(set_ansi)Install the indexer
   $(set_ansi $YELLOW $BOLD)-p <type>     $(set_ansi)Package type (defaults to auto - see below)
   $(set_ansi $YELLOW $BOLD)-v <version>  $(set_ansi)Install a specific Splunk version other than the latest (supported old versions: 9.2.10, 9.0.9)
+  $(set_ansi $YELLOW $BOLD)-d            $(set_ansi)Download the Splunk package without installing
   $(set_ansi $YELLOW $BOLD)-r            $(set_ansi)Reinstall Splunk
   $(set_ansi $YELLOW $BOLD)-u            $(set_ansi)Print Splunk package URLs
   $(set_ansi $YELLOW $BOLD)-S            $(set_ansi)Install Splunk only (no additional logging)
@@ -322,6 +325,7 @@ function print_usage {
   $(set_ansi $YELLOW $BOLD)-g <url>      $(set_ansi)Change the GitHub URL for downloading files (for local network hosting)
   $(set_ansi $YELLOW $BOLD)-a <path>     $(set_ansi)Add a new monitor (use only after installation)
   $(set_ansi $YELLOW $BOLD)-n            $(set_ansi)Disable colored output
+  $(set_ansi $YELLOW $BOLD)-D            $(set_ansi)Debug your installation
   $(set_ansi $YELLOW $BOLD)-V            $(set_ansi)Show verbose output"
     echo
     echo "$(set_ansi $GREEN $BOLD)Available packages:$(set_ansi)
@@ -376,6 +380,19 @@ function download {
             log_warning "Failed to download with wget. Trying with curl..."
             if ! curl -L -o "$output" -k "$url"; then
                 log_error "Failed to download with curl."
+                get_input_string "Download failed. Would you like to continue, retry, or exit? (C/r/e): " option
+                case "$option" in
+                    R|r )
+                        download "$url" "$output"
+                    ;;
+                    E|e )
+                        log_error "Exiting due to download failure."
+                        exit 1
+                    ;;
+                    * )
+                        log_info "Continuing despite download failure."
+                    ;;
+                esac
             fi
         # fi
     fi
@@ -414,6 +431,56 @@ function autodetect_os {
     fi
 }
 
+function debug_installation {
+    # Check if Splunk is installed
+    if ! sudo test -e "$SPLUNK_HOME/bin/splunk"; then
+        log_error "Splunk is not installed."
+        return 1
+    fi
+    # Check if owned by correct user
+    owner=$(ls -ld "$SPLUNK_HOME" | awk '{print $3}')
+    if [ "$owner" != "$SPLUNK_USERNAME" ]; then
+        log_warning "Splunk installation is owned by $owner instead of $SPLUNK_USERNAME."
+    fi
+    # Check if Splunk services are running
+    if ! sudo "$SPLUNK_HOME/bin/splunk" status &>/dev/null; then
+        log_warning "Splunk services are not running."
+    else
+        log_info "Splunk services are running."
+    fi
+    # Check if Splunk can connect to indexer (if forwarder)
+    if [ "$INDEXER" == false ]; then
+        # Check if forward server is set
+        if ! sudo "$SPLUNK_HOME/bin/splunk" list forward-server &>/dev/null; then
+            log_warning "Splunk forwarder is not connected to any indexer."
+        else
+            log_info "Splunk forwarder is connected to an indexer."
+        fi
+
+        # Check if indexer is pingable
+        ping -u "$IP" -c 3 &>/dev/null
+        if [ $? -ne 0 ]; then
+            log_warning "Cannot ping indexer at $IP."
+        else
+            log_info "Indexer at $IP is pingable."
+        fi
+
+        # Check if indexer is accessable on port 9997
+        nc -zv "$IP" 9997 &>/dev/null
+        if [ $? -ne 0 ]; then
+            log_warning "Cannot connect to indexer at $IP on port 9997."
+        else
+            log_info "Can connect to indexer at $IP on port 9997."
+        fi
+    fi
+    # Check if monitors are set up correctly
+    if sudo "$SPLUNK_HOME/bin/splunk" list monitor &>/dev/null; then
+        log_info "Splunk monitors are set up."
+    else
+        log_warning "No Splunk monitors are set up."
+    fi
+}
+
 ### Installation functions ###
 function install_dependencies {
     log_info "Installing dependencies"
@@ -421,11 +488,11 @@ function install_dependencies {
     if [ "$PM" == "" ]; then
         log_warning "No package manager detected."
     else
-        sudo "$PM" install -y wget curl acl unzip
+        sudo "$PM" install -qq -y wget curl acl unzip
         if [ "$PM" == "apt-get" ]; then
-            sudo "$PM" install -y debsums
+            sudo "$PM" install -qq -y debsums
         else
-            sudo "$PM" install -y rpm
+            sudo "$PM" install -qq -y rpm
         fi
 
         syslog_installed=false
@@ -437,7 +504,7 @@ function install_dependencies {
         done
 
         if ! $syslog_installed; then
-            sudo "$PM" install -y rsyslog
+            sudo "$PM" install -qq -y rsyslog
         fi
     fi
 
@@ -504,6 +571,11 @@ function prep_install {
     log_info "Downloading package from $link"
     download "$link" "./$filename"
 
+    if [ "$DOWNLOAD_ONLY" == true ]; then
+        log_info "Download-only flag set. Exiting after download."
+        exit 0
+    fi
+
     if [ $REINSTALL == true ]; then
         # TODO: detect existing splunk version
         log_info "Reinstall flag set. Preparing to reinstall..."
@@ -513,6 +585,8 @@ function prep_install {
         log_info "Stopping existing Splunk services"
         sudo /opt/splunk/bin/splunk stop -f &>/dev/null
         sudo /opt/splunk/bin/splunkforwarder stop -f &>/dev/null
+        sudo /opt/splunk/bin/splunk disable boot-start &>/dev/null
+        sudo /opt/splunk/bin/splunkforwarder disable boot-start &>/dev/null
 
         option=$(get_input_string "Would you like to remove any existing Splunk packages? (Y/n): " | tr -d ' ')
         if [[ $option != "n" ]]; then
@@ -548,13 +622,13 @@ function install_package {
             prep_install "$link" splunk.rpm
             case "$PM" in
                 zypper )
-                    sudo zypper --no-gpg-checks install -y ./splunk.rpm
+                    sudo zypper --no-gpg-checks install -y -qq ./splunk.rpm
                 ;;
                 dnf )
-                    sudo dnf install --nogpgcheck ./splunk.rpm -y
+                    sudo dnf install --nogpgcheck ./splunk.rpm -y -qq
                 ;;
                 yum )
-                    sudo yum install --nogpgcheck ./splunk.rpm -y
+                    sudo yum install --nogpgcheck ./splunk.rpm -y -qq
                 ;;
                 *)
                     log_error "Unknown package manager: $PM"
@@ -1279,9 +1353,9 @@ function install_snoopy {
         ;;
         dnf|zypper|yum )
             if sudo test -f "/etc/centos-release" || sudo test -f "/etc/redhat-release"; then
-                sudo "$PM" install -y epel-release
+                sudo "$PM" install -y -qq epel-release
             fi
-            sudo "$PM" install -y gcc gzip make procps socat tar wget
+            sudo "$PM" install -y -qq gcc gzip make procps socat tar wget
         ;;
         * )
         ;;
@@ -1469,7 +1543,7 @@ function main {
     echo
 }
 
-while getopts "hp:P:f:irg:uSa:Ll:Vv:n" opt; do
+while getopts "hp:P:df:irg:uSa:Ll:Vv:nD" opt; do
     case $opt in
         h)
             print_usage
@@ -1512,6 +1586,9 @@ while getopts "hp:P:f:irg:uSa:Ll:Vv:n" opt; do
             ;;
         P)
             LOCAL_PACKAGE=$OPTARG
+            ;;
+        d)
+            DOWNLOAD_ONLY=true
             ;;
         f)
             IP=$OPTARG
@@ -1571,6 +1648,10 @@ while getopts "hp:P:f:irg:uSa:Ll:Vv:n" opt; do
         :)
             log_error "Option -$OPTARG requires an argument (-h for help)"
             exit 1
+            ;;
+        D)
+            debug_installation
+            exit 0
             ;;
     esac
 done
