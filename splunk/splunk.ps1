@@ -1,4 +1,4 @@
-# splunk.ps1 -version <7|8|2012|2016|10|11|2019|2022|2025> -ip <indexer_ip> -type <dc|member>
+# splunk.ps1 -windowsVersion <7|8|2012|2016|10|11|2019|2022|2025> -ip <indexer_ip> -type <dc|member>
 #
 # Copyright (C) 2025 deltabluejay
 #
@@ -18,7 +18,7 @@
 ################## SCRIPT ARGUMENTS #################
 param (
     [Parameter(Mandatory=$true)]
-    [string]$version,
+    [string]$windowsVersion,
 
     [Parameter(Mandatory=$true)]
     [string]$ip,
@@ -122,7 +122,7 @@ function download {
 
 function detect_version {
     if ($arch -eq 64) {
-        switch ($version) {
+        switch ($windowsVersion) {
             "7" { return $7_3_9_x64 } # technically this is not supported for 7
             "8" { return $7_3_9_x64 }
             "2012" { return $9_1_6_x64 }
@@ -132,7 +132,7 @@ function detect_version {
         }
     }
     elseif ($arch -eq 32) {
-        switch ($version) {
+        switch ($windowsVersion) {
             "7" { return = $7_3_9_x86 } # technically this is not supported for 7
             "8" { return = $7_3_9_x86 }
             "2012" { return = $9_1_6_x86 }
@@ -305,7 +305,7 @@ if (((Get-WmiObject Win32_ComputerSystem).DomainRole -eq 5) -or ((Get-WmiObject 
 install_splunk
 install_sysmon
 
-if ($version -eq "7" -or $version -eq "8") {
+if ($windowsVersion -eq "7" -or $windowsVersion -eq "8") {
     # Add-on isn't supported on these versions of Splunk
     install_custom_inputs
 
