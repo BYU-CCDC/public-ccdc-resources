@@ -23,9 +23,9 @@ param (
     [Parameter(Mandatory=$true)]
     [string]$ip,
 
-    [Parameter(Mandatory=$true)]
-    [ValidateSet("dc", "member")]
-    [string]$type,
+    #[Parameter(Mandatory=$true)]
+    #[ValidateSet("dc", "member")]
+    #[string]$type,
 
     [Parameter(Mandatory=$false)]
     [string]$url = "",
@@ -232,7 +232,7 @@ function install_windows_ta {
     New-Item -Path "$SPLUNKDIR\etc\apps\Splunk_TA_windows\local\" -ItemType Directory -Force
     download "$GITHUB_URL/splunk/windows/windows-ta-inputs.conf" "$pwd\windows-ta-inputs.conf"
 
-    if ($type -eq "dc") {
+    if ($global:type -eq "dc") {
         "`n[admon://default]`ndisabled=0`nmonitorSubtree=1" | Out-File -Append -Encoding ascii "$pwd\windows-ta-inputs.conf"
     }
 
@@ -294,6 +294,12 @@ if ($ip -eq "indexer" -or $ip -eq "i") {
     error "Indexer installation not implemented yet"
 } else {
     $SPLUNKDIR = "C:\Program Files\SplunkUniversalForwarder"
+}
+
+if (((Get-WmiObject Win32_ComputerSystem).DomainRole -eq 5) -or ((Get-WmiObject Win32_ComputerSystem).DomainRole -eq 4 )) {
+    $global:type = "dc"
+} else {
+    $global:type = "member"
 }
 
 install_splunk
