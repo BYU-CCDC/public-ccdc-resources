@@ -1,0 +1,39 @@
+    [rule]
+    description = """
+    Identifies the execution of suspicious processes by web server applications (e.g., Apache, Nginx). This activity could
+    indicate a webshell or command injection attack where an attacker has compromised a web application to execute arbitrary
+    system commands. Web servers should typically not spawn interactive shells or execute suspicious system utilities.
+    This behavior is commonly associated with post-exploitation activities and should be investigated immediately.
+    """
+    id = "78ae5dbd-477b-4ce7-a7f7-8c4b5e228df2"
+    license = "Apache 2.0"
+    name = "Suspicious Process Execution by Web Server"
+    os_list = ["linux"]
+    version = "1.0.0"
+
+    query = '''
+    process.parent.name in ["apache", "nginx", "apache2", "httpd", "lighttpd", "caddy"] and process.executable in ["/usr/bin/dash", "/usr/bin/bash", "/usr/bin/sh", "/usr/bin/python", "/bin/dash", "/bin/bash", "/bin/sh", "/bin/python","/usr/bin/python3", "/bin/python3"]    
+    '''
+
+    min_endpoint_version = "8.3.0"
+    optional_actions = []
+    [[actions]]
+    action = "kill_process"
+    field = "process.pid"
+    state = 0
+
+    [[threat]]
+    framework = "MITRE ATT&CK"
+    [[threat.technique]]
+    id = "T1620"
+    name = "Reflective Code Loading"
+    reference = "https://attack.mitre.org/techniques/T1620/"
+
+
+    [threat.tactic]
+    id = "TA0005"
+    name = "Defense Evasion"
+    reference = "https://attack.mitre.org/tactics/TA0005/"
+
+    [internal]
+    min_endpoint_version = "8.3.0"

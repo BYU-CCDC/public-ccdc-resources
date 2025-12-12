@@ -1,0 +1,41 @@
+[rule]
+description = """
+This rule detects when a process executes the `curl` or `wget` command with an argument that includes the
+`api.telegram.org` domain. This may indicate command and control behavior.
+"""
+id = "1efdddfa-4678-6d30-a98d-1fcb24001ca8"
+license = "Apache License 2.0"
+name = "Linux Telegram API Request"
+os_list = ["linux"]
+version = "1.0.0"
+
+query = '''
+event.type == "start" and event.action == "exec" and process.name in ["curl", "wget"] and
+process.args like "*api.telegram.org*" 
+'''
+
+[[actions]]
+action = "kill_process"
+field = "process.pid"
+
+
+[[threat]]
+framework = "MITRE ATT&CK"
+[[threat.technique]]
+id = "T1071"
+name = "Application Layer Protocol"
+reference = "https://attack.mitre.org/techniques/T1071/"
+[[threat.technique.subtechnique]]
+id = "T1071.001"
+name = "Web Protocols"
+reference = "https://attack.mitre.org/techniques/T1071/001/"
+
+
+
+[threat.tactic]
+id = "TA0011"
+name = "Command and Control"
+reference = "https://attack.mitre.org/tactics/TA0011/"
+
+[internal]
+min_endpoint_version = "7.15.0"

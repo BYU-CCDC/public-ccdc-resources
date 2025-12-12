@@ -1,0 +1,32 @@
+[rule]
+description = """
+Screw you red team
+"""
+id = "3337a10c-e950-4827-a44e-96a688fba221"
+license = "Apache 2.0"
+name = "Red Teamer Detected"
+os_list = ["linux"]
+version = "1.0.8"
+
+query = '''
+event.action == "exec" and process.name == "wall"
+'''
+
+min_endpoint_version = "7.15.0"
+optional_actions = []
+
+[[actions]]
+action = "kill_process"
+field = "process.parent.pid"
+state = 0
+
+[[threat]]
+framework = "MITRE ATT&CK"
+
+[threat.tactic]
+id = "TA0002"
+name = "Execution"
+reference = "https://attack.mitre.org/tactics/TA0002/"
+
+[internal]
+min_endpoint_version = "7.15.0"
