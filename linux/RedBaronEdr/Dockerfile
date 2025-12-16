@@ -22,4 +22,4 @@ RUN go mod download
 
 ADD . .
 
-RUN go build -ldflags '-extldflags "-static -lyara -lssl -lcrypto -ljansson -lmagic -lz -llzma -lbz2 -lm -lpthread -lresolv"' -tags yara_static -o red .
+RUN go build -ldflags '-extldflags "-static -lyara -lssl -lcrypto -ljansson -lmagic -lz -llzma -lbz2 -lm -lpthread -lresolv"' -tags yara_static -o redbaron .
