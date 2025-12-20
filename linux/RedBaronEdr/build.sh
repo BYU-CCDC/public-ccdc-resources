@@ -11,5 +11,5 @@ fi
 # build for amd64 architecture
 sudo docker build --platform linux/amd64 -t go-red .
 sudo docker create --name go-red go-red
-sudo docker cp go-red:/build/red .
+sudo docker cp go-red:/build/redbaron .
 sudo docker rm -f go-red
