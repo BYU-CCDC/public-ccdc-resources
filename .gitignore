@@ -2,3 +2,5 @@ splunk/ccdc-app
 splunk/ccdc-add-on
 splunk/linux/*/
 splunk/windows/*/
+TA-LinuxAuditDecoder/
+splunk/splunk.log

@@ -374,7 +374,7 @@ function download {
     fi
     
     # TODO: figure out how to fix the progress bar
-    if ! wget -O "$output" --no-check-certificate -q "$url"; then
+    if ! wget -O "$output" --no-check-certificate "$url" --progress=dot:mega 2>&1 | grep -Eo ' [0-9]0% ' | uniq; then
         # log_error "Failed to download with wget. Trying wget with older TLS version..."
         # if ! wget -O "$output" --secure-protocol=TLSv1 --no-check-certificate "$url"; then
             log_warning "Failed to download with wget. Trying with curl..."
@@ -414,7 +414,7 @@ function autodetect_os {
         log_info "apt/apt-get detected (Debian-based OS)"
         log_debug "Updating package list"
         # TODO: pkill unattended-upgrades?
-        sudo apt-get update
+        sudo apt-get update -q
         PM="apt-get"
     elif [ $dnf == 0 ]; then
         log_info "dnf detected (Fedora-based OS)"
@@ -568,7 +568,7 @@ function prep_install {
     link="$1"
     filename="$2"
 
-    log_info "Downloading package from $link"
+    log_info "Downloading package from $link. Please wait..."
     download "$link" "./$filename"
 
     if [ "$DOWNLOAD_ONLY" == true ]; then
@@ -616,10 +616,12 @@ function install_package {
     case "$link" in
         *.deb )
             prep_install "$link" splunk.deb
+            log_info "Installing package..."
             sudo dpkg -i ./splunk.deb
         ;;
         *.rpm )
             prep_install "$link" splunk.rpm
+            log_info "Installing package..."
             case "$PM" in
                 zypper )
                     sudo zypper --no-gpg-checks install -y -qq ./splunk.rpm
@@ -675,24 +677,22 @@ function install_splunk {
                 return
             ;;
             deb|debian )
-                log_info "Installing .deb package"
                 echo
                 if [ "$INDEXER" == true ]; then
-                    log_info "Downloading and installing indexer package"
+                    log_info "Selected .deb for indexer"
                     link="$indexer_deb"
                 else
-                    log_info "Downloading and installing forwarder package"
+                    log_info "Selected .deb for forwarder"
                     link="$deb"
                 fi
             ;;
             rpm )
-                log_info "Installing .rpm package"
                 echo
                 if [ "$INDEXER" == true ]; then
-                    log_info "Downloading and installing indexer package"
+                    log_info "Selected indexer .rpm"
                     link="$indexer_rpm"
                 else
-                    log_info "Downloading and installing forwarder package"
+                    log_info "Selected forwarder .rpm"
                     link="$rpm"
                 fi
             ;;
@@ -700,10 +700,10 @@ function install_splunk {
                 log_info "Installing generic .tgz package"
                 echo
                 if [ "$INDEXER" == true ]; then
-                    log_info "Downloading and installing indexer package"
+                    log_info "Selected indexer .tgz"
                     link="$indexer_tgz"
                 else
-                    log_info "Downloading and installing forwarder package"
+                    log_info "Selected forwarder .tgz"
                     link="$tgz"
                 fi
             ;;
@@ -870,6 +870,12 @@ function setup_indexer {
     log_info "Giving $SPLUNK_USERNAME user can_delete role"
     sudo -H -u $SPLUNK_USERNAME $SPLUNK_HOME/bin/splunk edit user $SPLUNK_USERNAME -role admin -role can_delete
 
+    log_info "Creating SSL certs and enabling HTTPS for web interface"
+    sudo mkdir -p $SPLUNK_HOME/etc/auth/splunkweb/
+    sudo chown -R $SPLUNK_USERNAME:$SPLUNK_USERNAME $SPLUNK_HOME/etc/auth/splunkweb/
+    sudo $SPLUNK_HOME/bin/splunk createssl web-cert    # TODO: broken?
+    sudo $SPLUNK_HOME/bin/splunk enable web-ssl
+
     log_info "Installing indexer apps"
     sudo rm /tmp/app.spl &>/dev/null
     install_ccdc_app
@@ -900,10 +906,6 @@ function setup_splunk {
 
     create_splunk_user
 
-    if [ "$INDEXER" == true ]; then
-        sudo -H -u $SPLUNK_USERNAME $SPLUNK_HOME/bin/splunk createssl web-cert    # TODO: broken?
-        sudo -H -u $SPLUNK_USERNAME $SPLUNK_HOME/bin/splunk enable web-ssl
-    fi
     log_info "Starting splunk"
     # For some reason, splunk start doesn't work on Ubuntu 14 without a tty...
     # faketty sudo -H -u splunk $SPLUNK_HOME/bin/splunk start --accept-license --no-prompt
@@ -1271,16 +1273,20 @@ function setup_forward_server {
 }
 
 function install_auditd {
-    log_info "Installing auditd"
+    log_info "Installing auditd..."
 
-    # Install auditd
-    log_debug "Installing auditd package"
-    sudo $PM install -qq -y auditd
-    if [ $? -ne 0 ]; then
-        sudo $PM install -qq -y audit
+    if sudo [ -e /etc/audit/ ]; then
+        log_info "auditd already installed"
+    else
+        # Install auditd
+        log_debug "Installing auditd package"
+        sudo $PM install -qq -y auditd
         if [ $? -ne 0 ]; then
-            log_error "auditd installation failed"
-            return 1
+            sudo $PM install -qq -y audit
+            if [ $? -ne 0 ]; then
+                log_error "auditd installation failed"
+                return 1
+            fi
         fi
     fi
 
@@ -1363,7 +1369,7 @@ function install_snoopy {
 
     # Try installing Snoopy
     download "https://github.com/a2o/snoopy/releases/download/snoopy-$version/snoopy-$version.tar.gz" "snoopy-$version.tar.gz"
-    if ! sudo ./install-snoopy.sh "./snoopy-$version.tar.gz"; then
+    if ! sudo ./install-snoopy.sh "./snoopy-$version.tar.gz" > /dev/null; then
         # If it fails
         log_error "Snoopy installation for version $version failed"
         return 1
@@ -1381,8 +1387,8 @@ function install_snoopy {
             log_debug "Set Snoopy output to $SNOOPY_LOG."
             # Restart snoopy
             # TODO: these commands aren't consistent across all systems
-            sudo snoopyctl disable || sudo /usr/local/sbin/snoopy-disable  
-            sudo snoopyctl enable || sudo /usr/local/sbin/snoopy-enable
+            sudo $(which snoopyctl) disable || sudo /usr/local/sbin/snoopy-disable  
+            sudo $(which snoopyctl) enable || sudo /usr/local/sbin/snoopy-enable
         else
             log_error "Could not find Snoopy config file. Please add \`output = file:/var/log/snoopy.log\` to the end of the config."
         fi
@@ -1463,7 +1469,7 @@ function main {
     # log_info "CURRENT TIME: $(date +"%Y-%m-%d_%H:%M:%S")"
     check_prereqs
     setup_logging
-    print_banner "Installing dependencies"
+    print_banner "Installing dependencies..."
     autodetect_os
     install_dependencies
 
