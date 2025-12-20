@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 set -o pipefail
 
-# Helper: persistence & PM
-
+# Persistence & PM
 PACKAGE_CACHE_UPDATED="false"
 
 function detect_system_info {
@@ -48,6 +47,30 @@ function detect_system_info {
     fi
 }
 
+function remove_packages {
+    if [ -z "${pm:-}" ]; then
+        detect_system_info
+    fi
+
+    if [ $# -eq 0 ]; then
+        return 0
+    fi
+
+    case "$pm" in
+        apt-get)
+            sudo apt-get purge -y "$@" >/dev/null 2>&1 || true
+            ;;
+        yum|dnf)
+            sudo "$pm" remove -y "$@" >/dev/null 2>&1 || true
+            ;;
+        zypper)
+            sudo zypper remove -y "$@" >/dev/null 2>&1 || true
+            ;;
+        *)
+            ;;
+    esac
+}
+
 function install_prereqs {
     print_banner "Installing prerequisites"
     if [ -z "$pm" ]; then
@@ -86,7 +109,6 @@ function update_package_cache {
 }
 
 # iptables persistence
-
 function ensure_iptables_persistence {
     if grep -qi 'debian\|ubuntu' /etc/os-release; then
         if ! command -v netfilter-persistent >/dev/null 2>&1; then
@@ -138,7 +160,7 @@ function verify_iptables_restored_sample {
     sudo iptables -S | head -n 25 || sudo iptables -L -n -v | head -n 25
 }
 
-# Save helpers (no auto-add)
+# Save helpers 
 function backup_current_iptables_rules {
     if grep -qi 'fedora\|centos\|rhel' /etc/os-release; then
         sudo iptables-save | sudo tee /etc/sysconfig/iptables > /dev/null
@@ -164,157 +186,253 @@ function save_iptables_rules_persistent {
     log_info "Saved and configured for boot-time restore."
 }
 
-# UFW helpers
+# Firewall framework cleanup
+function disable_existing_firewalls {
+    print_banner "Disabling alternate firewall frameworks"
 
-function ensure_ufw_persistence {
-    if systemctl list-unit-files | awk '{print $1}' | grep -qx "ufw.service"; then
-        sudo systemctl enable ufw >/dev/null 2>&1 || true
-        log_info "ufw.service enabled for boot-time"
+    if [ -z "${pm:-}" ]; then
+        detect_system_info
     fi
-}
 
-function backup_current_ufw_rules {
-    log_info "Backing up current UFW rules to $UFW_BACKUP"
-    if [ -f /etc/ufw/user.rules ]; then
-        sudo cp /etc/ufw/user.rules "$UFW_BACKUP"
+    local action_taken="false"
+
+    if command -v systemctl >/dev/null 2>&1; then
+        if systemctl list-unit-files 2>/dev/null | awk '{print $1}' | grep -qx "firewalld.service"; then
+            log_info "Stopping firewalld service"
+            sudo systemctl stop firewalld 2>/dev/null || true
+            sudo systemctl disable firewalld 2>/dev/null || true
+            sudo systemctl mask firewalld 2>/dev/null || true
+            action_taken="true"
+        fi
+
+        if systemctl list-unit-files 2>/dev/null | awk '{print $1}' | grep -qx "nftables.service"; then
+            log_info "Stopping nftables service"
+            sudo systemctl stop nftables 2>/dev/null || true
+            sudo systemctl disable nftables 2>/dev/null || true
+            sudo systemctl mask nftables 2>/dev/null || true
+            action_taken="true"
+        fi
+
+        if systemctl list-unit-files 2>/dev/null | awk '{print $1}' | grep -qx "ufw.service"; then
+            log_info "Disabling ufw.service"
+            sudo systemctl stop ufw 2>/dev/null || true
+            sudo systemctl disable ufw 2>/dev/null || true
+            action_taken="true"
+        fi
+    fi
+
+    if command -v firewall-cmd >/dev/null 2>&1; then
+        log_info "Removing firewalld tooling"
+        remove_packages firewalld
+        action_taken="true"
+    fi
+
+    if command -v nft >/dev/null 2>&1; then
+        log_info "Flushing nftables ruleset"
+        sudo nft flush ruleset 2>/dev/null || true
+        log_info "Removing nftables tooling"
+        remove_packages nftables
+        action_taken="true"
+    fi
+
+    if command -v ufw >/dev/null 2>&1; then
+        log_info "Resetting and removing UFW"
+        sudo ufw --force disable 2>/dev/null || true
+        sudo ufw --force reset 2>/dev/null || true
+        remove_packages ufw
+        action_taken="true"
+    fi
+
+    if [ "$action_taken" = "true" ]; then
+        log_info "Alternate firewall services have been disabled."
     else
-        log_warning "/etc/ufw/user.rules not found; UFW may not be initialized yet."
+        log_info "No alternate firewall services detected."
     fi
 }
 
-function restore_ufw_rules {
-    if [ -f "$UFW_BACKUP" ]; then
-        log_info "Restoring UFW rules from $UFW_BACKUP"
-        sudo ufw reset
-        sudo cp "$UFW_BACKUP" /etc/ufw/user.rules
-        sudo ufw reload
+function prompt_read_line {
+    local __resultvar="$1"
+    local prompt="$2"
+    local default_value="${3:-}"
+    local input=""
+
+    if [ "${ANSIBLE:-false}" == "true" ]; then
+        printf -v "$__resultvar" '%s' "$default_value"
+        return 0
+    fi
+
+    if [ -n "$prompt" ]; then
+        read -e -r -p "$prompt" input
     else
-        log_error "No UFW backup file found."
+        read -e -r input
     fi
+
+    if [ -z "$input" ] && [ -n "$default_value" ]; then
+        input="$default_value"
+    fi
+
+    printf -v "$__resultvar" '%s' "$input"
 }
 
-function setup_ufw {
-    print_banner "Configuring ufw"
-    sudo $pm install -y ufw
-    sudo sed -i 's/^IPV6=yes/IPV6=no/' /etc/default/ufw
-    sudo ufw --force disable
-    sudo ufw --force reset
-    sudo ufw default deny outgoing
-    sudo ufw default deny incoming
-    sudo ufw allow out on lo
-    sudo ufw allow out to any port 53 proto tcp
-    sudo ufw allow out to any port 53 proto udp
-    log_info "UFW installed and configured with strict outbound deny (except DNS) successfully.\n"
-    if [ "$ANSIBLE" == "true" ]; then
-        log_info "Ansible mode: Skipping additional inbound port configuration."
-    else
-        log_info "Which additional ports should be opened for incoming traffic?"
-        echo "      WARNING: Do NOT forget to add 22/SSH if needed - please don't accidentally lock yourself out!"
-        ports=$(get_input_list)
-        for port in $ports; do
-            sudo ufw allow "$port"
-            log_info "Rule added for port $port"
-        done
-    fi
-    sudo ufw logging on
-    sudo ufw --force enable
-    ensure_ufw_persistence
-    backup_current_ufw_rules
-}
-
-# FastFW type
+# FastFW Implementation
 function yesno() {
-    read YESNO
-    YESNO="$(tr '[:upper:]' '[:lower:]' <<<"$YESNO" | head -c1)"
-    test "$YESNO" == "y" && return 0
-    test "$YESNO" == "n" && return 1
-    test "$1" == 'y'
-    return $?
+    local default_choice="${1:-}"
+    local prompt_text="${2:-}"
+    local normalized_default=""
+
+    if [ -n "$default_choice" ]; then
+        normalized_default="$(tr '[:upper:]' '[:lower:]' <<<"$default_choice" | head -c1)"
+    fi
+
+    if [ "${ANSIBLE:-false}" == "true" ]; then
+        [ "$normalized_default" == "y" ]
+        return $?
+    fi
+
+    if [ -n "$prompt_text" ]; then
+        case "$normalized_default" in
+            y) prompt_text+=" (Y/n) " ;;
+            n) prompt_text+=" (y/N) " ;;
+            *) prompt_text+=" (y/n) " ;;
+        esac
+    fi
+
+    local response=""
+    prompt_read_line response "$prompt_text" ""
+
+    if [ -z "$response" ] && [ -n "$normalized_default" ]; then
+        response="$normalized_default"
+    fi
+
+    response="$(tr '[:upper:]' '[:lower:]' <<<"$response" | head -c1)"
+
+    if [ "$response" == "y" ]; then
+        return 0
+    elif [ "$response" == "n" ]; then
+        return 1
+    fi
+
+    [ "$normalized_default" == "y" ]
 }
 
 function genPortList() {
-    read PORT_LIST
-    for port in $PORT_LIST; do
-        sudo iptables -A "$1" -p "$2" --dport "$port" $3 -j ACCEPT
+    local chain="$1"
+    local proto="$2"
+    local prompt_text="$3"
+    shift 3
+    local extra_args=("$@")
+
+    if [ "${ANSIBLE:-false}" == "true" ]; then
+        return 0
+    fi
+
+    local ports
+    ports=$(prompt_space_separated_list "$prompt_text")
+
+    for port in $ports; do
+        if [[ "$port" =~ ^[0-9]+$ ]]; then
+            local cmd=(sudo iptables -A "$chain" -p "$proto" --dport "$port")
+            if [ ${#extra_args[@]} -gt 0 ]; then
+                cmd+=("${extra_args[@]}")
+            fi
+            cmd+=(-j ACCEPT)
+            "${cmd[@]}"
+            if [ ${#extra_args[@]} -gt 0 ]; then
+                log_info "Allowing $chain $proto $port (${extra_args[*]})"
+            else
+                log_info "Allowing $chain $proto port $port"
+            fi
+        elif [ -n "$port" ]; then
+            log_warning "Skipping invalid port entry '$port'"
+        fi
     done
 }
 
 function iptables_base_policy_interactive {
-    print_banner "Interactive IPtables Base Policy (DSU-style)"
-    if [ "$EUID" != 0 ]; then
+    print_banner "Interactive IPtables Base Policy"
+
+    if [ "$EUID" -ne 0 ]; then
         log_error "Please run with sudo/root"
         return 1
     fi
 
-    # Optional flush if rules already exist
-    if [ "$(sudo iptables --list-rules | wc -l)" -gt 3 ]; then
-        echo 'It looks like there are already some firewall rules. Do you want to remove them? (y/N)'
-        yesno n && sudo iptables -F
+    disable_existing_firewalls
+
+    local existing_rules
+    existing_rules="$(sudo iptables --list-rules | wc -l | awk '{print $1}')"
+    if (( existing_rules > 3 )); then
+        if yesno n "Existing iptables rules detected. Flush them now?"; then
+            log_info "Flushing current iptables rules"
+            sudo iptables -F
+            sudo iptables -X
+            sudo iptables -Z
+        else
+            log_info "Keeping existing iptables rules and appending baseline allowances"
+        fi
+    else
+        sudo iptables -F
+        sudo iptables -X
+        sudo iptables -Z
+        log_info "Initialized clean iptables rule set"
     fi
 
-    # Core allow rules
+    log_info "Applying baseline loopback and stateful allowances"
     sudo iptables -A INPUT  -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
     sudo iptables -A OUTPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
     sudo iptables -A INPUT  -i lo -j ACCEPT
     sudo iptables -A OUTPUT -o lo -j ACCEPT
     sudo iptables -A INPUT  -p icmp --icmp-type echo-request -j ACCEPT
-    sudo iptables -A OUTPUT -p icmp --icmp-type echo-reply  -j ACCEPT
+    sudo iptables -A OUTPUT -p icmp --icmp-type echo-reply -j ACCEPT
 
-    # Splunk
-    echo 'Splunk indexer IP: '
-    read SPLUNK_IP
-    if [[ -n "$SPLUNK_IP" ]]; then
-        sudo iptables -A OUTPUT -d "$SPLUNK_IP" -p tcp --dport 9997 -j ACCEPT
-        sudo iptables -A OUTPUT -d "$SPLUNK_IP" -p udp --dport 1514 -j ACCEPT
-        sudo iptables -A OUTPUT -d "$SPLUNK_IP" -p udp --dport 1515 -j ACCEPT
+    local splunk_ip=""
+    prompt_read_line splunk_ip "Splunk indexer IP (leave blank to skip): "
+    if [ -n "$splunk_ip" ]; then
+        sudo iptables -A OUTPUT -d "$splunk_ip" -p tcp --dport 9997 -j ACCEPT
+        log_info "Allowing Splunk indexer at $splunk_ip (tcp/9997)"
     fi
 
-    # SSH client detection
-    if [ -n "$SSH_CLIENT" ]; then
-        echo 'SSH Detected. Whitelist client? (Y/n)'
-        yesno y && sudo iptables -A INPUT -s "$(cut -f1 -d' ' <<<"$SSH_CLIENT")" -p tcp --dport 22 -j ACCEPT
+    if [ -n "${SSH_CLIENT:-}" ]; then
+        local ssh_source
+        ssh_source="$(cut -f1 -d' ' <<<"${SSH_CLIENT}")"
+        if yesno y "SSH detected from $ssh_source. Whitelist client?"; then
+            sudo iptables -A INPUT -s "$ssh_source" -p tcp --dport 22 -j ACCEPT
+            log_info "Whitelisted SSH client $ssh_source"
+        fi
     fi
 
-    # DNS servers 
-    echo 'DNS Server IPs: (OUTPUT udp/53)'
-    read DNS_IPS
-    for ip in $DNS_IPS; do
+    local dns_ips
+    dns_ips=$(prompt_space_separated_list "DNS server IPs for outbound udp/53 (space-separated, blank to skip): ")
+    for ip in $dns_ips; do
         sudo iptables -A OUTPUT -d "$ip" -p udp --dport 53 -j ACCEPT
+        log_info "Allowing DNS queries to $ip"
     done
 
-    # Free-form port additions before policy change
-    for CHAIN in INPUT OUTPUT; do
-        for PROTO in tcp udp; do
-            echo "Space-separated list of $CHAIN $PROTO ports/services (press Enter for none):"
-            genPortList "$CHAIN" "$PROTO"
+    for chain in INPUT OUTPUT; do
+        for proto in tcp udp; do
+            genPortList "$chain" "$proto" "Space-separated list of $chain $proto ports/services (leave blank for none): "
         done
     done
 
-    # Optional whitelist block
-    echo 'Would you like to whitelist traffic to a specific IP or subnet? (y/N)'
-    yesno n && {
-        echo 'IP or subnet: '
-        read IP
-        for PROTO in tcp udp; do
-            echo "Space-separated list of INPUT $PROTO ports/services from whitelisted IP/subnet:"
-            genPortList INPUT "$PROTO" "-s $IP"
-        done
-        for PROTO in tcp udp; do
-            echo "Space-separated list of OUTPUT $PROTO ports/services to whitelisted IP/subnet:"
-            genPortList OUTPUT "$PROTO" "-d $IP"
-        done
-    }
+    if yesno n "Would you like to whitelist traffic to a specific IP or subnet?"; then
+        local whitelist_target=""
+        prompt_read_line whitelist_target "IP or subnet (CIDR): "
+        if [ -n "$whitelist_target" ]; then
+            for proto in tcp udp; do
+                genPortList INPUT "$proto" "Allowed INPUT $proto ports from $whitelist_target (blank for none): " -s "$whitelist_target"
+            done
+            for proto in tcp udp; do
+                genPortList OUTPUT "$proto" "Allowed OUTPUT $proto ports to $whitelist_target (blank for none): " -d "$whitelist_target"
+            done
+        fi
+    fi
 
-    # Change policies to DROP (test window), then revert
-    echo 'Changing policy...'
+    log_info "Temporarily setting default policies to DROP for validation"
     sudo iptables -P INPUT DROP
     sudo iptables -P OUTPUT DROP
     sudo iptables -P FORWARD DROP
 
     sleep 0.5
-    echo 'Policy changed.'
-    echo 'If you can see this, press Ctrl+C'
-    echo 'Reverting policies in 5s...'
+    log_info "Policies set to DROP. Press Ctrl+C within 5 seconds if connectivity is lost in order to revert changes to the base, default policy."
     sleep 5
 
     sudo iptables -P INPUT ACCEPT
@@ -322,13 +440,12 @@ function iptables_base_policy_interactive {
     sudo iptables -P FORWARD ACCEPT
 
     log_info "Base policy applied (test complete)."
-    # Ask to save now
-    echo "Would you like to SAVE these rules and make them PERSISTENT across reboots? (Y/n)"
-    yesno y && save_iptables_rules_persistent
+    if yesno y "Would you like to SAVE these rules and make them PERSISTENT across reboots?"; then
+        save_iptables_rules_persistent
+    fi
 }
 
 # Other iptables utilities
-
 function apply_established_only_rules {
     print_banner "Applying Established/Related Only Rules"
     sudo iptables -F; sudo iptables -X; sudo iptables -Z
@@ -398,7 +515,6 @@ function reset_iptables {
 }
 
 # Firewall menus
-
 function firewall_configuration_menu {
     if declare -F initialize_environment >/dev/null; then
         initialize_environment
@@ -409,113 +525,52 @@ function firewall_configuration_menu {
          return 0
     fi
 
-    read -p "Press ENTER to continue to the firewall configuration menu..." dummy
+    read -e -r -p "Press ENTER to continue to the firewall configuration menu..." dummy
     echo
-    echo "Select firewall type:"
-    echo "  1) UFW"
-    echo "  2) IPtables"
-    read -p "Enter your choice [1-2]: " fw_type_choice
-    echo
-    case $fw_type_choice in
-        1)
-            while true; do
-                echo "===== UFW Menu ====="
-                echo "  1) Setup UFW"
-                echo "  2) Create inbound allow rule"
-                echo "  3) Create outbound allow rule"
-                echo "  4) Show UFW rules"
-                echo "  5) Reset UFW"
-                echo "  6) Show Running Services"
-                echo "  7) Disable default deny (temporarily allow outbound)"
-                echo "  8) Enable default deny (restore outbound blocking)"
-                echo "  9) Exit UFW menu"
-                read -p "Enter your choice [1-9]: " ufw_choice
-                echo
-                case $ufw_choice in
-                    1) setup_ufw ;;
-                    2)
-                        log_info "Ports (one per line, blank to finish):"
-                        ports=$(get_input_list)
-                        for p in $ports; do
-                            sudo ufw allow in "$p"
-                            log_info "Inbound allow $p"
-                        done
-                        ;;
-                    3)
-                        log_info "Ports (one per line, blank to finish):"
-                        ports=$(get_input_list)
-                        for p in $ports; do
-                            sudo ufw allow out "$p"
-                            log_info "Outbound allow $p"
-                        done
-                        ;;
-                    4) sudo ufw status numbered ;;
-                    5)
-                        log_info "Resetting UFW..."
-                        sudo ufw --force reset
-                        ;;
-                    6) audit_running_services ;;
-                    7) sudo ufw default allow outgoing; backup_current_ufw_rules ;;
-                    8) sudo ufw default deny outgoing; sudo ufw allow out on lo; sudo ufw allow out to any port 53 proto tcp; sudo ufw allow out to any port 53 proto udp; backup_current_ufw_rules ;;
-                    9) break ;;
-                    *)
-                        log_error "Invalid option."
-                        ;;
-                esac
-                echo
-            done
-            ;;
-        2)
-            while true; do
-                echo "===== IPtables Menu ====="
-                echo "  1) Setup IPtables (guided base policy)"
-                echo "  2) Create outbound allow rule"
-                echo "  3) Create inbound allow rule"
-                echo "  4) Create outbound deny rule"
-                echo "  5) Create inbound deny rule"
-                echo "  6) Show IPtables rules"
-                echo "  7) Reset IPtables (flush & set ACCEPT)"
-                echo "  8) Show Running Services"
-                echo "  9) Disable default deny (temporarily allow outbound)"
-                echo " 10) Enable default deny (restore outbound blocking)"
-                echo " 11) Open OSSEC Ports (UDP 1514 & 1515)"
-                echo " 12) Allow only Established/Related Traffic"
-                echo " 13) Save & Persist iptables rules"
-                echo " 14) Exit IPtables menu"
-                read -p "Enter your choice [1-14]: " ipt_choice
-                echo
-                case $ipt_choice in
-                    1)  iptables_base_policy_interactive ;;
-                    2)  custom_iptables_manual_outbound_rules ;;
-                    3)  custom_iptables_manual_rules ;;
-                    4)
-                        read -p "Enter outbound port to deny: " port
-                        sudo iptables -A OUTPUT --protocol tcp --dport "$port" -j DROP
-                        log_info "Outbound deny $port"
-                        ;;
-                    5)
-                        read -p "Enter inbound port to deny: " port
-                        sudo iptables -A INPUT  --protocol tcp --dport "$port" -j DROP
-                        log_info "Inbound deny $port"
-                        ;;
-                    6)  sudo iptables -L -n -v ;;
-                    7)  reset_iptables ;;
-                    8)  audit_running_services ;;
-                    9)  iptables_disable_default_deny ;;
-                    10) iptables_enable_default_deny ;;
-                    11) open_ossec_ports ;;
-                    12) apply_established_only_rules ;;
-                    13) save_iptables_rules_persistent ;;   
-                    14) break ;;
-                    *)
-                        log_error "Invalid option."
-                        ;;
-                esac
-                echo
-            done
-            ;;
-        *)
-            log_error "Invalid firewall type selection."
-            ;;
-    esac
+
+    while true; do
+        echo "===== IPtables Menu ====="
+        echo "  1) Setup IPtables (guided base policy)"
+        echo "  2) Create outbound allow rule"
+        echo "  3) Create inbound allow rule"
+        echo "  4) Create outbound deny rule"
+        echo "  5) Create inbound deny rule"
+        echo "  6) Show IPtables rules"
+        echo "  7) Reset IPtables (flush & set ACCEPT)"
+        echo "  8) Show Running Services"
+        echo "  9) Disable default deny (temporarily allow outbound)"
+        echo " 10) Enable default deny (restore outbound blocking)"
+        echo " 11) Allow only Established/Related Traffic"
+        echo " 12) Save & Persist iptables rules"
+        echo " 13) Exit IPtables menu"
+        read -e -r -p "Enter your choice [1-13]: " ipt_choice
+        echo
+        case $ipt_choice in
+            1)  iptables_base_policy_interactive ;;
+            2)  custom_iptables_manual_outbound_rules ;;
+            3)  custom_iptables_manual_rules ;;
+            4)
+                read -e -r -p "Enter outbound port to deny: " port
+                sudo iptables -A OUTPUT --protocol tcp --dport "$port" -j DROP
+                log_info "Outbound deny $port"
+                ;;
+            5)
+                read -e -r -p "Enter inbound port to deny: " port
+                sudo iptables -A INPUT  --protocol tcp --dport "$port" -j DROP
+                log_info "Inbound deny $port"
+                ;;
+            6)  sudo iptables -L -n -v ;;
+            7)  reset_iptables ;;
+            8)  audit_running_services ;;
+            9)  iptables_disable_default_deny ;;
+            10) iptables_enable_default_deny ;;
+            11) apply_established_only_rules ;;
+            12) save_iptables_rules_persistent ;;
+            13) break ;;
+            *)
+                log_error "Invalid option."
+                ;;
+        esac
+        echo
+    done
 }
