@@ -30,6 +30,10 @@
     When provided, this salt will be used for all password generation operations.
     Alias: -s
 
+.PARAMETER SaltRandom
+    Generate a random salt phrase to make hardening faster.
+    Alias: -sr
+
 .PARAMETER QuickHarden
     Switch to run the Quick Harden sequence. This will disable unnecessary services, configure the firewall, and change passwords.
     Alias: -q
@@ -41,18 +45,10 @@
 .EXAMPLE
     .\Local-Hardening2.ps1
     Generates random salt phrase for password generation
-    
-.EXAMPLE
-    .\Local-Hardening2.ps1 -s "123-456-789"
-    Uses provided salt phrase for password generation
-    
+
 .EXAMPLE
     .\Local-Hardening2.ps1 -f 80,443,3389
     Configures firewall with specified ports
-    
-.EXAMPLE
-    .\Local-Hardening2.ps1 -s "123-456-789" -f 80,443
-    Uses provided salt phrase and configures firewall ports
 
 .EXAMPLE
     .\Local-Hardening2.ps1 -q -f 80, 443
@@ -74,11 +70,11 @@ param(
     [Parameter(HelpMessage="Ports to allow through firewall during Quick Harden. Accepts comma-separated port numbers (1-65535).")]
     [Alias("f")]
     [string[]]$FirewallPorts = $null,
-    
-    # Password Configuration
-    [Parameter(HelpMessage="Optional salt phrase for password generation (e.g., '123-456-789'). If not provided, a random salt will be generated.")]
-    [Alias("s")]
-    [string]$SaltPhrase = $null,
+
+    # Random Salt SaltRandom
+    [Parameter(HelpMessage="Chooses a random salt phrase and prints it to the screen.")]
+    [Alias("rs")]
+    [switch]$SaltRandom = $false,
 
     # Quick Harden Configuration
     [Parameter(HelpMessage="Switch to run the Quick Harden sequence. This will disable unnecessary services, configure the firewall, and change passwords.")]
@@ -87,8 +83,15 @@ param(
     
     # Quick Harden Without Password Change
     [Parameter(HelpMessage="Switch to run the Quick Harden sequence without password changes. This will disable unnecessary services, configure the firewall, but skip password changes.")]
-    [Alias("qp")]
-    [switch]$QuickHardenNoPassword = $false
+    [Alias("sp")]
+    [switch]$SkipPasswordChange = $false,
+
+    # Skip RDP harden
+    [Parameter(HelpMessage="Switch to run the Quick Harden sequence without password changes. This will disable unnecessary services, configure the firewall, but skip password changes.")]
+    [Alias("srdp")]
+    [switch]$SkipRDP = $false
+
+
     
     # Future Parameters
     # Add new parameters here with proper categorization and documentation
@@ -176,7 +179,7 @@ $functionNames = @(
     "Quick Harden", "Add Competition Users", "Remove RDP Users", "Add RDP Users", "Configure Firewall", 
     "Disable Unnecessary Services", "Enable Advanced Auditing", "Configure Splunk", 
     "EternalBlue Mitigated", "Upgrade SMB", "Patch Mimikatz", 
-    "Set Execution Policy"
+    "Set Execution Policy", "Remove Admins"
 )
 
 $script:log = @{}
@@ -946,8 +949,10 @@ function Generate-Password {
             }
         }
 
-        # Join words with '5-' to create final password
-        $GeneratedPassword = $GeneratedPasswordWords -join '5-'
+        # Join words with '-' to create final password
+        $GeneratedPassword = $GeneratedPasswordWords -join '-'
+        # Append 1 to password for complexity
+        $GeneratedPassword += "1"
         
         return $GeneratedPassword
         
@@ -964,7 +969,7 @@ function Change-Passwords {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory=$false)]
-        [string]$SaltPhrase = $null
+        [switch]$randomSalt = $false
     )
     
     try {
@@ -973,18 +978,24 @@ function Change-Passwords {
         [string[]]$WordlistData = Get-WordlistData
         Write-Log -Level "INFO" -Message "Retrieved wordlist with $($WordlistData.Count) words"
         
-        # Step b: Use provided salt or generate a random one
-        if ([string]::IsNullOrWhiteSpace($SaltPhrase)) {
-            Write-Host "[INFO] No salt phrase provided. Generating random salt phrase..." -ForegroundColor Cyan
+        # Case 1: Random Salt (-RandomSalt or -sr)
+        if ($randomSalt) {
+            Write-Host "[INFO] Random salt flag detected. Generating..." -ForegroundColor Cyan
             $SaltPhrase = Generate-SaltPhrase -WordlistData $WordlistData
             Write-Log -Level "INFO" -Message "Generated random salt phrase"
-        } else {
-            Write-Host "[INFO] Using provided salt phrase" -ForegroundColor Cyan
-            Write-Log -Level "INFO" -Message "Using provided salt phrase"
+        }
+        # Case 2: Default Prompt (No flags used)
+        else {
+            Write-Host "[INFO] No salt phrase provided. Please enter salt phrase (DON'T LOSE IT): " -ForegroundColor Yellow
+            $SaltPhrase = Get-ValidatedPassword -salt
+        
+            Write-Log -Level "INFO" -Message "User manually entered salt phrase"
         }
         
         # Step c: Get list of local user accounts
-        $UserList = Get-LocalUser | Select-Object -ExpandProperty Name
+        $ExcludedUsers = @("Administrator", "ccdcuser1", "ccdcuser2", "splunk")
+
+        $UserList = Get-LocalUser | Where-Object { [string]$_.Name -notin $ExcludedUsers } | Select-Object -ExpandProperty Name
         Write-Host "[INFO] Found $($UserList.Count) local user account(s) to process" -ForegroundColor Cyan
         Write-Log -Level "INFO" -Message "Starting password change process for $($UserList.Count) local (non-AD) users"
         
@@ -1066,7 +1077,7 @@ function Export-Users {
 <#
 .SYNOPSIS
     Adds competition-specific users with certain privileges.
-    Prompts user directly for 2 users (username and password for each).
+    Prompts user for new user creation (password for each).
 #>
 ## Helper Function for Competition User Creation
 # This function must be defined outside the Invoke-HardeningOperation script block
@@ -1074,99 +1085,131 @@ function Export-Users {
 ## 1. Helper Function Definition (MUST be outside the main script block)
 function New-CompetitionUser {
     param(
+        [Parameter(Mandatory=$true)]
         [string]$Username,
-        [System.Security.SecureString]$Password,
-        [int]$UserNumber,
-        [bool]$IsFirstUser = $false
+
+        [Parameter(Mandatory=$false)]
+        [bool]$IsAdminUser = $false
+    )  
+    $success = $false
+    do {
+        $userCreated = $false   
+        # Get-ValidatedPassword handles the complexity and confirms the password
+        $Password = Get-ValidatedPassword -Username $Username
+        # Check if user already exists
+        $existingUser = Get-LocalUser -Name $Username -ErrorAction SilentlyContinue
+        
+        if ($existingUser) {
+            Write-Host "User ${Username} already exists (skipping creation)" -ForegroundColor Yellow
+            Write-Log -Level "WARNING" -Message "User ${Username} already exists"
+            $userCreated = $true
+        } else {
+            try {
+                $splat = @{
+                    Name     = $Username
+                    Password = $Password
+                }
+                
+                New-LocalUser @splat -ErrorAction Stop
+                
+                # Small pause to allow the SAM database to update
+                Start-Sleep -Milliseconds 500
+                
+                if (Get-LocalUser -Name $Username -ErrorAction SilentlyContinue) {
+                    Write-Host "User ${Username} created successfully" -ForegroundColor Green
+                    Write-Log -Level "SUCCESS" -Message "Created user: ${Username}"
+                    $userCreated = $true
+                } else {
+                    Write-Host "Failed to verify user ${Username}. Retrying..." -ForegroundColor Red
+                    continue # Looping back with the same $Username
+                }
+            } catch {
+                $errorMessage = $_.Exception.Message
+                Write-Host "Error creating user: $errorMessage" -ForegroundColor Red
+                Write-Log -Level "ERROR" -Message "Failed to create user '${Username}': $errorMessage"
+                
+                Write-Host "Please try again for user: ${Username}" -ForegroundColor Cyan
+                continue # Looping back with the same $Username
+            }
+        }
+        
+        # Group Assignment Logic
+        if ($userCreated) {
+            try {
+                # Everyone gets Remote Desktop Users
+                Add-LocalGroupMember -Group "Remote Desktop Users" -Member $Username -ErrorAction SilentlyContinue
+                
+                if ($IsAdminUser) {
+                    Add-LocalGroupMember -Group "Administrators" -Member $Username -ErrorAction SilentlyContinue
+                }
+
+                $script:UserArray += $Username
+                $success = $true # Exit the loop
+            } catch {
+                Write-Log -Level "WARNING" -Message "Could not add ${Username} to groups: $($_.Exception.Message)"
+                $success = $true # The user exists, so we stop the loop despite group errors
+            }
+        }
+
+    } while (-not $success)
+
+    return $true
+}
+
+function Get-ValidatedPassword {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory=$false)]
+        [string]$Username,
+
+        [Parameter(Mandatory=$false)]
+        [switch]$salt
     )
-    
-    $userCreated = $false
-    
-    # Validate username is not empty
-    if ([string]::IsNullOrWhiteSpace($Username)) {
-        Write-Host "Failed to create user ${Username}: Username cannot be empty" -ForegroundColor Red
-        Write-Log -Level "ERROR" -Message "User ${Username} username is empty"
-        return $false
-    }
-            
-    # Check if user already exists
-    $existingUser = Get-LocalUser -Name $Username -ErrorAction SilentlyContinue
-    if ($existingUser) {
-        Write-Host "User ${Username} already exists (skipping creation)" -ForegroundColor Yellow
-        Write-Log -Level "WARNING" -Message "User ${Username} already exists"
-        $userCreated = $true
-    } else {
-        # Validate password is not empty
-        $passwordLength = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($Password)).Length
-        if ($passwordLength -eq 0) {
-            Write-Host "Failed to create user ${Username}: Password cannot be empty" -ForegroundColor Red
-            Write-Log -Level "ERROR" -Message "User ${Username} password is empty"
-            return $false
+
+    while ($true) {
+        if ($salt){
+            $securedValue = Read-Host -AsSecureString "Enter a salt phrase"
+            $confirmValue = Read-Host -AsSecureString "Confirm salt"
         }
+        else{
+            $securedValue = Read-Host -AsSecureString "Create a Password for ${Username}"
+            $confirmValue = Read-Host -AsSecureString "Confirm password"
+        }
+        # Convert to plain text temporarily for validation
+        $bstr1 = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($securedValue)
+        $bstr2 = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($confirmValue)
         
-        # Attempt to create user
         try {
-            $splat = @{
-                Name = $Username
-                Password = $Password
+            $pass1 = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr1)
+            $pass2 = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr2)
+
+            # Validation Logic
+            if ($pass1 -ne $pass2) {
+                Write-Host "Error: Passwords do not match. Please try again." -ForegroundColor Red
+                continue
             }
-            New-LocalUser @splat -ErrorAction Stop
-            
-            # Verify user was actually created
-            Start-Sleep -Milliseconds 500
-            $verifyUser = Get-LocalUser -Name $Username -ErrorAction SilentlyContinue
-            
-            if ($verifyUser) {
-                Write-Host "User ${Username} created successfully" -ForegroundColor Green
-                Write-Log -Level "SUCCESS" -Message "Created user: ${Username}"
-                $userCreated = $true
-            } else {
-                Write-Host "Failed to create user ${Username}: User creation appeared to succeed but user was not found in system" -ForegroundColor Red
-                Write-Log -Level "ERROR" -Message "User creation verification failed for: ${Username}"
-                return $false
+
+            if ($pass1.Length -lt 8) {
+                Write-Host "Error: Password must be at least 8 characters. Please try again." -ForegroundColor Red
+                continue
             }
-        } catch {
-            $errorMessage = $_.Exception.Message
-            
-            # ... (Error handling logic remains the same) ...
-            if ($errorMessage -match "already exists" -or $errorMessage -match "The account already exists") {
-                Write-Host "Failed to create user ${Username}: Username already exists" -ForegroundColor Red
-            } elseif ($errorMessage -match "password" -or $errorMessage -match "complexity" -or $errorMessage -match "requirements") {
-                Write-Host "Failed to create user ${Username}: Password does not meet complexity requirements" -ForegroundColor Red
-            } elseif ($errorMessage -match "permission" -or $errorMessage -match "access denied" -or $errorMessage -match "unauthorized") {
-                Write-Host "Failed to create user ${Username}: Insufficient permissions to create user" -ForegroundColor Red
-            } elseif ($errorMessage -match "invalid" -or $errorMessage -match "format") {
-                Write-Host "Failed to create user ${Username}: Invalid username format" -ForegroundColor Red
-            } else {
-                Write-Host "Failed to create user ${Username}: $errorMessage" -ForegroundColor Red
+
+            # If we reach here, validation passed
+            if ($salt){
+                Write-Host "Salt phrase confirmed." -ForegroundColor Green
+                return [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($securedValue))
+
             }
-            
-            Write-Log -Level "ERROR" -Message "Failed to create user '${Username}': $errorMessage"
-            return $false
+            else{
+                Write-Host "Password confirmed." -ForegroundColor Green
+                return $securedValue}
+            }
+        finally {
+            # Critical: Clear plain text from memory
+            [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr1)
+            [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr2)
         }
     }
-    
-    # Add user to appropriate groups
-    if ($userCreated) {
-        try {
-            if ($IsFirstUser) {
-                Add-LocalGroupMember -Group "Administrators" -Member $Username -ErrorAction SilentlyContinue
-                Add-LocalGroupMember -Group "Remote Desktop Users" -Member $Username -ErrorAction SilentlyContinue
-                Write-Log -Level "SUCCESS" -Message "Added ${Username} to Administrators and Remote Desktop Users groups"
-            } else {
-                Add-LocalGroupMember -Group "Remote Desktop Users" -Member $Username -ErrorAction SilentlyContinue
-                Write-Log -Level "SUCCESS" -Message "Added ${Username} to Remote Desktop Users group"
-            }
-        } catch {
-            Write-Log -Level "WARNING" -Message "Could not add ${Username} to groups: $($_.Exception.Message)"
-        }
-        
-        # Add to UserArray
-        $script:UserArray += $Username
-        return $true
-    }
-    
-    return $false
 }
 
 ## 2. Main Function Definition (Uses the Helper Function)
@@ -1180,25 +1223,18 @@ function Add-Competition-Users {
         [string[]]$script:UserArray = @()
         $successCount = 0
         $totalUsers = 2
-        
-        # NOTE: New-CompetitionUser is now callable here because it was defined previously.
-        
+                
         # Prompt for and create User 1
-        $user1Name = Read-Host "Enter username for user 1"
-        $user1Password = Read-Host -AsSecureString "Enter password for user 1"
-        
-        # Call the external function
-        if (New-CompetitionUser -Username $user1Name -Password $user1Password -UserNumber 1 -IsFirstUser $true) {
+        $user1Name = "ccdcuser1"        
+        if (New-CompetitionUser -Username $user1Name -IsAdminUser $true) {
             $successCount++
         }
         
         # Prompt for and create User 2
         Write-Host ""
-        $user2Name = Read-Host "Enter username for user 2"
-        $user2Password = Read-Host -AsSecureString "Enter password for user 2"
+        $user2Name = "ccdcuser2"
         
-        # Call the external function
-        if (New-CompetitionUser -Username $user2Name -Password $user2Password -UserNumber 2 -IsFirstUser $false) {
+        if (New-CompetitionUser -Username $user2Name -IsAdminUser $false) {
             $successCount++
         }
         
@@ -1228,6 +1264,68 @@ function Add-Competition-Users {
 
 <#
 .SYNOPSIS
+    Removes users from Administrators group except specified ones.
+#>
+
+function Remove-Admin-Users {
+    [CmdletBinding()]
+    param()
+    
+    Invoke-HardeningOperation -OperationName "Remove Admin Users" -ScriptBlock {
+        Write-Host "Cleaning local Administrators group..." -ForegroundColor Cyan
+        
+        # Define protected accounts that should NEVER be removed
+        $ExclusionList = @("Administrator", "ccdcuser1")
+        
+        try {
+            $GroupName = "Administrators"
+            # Get all members of the Administrators group
+            $adminMembers = Get-LocalGroupMember -Name $GroupName -ErrorAction SilentlyContinue
+            
+            if ($null -eq $adminMembers -or $adminMembers.Count -eq 0) {
+                Write-Host "  [INFO] ${GroupName} group is empty (Unexpected)" -ForegroundColor Yellow
+                Write-Log -Level "INFO" -Message "${GroupName} group is already empty"
+            } else {
+                $removedCount = 0
+                foreach ($member in $adminMembers) {
+                    try {
+                        # Extract username from "COMPUTER\Username" format
+                        $username = $member.Name.Split('\')[-1]
+
+                        # Check if the user is in the exclusion list (Case-Insensitive)
+                        if ($ExclusionList -contains $username) {
+                            Write-Host "  [SKIP] Skipping ${username} (Protected Admin)" -ForegroundColor Magenta
+                            Write-Log -Level "INFO" -Message "Skipped removal of ${username} from ${GroupName} group"
+                            continue 
+                        }
+
+                        # Remove the member
+                        Remove-LocalGroupMember -Group $GroupName -Member $member -Confirm:$false -ErrorAction Stop
+                        
+                        Write-Host "  [SUCCESS] Removed ${username} from ${GroupName}" -ForegroundColor Green
+                        Write-Log -Level "SUCCESS" -Message "Removed ${username} from ${GroupName}"
+                        $removedCount++
+                    } catch {
+                        $msg = $_.Exception.Message
+                        Write-Host "  [WARNING] Could not remove $($member.Name): $msg" -ForegroundColor Yellow
+                        Write-Log -Level "WARNING" -Message "Could not remove $($member.Name) from ${GroupName}: $msg"
+                    }
+                }
+                Write-Host "  [INFO] Removed $removedCount unauthorized admin(s)" -ForegroundColor Cyan
+            }
+            
+            Write-Host "Administrator group hardening complete" -ForegroundColor Green
+            Write-Log -Level "SUCCESS" -Message "Administrators group reset completed"
+        } catch {
+            Write-Host "  [ERROR] Failed to harden Administrators: $($_.Exception.Message)" -ForegroundColor Red
+            Write-Log -Level "ERROR" -Message "Failed to harden Administrators: $($_.Exception.Message)"
+            throw
+        }
+    }
+}
+
+<#
+.SYNOPSIS
     Removes users from Remote Desktop Users group except specified ones.
 #>
 function Remove-RDP-Users {
@@ -1236,7 +1334,7 @@ function Remove-RDP-Users {
     
     Invoke-HardeningOperation -OperationName "Remove RDP Users" -ScriptBlock {
         Write-Host "Removing all users from Remote Desktop Users group..." -ForegroundColor Cyan
-        
+        $ExclusionList = @("ccdcuser1", "ccdcuser2")
         try {
             # Get all members of the Remote Desktop Users group
             $rdpGroupMembers = Get-LocalGroupMember -Name "Remote Desktop Users" -ErrorAction SilentlyContinue
@@ -1250,6 +1348,15 @@ function Remove-RDP-Users {
                     try {
                         # Extract username from the member object (format: "DOMAIN\Username" or "COMPUTER\Username")
                         $username = $member.Name.Split('\')[-1]
+                        # Skip specified users
+                        # Check if the user is in the exclusion list
+                        if ($ExclusionList -contains $username) {
+                            Write-Host "  [SKIP] Skipping $username (Protected Account)" -ForegroundColor Magenta
+                            Write-Log -Level "INFO" -Message "Skipped removal of $username from RDP group"
+                            continue # Jump to the next user in the loop
+                        }
+
+
                         Remove-LocalGroupMember -Name "Remote Desktop Users" -Member $member -Confirm:$false -ErrorAction Stop
                         Write-Host "  [SUCCESS] Removed $username from Remote Desktop Users group" -ForegroundColor Green
                         Write-Log -Level "SUCCESS" -Message "Removed $username from Remote Desktop Users group"
@@ -1689,10 +1796,7 @@ function Disable-Unnecessary-Services {
 #>
 function Quick-Harden {
     [CmdletBinding()]
-    param(
-        [Parameter(Mandatory=$false)]
-        [switch]$SkipPasswordChange = $false
-    )
+    param()
     
     $operationName = if ($SkipPasswordChange) { "Quick Harden (No Password Change)" } else { "Quick Harden" }
     $totalSteps = if ($SkipPasswordChange) { 7 } else { 8 }
@@ -1718,9 +1822,12 @@ function Quick-Harden {
         Upgrade-SMB
         
         # Step 2: Change Passwords (skip if requested)
-        if (-not $SkipPasswordChange) {
+        if (-not $SkipPasswordChange -and $SaltRandom) {
+            Write-Host "`nStep 2/8: Changing Passwords using a random Salt..." -ForegroundColor Cyan
+            Change-Passwords -randomSalt   
+        } elseif (-not $SkipPasswordChange ) {
             Write-Host "`nStep 2/8: Changing Passwords..." -ForegroundColor Cyan
-            Change-Passwords -SaltPhrase $SaltPhrase
+            Change-Passwords
         } else {
             Write-Host "`n[SKIPPED] Step 2/8: Password change step skipped (using -qp parameter)" -ForegroundColor Yellow
             Write-Log -Level "INFO" -Message "Password change step skipped per -qp parameter"
@@ -1740,31 +1847,19 @@ function Quick-Harden {
         Add-Competition-Users
         
         # Step 6: Remove non-administrator users from Remote Desktop Users group
-        Write-Host "`nStep 6/8: Removing non-administrator users from Remote Desktop Users group..." -ForegroundColor Cyan
-        Remove-RDP-Users
+        if (-not $skipRDP) {
+            Write-Host "`nStep 6/8: Removing non-administrator users from Remote Desktop Users group..." -ForegroundColor Cyan
+            Remove-RDP-Users
+        } else {
+            Write-Host "`n[SKIPPED] Step 6/8: Removing non-administrator users from Remote Desktop Users group skipped (using -sr parameter)" -ForegroundColor Yellow
+            Write-Log -Level "INFO" -Message "Remove RDP users step skipped per -sr parameter"
+        }
         
         # Step 7: Configure Splunk (USER INPUT REQUIRED)
         Write-Host "`nStep 7/8: Configuring Splunk..." -ForegroundColor Cyan
         Write-Host "  [NOTE] User input will be required for Splunk configuration" -ForegroundColor Yellow
         $SplunkIP = Read-Host "`nInput IP address of Splunk Server"
-
-        # Extract numeric version from OSVersion string
-        $SplunkVersion = switch -Regex ($script:OSInfo.OSVersion) {
-            'Windows Server 2022' { '2022'; break }
-            'Windows Server 2019' { '2019'; break }
-            'Windows Server 2016' { '2016'; break }
-            'Windows Server 2012 R2' { '2012'; break }
-            'Windows Server 2012' { '2012'; break }
-            'Windows 11' { '11'; break }
-            'Windows 10' { '10'; break }
-            'Windows 8' { '8'; break }
-            'Windows 7' { '7'; break }
-            default { 
-                Write-Warning "Unknown OS version: $($script:OSInfo.OSVersion). Defaulting to prompt."
-                Read-Host "`nInput OS Version (7, 8, 10, 11, 2012, 2016, 2019, 2022): "
-            }
-        }
-        Download-Install-Setup-Splunk -Version $SplunkVersion -IP $SplunkIP
+        Download-Install-Setup-Splunk -IP $SplunkIP
         
         # Step 8: Set Execution Policy to Restricted
         Write-Host "`nStep 8/8: Setting Execution Policy to Restricted..." -ForegroundColor Cyan
@@ -2039,18 +2134,19 @@ function Show-Main-Menu {
     Write-Host "  0) Print Execution Summary"
     Write-Host "  A) Initialize Context (download files, set variables)"
     Write-Host "  1) Quick Harden (essential steps only)"
-    Write-Host "  2) Change Passwords" #2 Passwords Changes | 4 word passphrase from word list -> set all passwords to username + passphrase + print passphrase | make seperate script for this to rederive passwords. List of users + secret -> csv of user, password
-    Write-Host "  3) Add Competition Users" #8
+    Write-Host "  2) Change Passwords"
+    Write-Host "  3) Add Competition Users"
     Write-Host "  4) Remove RDP Users (reset RDP access - removes all users)"
     Write-Host "  5) Add RDP Users (interactively add users to RDP group)"
-    Write-Host "  6) Configure Firewall" #4
-    Write-Host "  7) Disable Unnecessary Services" #7
+    Write-Host "  6) Configure Firewall"
+    Write-Host "  7) Disable Unnecessary Services"
     Write-Host "  8) Enable Advanced Auditing + Firewall Logging"
-    Write-Host "  9) Configure Splunk" #9
+    Write-Host "  9) Configure Splunk"
     Write-Host " 10) Install EternalBlue Patch"
-    Write-Host " 11) Upgrade SMB (enable v2/3, disable v1)" #1
+    Write-Host " 11) Upgrade SMB (enable v2/3, disable v1)"
     Write-Host " 12) Patch Mimikatz (WDigest)"
-    Write-Host " 13) Set Execution Policy to Restricted" #10
+    Write-Host " 13) Set Execution Policy to Restricted"
+    Write-Host " 14) Remove Admin Users"
 }
 
 
@@ -2124,12 +2220,6 @@ if ($QuickHarden) {
     Quick-Harden
 }
 
-# Check if Quick Harden No Password parameter was provided
-if ($QuickHardenNoPassword) {
-    Quick-Harden -SkipPasswordChange
-}
-
-
 # Main execution loop
 while ($true) {
     Show-Main-Menu
@@ -2141,7 +2231,7 @@ while ($true) {
             '0' { Print-Log }
             'A' { Initialize-System }
             '1' { Write-Host "`n***Quick Hardening (Essential Steps Only)...***" -ForegroundColor Magenta; Quick-Harden }
-            '2' { Write-Host "`n***Changing Passwords...***" -ForegroundColor Magenta; Change-Passwords -SaltPhrase $SaltPhrase }
+            '2' { Write-Host "`n***Changing Passwords...***" -ForegroundColor Magenta;Change-Passwords }
             '3' { Write-Host "`n***Adding Competition Users...***" -ForegroundColor Magenta; Add-Competition-Users }
             '4' { Write-Host "`n***Removing all users from RDP group (resetting RDP access)...***" -ForegroundColor Magenta; Remove-RDP-Users }
             '5' { Write-Host "`n***Adding users to RDP group (interactive)...***" -ForegroundColor Magenta; Add-RDP-Users }
@@ -2191,6 +2281,7 @@ while ($true) {
                     Write-Log -Level "ERROR" -Message "Could not set execution policy: $($_.Exception.Message)"
                 }
             }
+            '14' { Write-Host "`n***Removing Admin Users...***" -ForegroundColor Magenta; Remove-Admin-Users }
             Default { Write-Host "Invalid selection." -ForegroundColor Yellow }
         }
     } catch {
