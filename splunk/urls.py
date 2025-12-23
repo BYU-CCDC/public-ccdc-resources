@@ -2,7 +2,7 @@ import requests
 from bs4 import BeautifulSoup
 import sys
 
-versions = ['9.2.10']
+versions = ['latest']
 oses = ['windows', 'linux', 'solaris', 'osx', 'freebsd', 'aix']
 
 class SplunkDownload:
@@ -70,13 +70,20 @@ def scrape(scrape_version, type):
             if len(divs) < 4:
                 print("ERROR: insufficient data in version block")
                 continue
-            version = divs[0].text.strip()
-            bits = divs[1].text.strip()
-            os = divs[2].text.strip()
-            downloads = divs[3]
-            # We only want the version we're scraping for
-            if version != scrape_version:
-                continue
+
+            if scrape_version == 'latest':
+                version = soup.find('span', class_='version').text.strip()
+                bits = divs[0].text.strip()
+                os = divs[1].text.strip()
+                downloads = divs[2]
+            else:
+                version = divs[0].text.strip()
+                bits = divs[1].text.strip()
+                os = divs[2].text.strip()
+                downloads = divs[3]
+                # We only want the version we're scraping for
+                if version != scrape_version:
+                    continue
             splunk_version = SplunkVersion(version, bits, os)
 
             # Extract download links
@@ -101,7 +108,7 @@ for version in versions:
     uf_markdown = "\n".join(str(result) for result in uf_results)
 
     markdown = f"""# Splunk Download URLs
-Version: [{version}](https://docs.splunk.com/Documentation/Splunk/{version}/Installation/Systemrequirements)
+Version: [{indexer_results[0].version}](https://docs.splunk.com/Documentation/Splunk/{version}/Installation/Systemrequirements)
 
 ## Indexer
 {indexer_markdown}

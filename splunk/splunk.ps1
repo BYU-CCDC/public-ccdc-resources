@@ -1,14 +1,31 @@
+# splunk.ps1 -windowsVersion <7|8|2012|2016|10|11|2019|2022|2025> -ip <indexer_ip> -type <dc|member>
+#
+# Copyright (C) 2025 deltabluejay
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 ################## SCRIPT ARGUMENTS #################
 param (
     [Parameter(Mandatory=$true)]
-    [string]$version,
+    [string]$windowsVersion,
 
     [Parameter(Mandatory=$true)]
     [string]$ip,
 
-    [Parameter(Mandatory=$true)]
-    [ValidateSet("dc", "member")]
-    [string]$type,
+    #[Parameter(Mandatory=$true)]
+    #[ValidateSet("dc", "member")]
+    #[string]$type,
 
     [Parameter(Mandatory=$false)]
     [string]$url = "",
@@ -49,14 +66,15 @@ if ($local -ne "") {
 }
 
 $SPLUNKDIR = ""
-$9_2_5_x64 = "https://download.splunk.com/products/universalforwarder/releases/9.2.5/windows/splunkforwarder-9.2.5-7bfc9a4ed6ba-x64-release.msi"
-$9_2_5_x86 = "https://download.splunk.com/products/universalforwarder/releases/9.2.5/windows/splunkforwarder-9.2.5-7bfc9a4ed6ba-x86-release.msi"
+$10_0_2_x64 = "https://download.splunk.com/products/universalforwarder/releases/10.0.2/windows/splunkforwarder-10.0.2-e2d18b4767e9-windows-x64.msi"
+$9_2_10_x64 = "https://download.splunk.com/products/universalforwarder/releases/9.2.10/windows/splunkforwarder-9.2.10-37c0a7e2ccbd-x64-release.msi"
+$9_2_10_x86 = "https://download.splunk.com/products/universalforwarder/releases/9.2.10/windows/splunkforwarder-9.2.10-37c0a7e2ccbd-x86-release.msi"
 $9_1_6_x64 = "https://download.splunk.com/products/universalforwarder/releases/9.1.6/windows/splunkforwarder-9.1.6-a28f08fac354-x64-release.msi"
 $9_1_6_x86 = "https://download.splunk.com/products/universalforwarder/releases/9.1.6/windows/splunkforwarder-9.1.6-a28f08fac354-x86-release.msi"
 $7_3_9_x64 = "https://download.splunk.com/products/universalforwarder/releases/7.3.9/windows/splunkforwarder-7.3.9-39a78bf1bc5b-x64-release.msi"
 $7_3_9_x86 = "https://download.splunk.com/products/universalforwarder/releases/7.3.9/windows/splunkforwarder-7.3.9-39a78bf1bc5b-x86-release.msi"
-$newest_x64 = $9_2_5_x64
-$newest_x86 = $9_2_5_x86
+$newest_x64 = $10_0_2_x64
+$newest_x86 = $9_2_10_x86
 
 $OSSECDIR="C:\Program Files (x86)\ossec-agent"
 $OSSEC_DOWNLOAD = "https://updates.atomicorp.com/channels/atomic/windows/ossec-agent-win32-3.8.0-35114.exe"
@@ -104,22 +122,22 @@ function download {
 
 function detect_version {
     if ($arch -eq 64) {
-        switch ($version) {
+        switch ($windowsVersion) {
             "7" { return $7_3_9_x64 } # technically this is not supported for 7
             "8" { return $7_3_9_x64 }
             "2012" { return $9_1_6_x64 }
-            "2016" { return $9_2_4_x64 }
-            {$_ -in "10", "11", "2019", "2022"} { return $newest_x64 }
+            "2016" { return $10_0_2_x64 }
+            {$_ -in "10", "11", "2019", "2022", "2025"} { return $newest_x64 }
             default { error "Invalid option"; exit 1 }
         }
     }
     elseif ($arch -eq 32) {
-        switch ($version) {
+        switch ($windowsVersion) {
             "7" { return = $7_3_9_x86 } # technically this is not supported for 7
             "8" { return = $7_3_9_x86 }
             "2012" { return = $9_1_6_x86 }
-            "2016" { return = $9_2_4_x86 }
-            {$_ -in "10", "11", "2019", "2022"} { return = $newest_x86 }
+            "2016" { return = $9_2_10_x86 }
+            {$_ -in "10", "11", "2019", "2022", "2025"} { return = $newest_x86 }
             default { error "Invalid option"; exit 1 }
         }
     } else {
@@ -162,7 +180,8 @@ function install_splunk {
 
     print "The installation will now continue in the background. This may take a few minutes."
     # TODO: create splunk service user
-    Start-Process msiexec.exe -ArgumentList "/i $installer_path SPLUNKUSERNAME=splunk SPLUNKPASSWORD=$password USE_LOCAL_SYSTEM=1 RECEIVING_INDEXER=`"$ip:9997`" AGREETOLICENSE=yes LAUNCHSPLUNK=1 SERVICESTARTTYPE=auto /L*v splunk_log.txt /quiet" -Wait -NoNewWindow
+    print "Installer path: $installer_path"
+    Start-Process msiexec.exe -ArgumentList "/i $installer_path SPLUNKUSERNAME=splunk SPLUNKPASSWORD=$password USE_LOCAL_SYSTEM=1 RECEIVING_INDEXER=`"$($ip):9997`" AGREETOLICENSE=yes LAUNCHSPLUNK=1 SERVICESTARTTYPE=auto /L*v splunk_log.txt /quiet" -Wait -NoNewWindow
 
     if (Test-Path "C:\Program Files\SplunkUniversalForwarder\bin\splunk.exe") {
         print "Splunk installed successfully"
@@ -214,7 +233,7 @@ function install_windows_ta {
     New-Item -Path "$SPLUNKDIR\etc\apps\Splunk_TA_windows\local\" -ItemType Directory -Force
     download "$GITHUB_URL/splunk/windows/windows-ta-inputs.conf" "$pwd\windows-ta-inputs.conf"
 
-    if ($type -eq "dc") {
+    if ($global:type -eq "dc") {
         "`n[admon://default]`ndisabled=0`nmonitorSubtree=1" | Out-File -Append -Encoding ascii "$pwd\windows-ta-inputs.conf"
     }
 
@@ -276,20 +295,18 @@ if ($ip -eq "indexer" -or $ip -eq "i") {
     error "Indexer installation not implemented yet"
 } else {
     $SPLUNKDIR = "C:\Program Files\SplunkUniversalForwarder"
-    # $ip = $ip + ":9997"
+}
 
-    # Check that the IP is valid
-    $regex = '\b(([01]?\d?\d|2[0-4]\d|25[0-5])\.){3}([01]?\d?\d|2[0-4]\d|25[0-5])\b'
-    if (-not ($ip -match $regex)) {
-        Write-Output "Invalid IP"
-        exit 1
-    }
+if (((Get-WmiObject Win32_ComputerSystem).DomainRole -eq 5) -or ((Get-WmiObject Win32_ComputerSystem).DomainRole -eq 4 )) {
+    $global:type = "dc"
+} else {
+    $global:type = "member"
 }
 
 install_splunk
 install_sysmon
 
-if ($version -eq "7" -or $version -eq "8") {
+if ($windowsVersion -eq "7" -or $windowsVersion -eq "8") {
     # Add-on isn't supported on these versions of Splunk
     install_custom_inputs
 
@@ -302,13 +319,13 @@ if ($version -eq "7" -or $version -eq "8") {
 }
 
 print "Adding web logs..."
-add_monitor "C:\inetpub\logs\LogFiles\" "web"
+add_monitor "C:\inetpub\logs\LogFiles\" "web" # this also includes FTP
 
-print "Installing OSSEC..."
-print "You do not need to provide a key or server IP (just close the window when it asks for it)"
-install_ossec
-Start-Service OssecSvc
-Get-Service OssecSvc
+# print "Installing OSSEC..."
+# print "You do not need to provide a key or server IP (just close the window when it asks for it)"
+# install_ossec
+# Start-Service OssecSvc
+# Get-Service OssecSvc
 
 print "End of script"
 #####################################################
