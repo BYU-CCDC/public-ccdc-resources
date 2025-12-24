@@ -1107,7 +1107,8 @@ function New-CompetitionUser {
             try {
                 $splat = @{
                     Name     = $Username
-                    Password = $Password
+                    AccountPassword = $Password
+                    Enabled = $true
                 }
                 
                 New-ADUser @splat -ErrorAction Stop
@@ -2138,7 +2139,7 @@ function Show-Main-Menu {
     Write-Host "  1) Quick Harden (essential steps only)"
     Write-Host "  2) Change Passwords"
     Write-Host "  3) Add Competition Users"
-    Write-Host "  4) Remove RDP Users (reset RDP access - removes all users)"
+    Write-Host "  4) Remove RDP Users (reset RDP access - removes all users except ours)"
     Write-Host "  5) Add RDP Users (interactively add users to RDP group)"
     Write-Host "  6) Configure Firewall"
     Write-Host "  7) Disable Unnecessary Services"
