@@ -121,14 +121,34 @@ function error {
 }
 
 function print_usage {
-    # TODO: add -h flag
-    error "Not yet implemented"
-    exit 1
+    Write-Host "Usage:" -ForegroundColor Green
+    Write-Host "  .\splunk.ps1 -ip <INDEXER IP> [flags]" -ForegroundColor Cyan
+    Write-Host "  .\splunk.ps1 -indexer [flags]" -ForegroundColor Cyan
+    Write-Host "  .\splunk.ps1 -ResetPassword" -ForegroundColor Cyan
+    Write-Host
+    Write-Host "Flags:" -ForegroundColor Green
+    Write-Host "  -h                 Show this help message" -ForegroundColor Yellow
+    Write-Host "  -WindowsVersion    Specify Windows version (auto-detected if not provided)" -ForegroundColor Yellow
+    Write-Host "  -arch              Specify architecture (32 or 64; default: 64)" -ForegroundColor Yellow
+    Write-Host "  -GithubUrl         Specify custom GitHub URL to download resources from" -ForegroundColor Yellow
+    Write-Host "  -local             Specify local path to repository for offline installation" -ForegroundColor Yellow
+    Write-Host "  -run               Run a specific function and exit" -ForegroundColor Yellow
+    Write-Host "  -ResetPassword     Reset the Splunk admin password" -ForegroundColor Yellow
+    Write-Host
+
+    exit 0
 }
 
 function reset_password {
-    error "Not yet implemented"
-    exit 1
+    info "Enter a new password for the $SPLUNK_USERNAME user."
+    $password = get_password
+    Set-Content -Path "$SPLUNKDIR\etc\system\local\user-seed.conf" -Value "[user_info]
+    USERNAME = $SPLUNK_USERNAME
+    PASSWORD = $password"
+    Remove-Item "$SPLUNKDIR\etc\passwd" -Force -ErrorAction SilentlyContinue
+    info "Restarting Splunk service to apply new password..."
+    Restart-Service -Name $SPLUNK_SERVICE
+    exit 0
 }
 
 function download {
@@ -307,18 +327,33 @@ function select_version {
     }
 }
 
+function get_password {
+    while ($true) {
+        $securedValue = Read-Host -AsSecureString "Password"
+        $bstr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($securedValue)
+        $password = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr)
+
+        $securedValue = Read-Host -AsSecureString "Confirm password"
+        $bstr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($securedValue)
+        $confirm_password = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr)
+
+        if ($password -ne $confirm_password) {
+            error "Passwords do not match"
+        }
+        elseif ($password.Length -lt 8) {
+            error "Password must be at least 8 characters"
+        } else {
+            return $password
+        }
+    }
+}
+
 function handle_args {
     debug "Handling script arguments..."
 
     # Help
     if ($h) {
         print_usage
-        exit 0
-    }
-    
-    # Reset splunk password
-    if ($ResetPassword) {
-        reset_password
         exit 0
     }
 
@@ -332,9 +367,27 @@ function handle_args {
             exit 1
         }
     }
+    
+    # Check if we are installing an indexer
+    if ($indexer) {
+        $script:SPLUNKDIR = "C:\Program Files\Splunk"  # TODO: check this path
+        $script:SPLUNK_SERVICE = "Splunkd"
+    } else {
+        if ($ip -eq "" -and -not $ResetPassword) {
+            error "Please provide the IP address of the Splunk indexer to forward to using the -ip parameter."
+            exit 1
+        }
+    }
+
+    # Reset splunk password
+    if ($ResetPassword) {
+        reset_password
+        exit 0
+    }
 
     if ($GithubUrl -ne "") {
         debug "Using custom GitHub URL: $GithubUrl"
+        # TODO: trim trailing slash
         $script:GITHUB_URL = $GithubUrl
     }
 
@@ -348,17 +401,6 @@ function handle_args {
     # Set global WindowsVersion variable if provided
     if ($PSBoundParameters.ContainsKey('WindowsVersion')) {
         $script:WindowsVersion = $WindowsVersion
-    }
-
-    # Check if we are installing an indexer
-    if ($indexer) {
-        $script:SPLUNKDIR = "C:\Program Files\Splunk"  # TODO: check this path
-        $script:SPLUNK_SERVICE = "Splunkd"
-    } else {
-        if ($ip -eq "") {
-            error "Please provide the IP address of the Splunk indexer to forward to using the -ip parameter."
-            exit 1
-        }
     }
 }
 
@@ -384,27 +426,9 @@ function install_splunk {
     $installer_path = "$pwd\splunk.msi"
     download $msi $installer_path
 
-    while ($true) {
-        info "Please enter a password for the $SPLUNK_USERNAME user."
-        warning "This needs to be at least 8 characters and match system password complexity requirements or else the install will fail!"
-        $securedValue = Read-Host -AsSecureString "Password"
-        $bstr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($securedValue)
-        $password = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr)
-
-        $securedValue = Read-Host -AsSecureString "Confirm password"
-        $bstr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($securedValue)
-        $confirm_password = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr)
-
-        if ($password -ne $confirm_password) {
-            error "Passwords do not match"
-        }
-        elseif ($password.Length -lt 8) {
-            error "Password must be at least 8 characters"
-        } else {
-            $script:SPLUNK_PASSWORD = $password
-            break
-        }
-    }
+    info "Please enter a password for the $SPLUNK_USERNAME user."
+    warning "This needs to be at least 8 characters and match system password complexity requirements or else the install will fail!"
+    $script:SPLUNK_PASSWORD = get_password
 
     info "The installation will now continue in the background. This may take a few minutes."
     # TODO: create splunk service user
@@ -500,9 +524,7 @@ handle_args
 install_splunk
 Write-Host
 
-# do {
 & "$SPLUNKDIR\bin\splunk.exe" login -auth "${SPLUNK_USERNAME}:${SPLUNK_PASSWORD}"
-# } while ($LASTEXITCODE -ne 0)
 
 install_sysmon
 Write-Host
