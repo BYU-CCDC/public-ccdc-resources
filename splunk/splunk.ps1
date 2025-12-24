@@ -55,7 +55,7 @@ param (
 
 ###################### GLOBALS ######################
 $SPLUNK_USERNAME = "splunk"
-$INDEXES = @("system", "web", "network", "windows", "misc", "snoopy", "ossec")
+$INDEXES = @("system", "web", "network", "windows", "misc", "snoopy", "ossec", "edr")
 $SPLUNKDIR = "C:\Program Files\SplunkUniversalForwarder"
 $SPLUNK_SERVICE = "SplunkForwarder"
 $GITHUB_URL = "https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main"

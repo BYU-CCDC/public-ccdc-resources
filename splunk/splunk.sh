@@ -18,7 +18,7 @@
 ###################### GLOBALS ######################
 LOG='/var/log/ccdc/splunk.log'
 GITHUB_URL="https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main"
-INDEXES=( 'system' 'web' 'network' 'windows' 'misc' 'snoopy' 'ossec' )
+INDEXES=( 'system' 'web' 'network' 'windows' 'misc' 'snoopy' 'ossec' 'edr' )
 PM=""
 IP=""
 INDEXER=false
