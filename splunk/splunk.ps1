@@ -501,7 +501,7 @@ install_splunk
 Write-Host
 
 # do {
-& "C:\Program Files\Splunk\bin\splunk.exe" login -auth "${SPLUNK_USERNAME}:${SPLUNK_PASSWORD}"
+& "$SPLUNKDIR\bin\splunk.exe" login -auth "${SPLUNK_USERNAME}:${SPLUNK_PASSWORD}"
 # } while ($LASTEXITCODE -ne 0)
 
 install_sysmon
