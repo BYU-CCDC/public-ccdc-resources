@@ -1736,8 +1736,8 @@ function Configure-Firewall {
 
             # We need to enable these rules to allow the domain to work, but we should restrict them to our local subnet
             # This may cause problems at nats
-            Get-NetFirewallRule | Where-Object { $_.Name -like "*RPC*" -or $_.DisplayName -like "*135*" } | Set-NetFirewallRule -RemoteAddress "LocalSubnet" -Enabled $true
-            Get-NetFirewallRule | Where-Object { $_.Name -like "*SMB*" -or $_.DisplayName -like "*139*" -or $_.DisplayName -like "*445*" } | Set-NetFirewallRule -RemoteAddress "LocalSubnet" -Enabled $true
+            Get-NetFirewallRule | Where-Object { $_.Name -like "*RPC*" -or $_.DisplayName -like "*135*" } | Set-NetFirewallRule -RemoteAddress "LocalSubnet" -Enabled "True"
+            Get-NetFirewallRule | Where-Object { $_.Name -like "*SMB*" -or $_.DisplayName -like "*139*" -or $_.DisplayName -like "*445*" } | Set-NetFirewallRule -RemoteAddress "LocalSubnet" -Enabled "True"
             
             Write-Host "Firewall configured successfully" -ForegroundColor Green
             Write-Log -Level "SUCCESS" -Message "Firewall configuration completed"
