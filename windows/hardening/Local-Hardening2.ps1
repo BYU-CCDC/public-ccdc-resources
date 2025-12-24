@@ -1903,14 +1903,10 @@ function Download-Install-Setup-Splunk {
             Write-Log -Level "SUCCESS" -Message "Downloaded Splunk installation script"
             
             $splunkServer = "$($IP):9997"
-            
             # Install splunk using downloaded script
-            if ((Get-ChildItem ./splunk.ps1).Length -lt 6000) {
-                & ./splunk.ps1 $Version $SplunkServer
-            } else {
-                & ./splunk.ps1 $Version $SplunkServer "member"
-            }
-            
+
+            & ./splunk.ps1 $Version $SplunkServer
+
             Write-Log -Level "SUCCESS" -Message "Splunk installation completed"
         } catch {
             Write-Log -Level "ERROR" -Message "Splunk installation failed: $($_.Exception.Message)"
