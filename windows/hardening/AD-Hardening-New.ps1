@@ -1723,7 +1723,8 @@ function Configure-Firewall {
                     }
                     
                     # Inbound Allow rules (with higher priority/lower number than Deny All so they're evaluated first)
-                    New-NetFirewallRule -DisplayName "Allow $port" -Direction Inbound -LocalPort $port -Action Allow -Enabled True
+                    New-NetFirewallRule -DisplayName "Allow TCP $port" -Direction Inbound -LocalPort $port -Action Allow -Protocol TCP -Enabled True
+                    New-NetFirewallRule -DisplayName "Allow UDP $port" -Direction Inbound -LocalPort $port -Action Allow -Protocol UDP -Enabled True
                     Write-Log -Level "SUCCESS" -Message "Added inbound rules for port $port ($description)"
                 }
                 Write-Host "  [SUCCESS] Allow rules created for ports: $($portsToAllow -join ', ')" -ForegroundColor Green
@@ -1735,8 +1736,8 @@ function Configure-Firewall {
 
             # We need to enable these rules to allow the domain to work, but we should restrict them to our local subnet
             # This may cause problems at nats
-            Get-NetFirewallRule | Where-Object Name -like "*RPC*" -or DisplayName -like "*135*" | Set-NetFirewallRule -RemoteAddress "LocalSubnet" -Enabled $true
-            Get-NetFirewallRule | Where-Object Name -like "*SMB*" -or DisplayName -like "*139*" -or DisplayName "*445*" | Set-NetFirewallRule -RemoteAddress "LocalSubnet" -Enabled $true
+            Get-NetFirewallRule | Where-Object { $_.Name -like "*RPC*" -or $_.DisplayName -like "*135*" } | Set-NetFirewallRule -RemoteAddress "LocalSubnet" -Enabled $true
+            Get-NetFirewallRule | Where-Object { $_.Name -like "*SMB*" -or $_.DisplayName -like "*139*" -or $_.DisplayName -like "*445*" } | Set-NetFirewallRule -RemoteAddress "LocalSubnet" -Enabled $true
             
             Write-Host "Firewall configured successfully" -ForegroundColor Green
             Write-Log -Level "SUCCESS" -Message "Firewall configuration completed"
