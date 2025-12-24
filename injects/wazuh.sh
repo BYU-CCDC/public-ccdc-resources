@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # 1. CLEANUP: Remove any broken previous attempts
 sudo rm -f /usr/share/keyrings/wazuh.gpg
 sudo rm -f /etc/apt/sources.list.d/wazuh.list
