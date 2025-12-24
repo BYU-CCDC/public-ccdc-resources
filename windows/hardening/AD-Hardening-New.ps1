@@ -995,7 +995,7 @@ function Change-Passwords {
         # Step c: Get list of local user accounts
         $ExcludedUsers = @("Administrator", "ccdcuser1", "ccdcuser2", "splunk")
 
-        $UserList = Get-ADUser | Where-Object ObjectClass -eq "user" | Where-Object { [string]$_.SamAccountName -notin $ExcludedUsers } | Select-Object -ExpandProperty Name
+        $UserList = Get-ADUser -Filter * | Where-Object ObjectClass -eq "user" | Where-Object { [string]$_.SamAccountName -notin $ExcludedUsers } | Select-Object -ExpandProperty Name
         Write-Host "[INFO] Found $($UserList.Count) domain user account(s) to process" -ForegroundColor Cyan
         Write-Log -Level "INFO" -Message "Starting password change process for $($UserList.Count) AD users"
         
@@ -1503,7 +1503,7 @@ function Print-Users {
         
         Write-Host "`n==== Enabled Users ====" -ForegroundColor Green
         $enabledUsersOutput = "==== Enabled Users ===="
-        $enabledUsers = Get-ADUser | Where-Object { $_.Enabled -eq $true -and $_.ObjectClass -eq "User" } | ForEach-Object {
+        $enabledUsers = Get-ADUser -Filter * | Where-Object { $_.Enabled -eq $true -and $_.ObjectClass -eq "User" } | ForEach-Object {
             Write-Host "User: $($_.Name)"
             $enabledUsersOutput += "`nUser: $($_.Name)"
             $user = $_
