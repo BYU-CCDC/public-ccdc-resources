@@ -23,7 +23,7 @@ param (
     [string]$WindowsVersion,
 
     # IP address of Splunk indexer to forward to
-    [Parameter(Mandatory=$true)]
+    [Parameter(Mandatory=$false)]
     [string]$ip,
 
     # GitHub URL to download resources from
@@ -41,7 +41,15 @@ param (
     # Architecture: 64 or 32 bit
     [Parameter(Mandatory=$false)]
     [ValidateSet(32, 64)]
-    [int]$arch = 64
+    [int]$arch = 64,
+
+    # Help
+    [Parameter(Mandatory=$false)]
+    [switch]$h,
+
+    # Reset Splunk admin password (not implemented yet)
+    [Parameter(Mandatory=$false)]
+    [switch]$ResetPassword
 )
 #####################################################
 
@@ -89,10 +97,10 @@ function info {
     param (
         [string]$msg
     )
-    # $old = [Console]::ForegroundColor
-    # [Console]::ForegroundColor = 'Cyan'
+    $old = [Console]::ForegroundColor
+    [Console]::ForegroundColor = 'green'
     Write-Information $msg
-    # [Console]::ForegroundColor = $old
+    [Console]::ForegroundColor = $old
 }
 
 function warning {
@@ -112,12 +120,23 @@ function error {
     [Console]::ForegroundColor = $old
 }
 
+function print_usage {
+    # TODO: add -h flag
+    error "Not yet implemented"
+    exit 1
+}
+
+function reset_password {
+    error "Not yet implemented"
+    exit 1
+}
+
 function download {
     param (
         [string]$url,
         [string]$path
     )
-    info "Downloading $url to $path"
+    verbose "Downloading $url to $path"
     
     # Remove the file if it exists
     if (Test-Path $path) {
@@ -141,7 +160,7 @@ function detect_version {
     # Detect the Windows version if not provided
     if ($script:WindowsVersion -eq "") {
         try {
-            info "Detecting operating system..."
+            verbose "Detecting operating system..."
             
             # Use CIM for better compatibility, fallback to WMI if needed
             try {
@@ -172,9 +191,9 @@ function detect_version {
                     select_version
                 }
             }
-            info "Detected operating system: $script:WindowsVersion"
+            info "Detected Windows version: $script:WindowsVersion"
         } catch {
-            error "Failed to detect operating system: $($_.Exception.Message)"
+            error "Failed to detect Windows version: $($_.Exception.Message)"
             exit 1
         }
     } else {
@@ -291,6 +310,18 @@ function select_version {
 function handle_args {
     debug "Handling script arguments..."
 
+    # Help
+    if ($h) {
+        print_usage
+        exit 0
+    }
+    
+    # Reset splunk password
+    if ($ResetPassword) {
+        reset_password
+        exit 0
+    }
+
     # Run a specific function and exit
     if ($run -ne "") {
         if (Get-Command $run -CommandType Function -ErrorAction SilentlyContinue) {
@@ -322,16 +353,21 @@ function handle_args {
     # Check if we are installing an indexer
     if ($indexer) {
         $script:SPLUNKDIR = "C:\Program Files\Splunk"  # TODO: check this path
-        $script:SPLUNK_SERVICE = "Splunk"
+        $script:SPLUNK_SERVICE = "Splunkd"
+    } else {
+        if ($ip -eq "") {
+            error "Please provide the IP address of the Splunk indexer to forward to using the -ip parameter."
+            exit 1
+        }
     }
 }
 
-function print_usage {
-    # TODO: add -h flag
-}
-
 function install_splunk {
-    info "Installing Splunk..."
+    if ($indexer) {
+        info "Installing Splunk Indexer..."
+    } else {
+        info "Installing Splunk Universal Forwarder..."
+    }
     $msi = detect_version
 
     if (Test-Path "$SPLUNKDIR\bin\splunk.exe") {
@@ -365,6 +401,7 @@ function install_splunk {
         elseif ($password.Length -lt 8) {
             error "Password must be at least 8 characters"
         } else {
+            $script:SPLUNK_PASSWORD = $password
             break
         }
     }
@@ -373,10 +410,9 @@ function install_splunk {
     # TODO: create splunk service user
     debug "Installer path: $installer_path"
     if ($indexer) {
-        # TODO: check args
-        exit 1
+        Start-Process msiexec.exe -ArgumentList "/i $installer_path SPLUNKUSERNAME=$SPLUNK_USERNAME SPLUNKPASSWORD=$script:SPLUNK_PASSWORD USE_LOCAL_SYSTEM=1 AGREETOLICENSE=yes LAUNCHSPLUNK=1 SERVICESTARTTYPE=auto /L*v splunk_log.txt /quiet" -Wait -NoNewWindow
     } else {
-        Start-Process msiexec.exe -ArgumentList "/i $installer_path SPLUNKUSERNAME=$SPLUNK_USERNAME SPLUNKPASSWORD=$password USE_LOCAL_SYSTEM=1 RECEIVING_INDEXER=`"$($ip):9997`" AGREETOLICENSE=yes LAUNCHSPLUNK=1 SERVICESTARTTYPE=auto /L*v splunk_log.txt /quiet" -Wait -NoNewWindow
+        Start-Process msiexec.exe -ArgumentList "/i $installer_path SPLUNKUSERNAME=$SPLUNK_USERNAME SPLUNKPASSWORD=$script:SPLUNK_PASSWORD USE_LOCAL_SYSTEM=1 RECEIVING_INDEXER=`"$($ip):9997`" AGREETOLICENSE=yes LAUNCHSPLUNK=1 SERVICESTARTTYPE=auto /L*v splunk_log.txt /quiet" -Wait -NoNewWindow
     }
 
     debug "Testing path at $SPLUNKDIR\bin\splunk.exe"
@@ -386,8 +422,6 @@ function install_splunk {
         error "Splunk installation failed"
         exit 1
     }
-
-    # TODO: enable service autostart
 }
 
 function install_sysmon {
@@ -406,6 +440,15 @@ function install_sysmon {
     Start-Process -FilePath "$sysmon_extract_path\Sysmon.exe" -ArgumentList "-accepteula -i $sysmon_config_path" -Wait -NoNewWindow
 }
 
+function enable_auditing {
+    info "Downloading and running advanced auditing script..."
+    download "$GITHUB_URL/windows/hardening/advancedAuditing.ps1" "$pwd\advancedAuditing.ps1"
+    & "$pwd\advancedAuditing.ps1"
+
+    add_monitor "C:\Windows\System32\LogFiles\Firewall\pfirewall.log" "windows" # firewall logs
+    add_monitor "C:\inetpub\logs\LogFiles\" "windows" # web and FTP logs
+}
+
 function install_manual_inputs {
     info "Installing manual inputs.conf..."
     info "This adds Windows Event Log monitors: System, Security, Application, PowerShell, Sysmon"
@@ -420,6 +463,10 @@ function add_monitor {
         [string]$index,
         [string]$sourcetype = "auto"
     )
+    if (-not (Test-Path $source)) {
+        warning "Source path $source does not exist; skipping monitor addition"
+        return
+    }
     & "$SPLUNKDIR\bin\splunk.exe" add monitor $source -index $index -sourcetype $sourcetype
 }
 
@@ -432,12 +479,14 @@ function install_app {
     info "Installing $name..."
     download $url "$pwd\$filename"
     & "$SPLUNKDIR\bin\splunk.exe" install app "$pwd\$filename" -update 1
+
+    $app_folder = [System.IO.Path]::GetFileNameWithoutExtension($filename)
+    $app_path = Join-Path $SPLUNKDIR "etc\apps\$app_folder"
+    icacls $app_path /grant "SYSTEM:F" /T /C > $null 2>&1
 }
 #####################################################
 
 ######################## MAIN #######################
-info "Start of script"
-
 # Check for administrator privileges
 if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
     error "Please run this script in an Administrator prompt."
@@ -449,21 +498,28 @@ if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdenti
 
 handle_args
 install_splunk
+Write-Host
+
+# do {
+& "C:\Program Files\Splunk\bin\splunk.exe" login -auth "${SPLUNK_USERNAME}:${SPLUNK_PASSWORD}"
+# } while ($LASTEXITCODE -ne 0)
+
 install_sysmon
+Write-Host
 
 if ($script:WindowsVersion -eq "Windows 7" -or $script:WindowsVersion -eq "Windows 8") {
     # Add-ons aren't supported on old versions of Splunk
     install_manual_inputs
-
-    # TODO: do I actually want this?
-    info "Adding firewall logs..."
-    netsh advfirewall set allprofiles logging allowedconnections enable
-    netsh advfirewall set allprofiles logging droppedconnections enable
-    add_monitor "C:\Windows\System32\LogFiles\Firewall\pfirewall.log" "windows"
 } else {
     if ($indexer) {
         # Add listening port
+        info "Enabling Splunk to listen on port 9997 for forwarder data..."
         & "$SPLUNKDIR\bin\splunk.exe" enable listen 9997
+
+        # Open firewall ports
+        info "Adding Splunk firewall rules..."
+        netsh advfirewall firewall add rule name="Splunk TCP Receive" dir=in action=allow protocol=TCP localport=9997
+        netsh advfirewall firewall add rule name="Splunk HTTP Web" dir=in action=allow protocol=TCP localport=8000
 
         # Add indexes
         foreach ($index in $INDEXES) {
@@ -472,25 +528,29 @@ if ($script:WindowsVersion -eq "Windows 7" -or $script:WindowsVersion -eq "Windo
         }
 
         # Give splunk user can_delete role
-        & "$SPLUNKDIR\bin\splunk.exe" edit user $SPLUNK_USERNAME -roles admin,can_delete
+        info "Granting splunk user 'can_delete' role..."
+        & "$SPLUNKDIR\bin\splunk.exe" edit user $SPLUNK_USERNAME -role admin -role can_delete
         
         # Enable HTTPS
+        info "Enabling HTTPS for Splunk Web interface..."
         # New-Item -ItemType Directory -Path "$SPLUNKDIR\etc\auth\splunkweb" -Force
         # icacls "$SPLUNKDIR\etc\auth\splunkweb" /setowner $SPLUNK_USERNAME /T /C
         & "$SPLUNKDIR\bin\splunk.exe" createssl web-cert
         & "$SPLUNKDIR\bin\splunk.exe" enable web-ssl
 
         # Install indexer-specific apps
-        install_app "CCDC App" "ccdc_app.spl" "$GITHUB_URL/splunk/ccdc_app.spl"
+        install_app "CCDC App" "ccdc_app.spl" "$GITHUB_URL/splunk/ccdc-app.spl"
         install_app "Audit Parser" "TA-LinuxAuditDecoder.spl" "$GITHUB_URL/splunk/TA-LinuxAuditDecoder.spl"
 
         download "https://github.com/PaloAltoNetworks/Splunk-Apps/archive/refs/tags/v8.1.3.zip" "$pwd\palo.zip"
         Expand-Archive -Path "$pwd\palo.zip" -DestinationPath "$pwd\palo-apps" -Force
 
-        Move-Item -Path "$pwd\palo-apps\Splunk-Apps-8.1.3\Splunk_TA_paloalto\" -Destination "$SPLUNKDIR\etc\apps\" -Force
-        Move-Item -Path "$pwd\palo-apps\Splunk-Apps-8.1.3\SplunkforPaloAltoNetworks" -Destination "$SPLUNKDIR\etc\apps\" -Force
+        # Palo Alto Apps
+        Move-Item -Path "$pwd\palo-apps\Splunk-Apps-8.1.3\Splunk_TA_paloalto\" -Destination "$SPLUNKDIR\etc\apps\Splunk_TA_paloalto\" -Force
+        icacls "$SPLUNKDIR\etc\apps\Splunk_TA_paloalto" /grant "SYSTEM:F" /T /C > $null 2>&1
 
-        # chown?
+        Move-Item -Path "$pwd\palo-apps\Splunk-Apps-8.1.3\SplunkforPaloAltoNetworks" -Destination "$SPLUNKDIR\etc\apps\SplunkforPaloAltoNetworks" -Force
+        icacls "$SPLUNKDIR\etc\apps\SplunkforPaloAltoNetworks" /grant "SYSTEM:F" /T /C > $null 2>&1
     }
 
     # Install Splunk Add-ons
@@ -498,15 +558,12 @@ if ($script:WindowsVersion -eq "Windows 7" -or $script:WindowsVersion -eq "Windo
     install_app "Splunk Add-on for Sysmon" "Splunk_TA_microsoft_sysmon.spl" "$GITHUB_URL/splunk/windows/Splunk_TA_microsoft_sysmon.spl"
 }
 
-info "Adding FTP and web logs..."
-add_monitor "C:\inetpub\logs\LogFiles\" "web" # this also includes FTP
+enable_auditing
+Write-Host
 
-# TODO: idk if this is right
 # Set Splunk service to start automatically
 Set-Service -Name $SPLUNK_SERVICE -StartupType Automatic
 
 info "Restarting Splunk service..."
 Restart-Service $SPLUNK_SERVICE
-
-info "End of script"
 #####################################################
