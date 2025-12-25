@@ -18,7 +18,7 @@
 ###################### GLOBALS ######################
 LOG='/var/log/ccdc/splunk.log'
 GITHUB_URL="https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main"
-INDEXES=( 'system' 'web' 'network' 'windows' 'misc' 'snoopy' 'ossec' )
+INDEXES=( 'system' 'web' 'network' 'windows' 'misc' 'snoopy' 'ossec' 'edr' )
 PM=""
 IP=""
 INDEXER=false
@@ -87,7 +87,7 @@ UNDERLINE=4
 BLACK=30
 BLACK_BG=40
 RED=31
-REG_BG=41
+RED_BG=41
 GREEN=32
 GREEN_BG=42
 YELLOW=33
@@ -229,17 +229,16 @@ function log_debug {
 
 function setup_logging {
     log_path=$(dirname "$LOG")
-    log_file=$(basename "$LOG")
 
     sudo mkdir -p "$log_path"
     sudo chown root:root "$log_path"
     sudo chmod 750 "$log_path"
 
-    sudo touch "$log_file"
-    sudo chown root:root "$log_file"
-    sudo chmod 640 "$log_file"
+    sudo touch "$LOG"
+    sudo chown root:root "$LOG"
+    sudo chmod 640 "$LOG"
 
-    exec 1> >(sudo tee -a "$log_file")
+    exec 1> >(sudo tee -a "$LOG")
     exec 2>&1
     log_info "Verbose logging initialized at $LOG"
 }
@@ -271,27 +270,13 @@ function print_banner {
     echo -e "\n"
 }
 
-# function info {
-#     print_ansi "[+] " $GREEN $BOLD
-#     print_ansi "$1\n" $DEFAULT
-# }
-
-# function error {
-#     print_ansi "[X] ERROR: " $RED $BOLD
-#     print_ansi "$1\n" $DEFAULT
-# }
-
-# function warn {
-#     print_ansi "[!] WARNING: " $YELLOW $BOLD
-#     print_ansi "$1\n" $DEFAULT
-# }
-
-# function debug {
-#     if [ "$VERBOSE" == true ]; then
-#         print_ansi "[*] " $BLUE $BOLD
-#         print_ansi "$1\n" $DEFAULT
-#     fi
-# }
+function print_true_false {
+    if [ "$1" == true ]; then
+        print_ansi "true" $GREEN_BG $BOLD
+    else
+        print_ansi "false" $RED_BG $BOLD
+    fi
+}
 
 function get_silent_input_string {
     read -r -s -p "$1" input
@@ -412,8 +397,10 @@ function autodetect_os {
 
     if [ $apt == 0 ]; then
         log_info "apt/apt-get detected (Debian-based OS)"
+        if ps -C unattended-upgrades > /dev/null 2>&1; then
+            log_warning "Unattended upgrades service is running. This may interfere with the installation. Consider disabling it temporarily with \`systemctl stop unattended-upgrades\`."
+        fi
         log_debug "Updating package list"
-        # TODO: pkill unattended-upgrades?
         sudo apt-get update -q
         PM="apt-get"
     elif [ $dnf == 0 ]; then
@@ -731,7 +718,7 @@ function create_splunk_user {
 
     # Create splunk user/group
     if id $SPLUNK_USERNAME &>/dev/null; then
-        option=$(get_input_string "Splunk user already exists. Would you like to reset the password for the $SPLUNK_USERNAME user? You'll need to do this if you're reinstalling Splunk or setting it up for the first time. (Y/n): " | tr -d ' ')
+        option=$(get_input_string "$SPLUNK_USERNAME user already exists. Would you like to reset the password for the $SPLUNK_USERNAME user? You'll need to do this if you're reinstalling Splunk or setting it up for the first time. (Y/n): " | tr -d ' ')
         if [ "$option" == "n" ]; then
             set_pass=false
         fi
@@ -783,6 +770,7 @@ function create_splunk_user {
         # Add splunk user as forwarder/indexer admin
         log_info "Adding $SPLUNK_USERNAME user to user-seed.conf"
         sudo sh -c "printf '[user_info]\nUSERNAME = $SPLUNK_USERNAME\nPASSWORD = $password' > $SPLUNK_HOME/etc/system/local/user-seed.conf"
+        sudo rm "$SPLUNK_HOME/etc/passwd" &>/dev/null
         # log_info "Please remember these credentials for when Splunk asks for them later during the configuration process"
     fi
     # Set ACL to allow splunk to read any log files (execute needed for directories)
@@ -799,45 +787,6 @@ function install_app {
     sudo chown $SPLUNK_USERNAME:$SPLUNK_USERNAME "/tmp/app.spl"
     sudo -H -u $SPLUNK_USERNAME $SPLUNK_HOME/bin/splunk install app "/tmp/app.spl" -update 1
     sudo rm /tmp/app.spl
-}
-
-function install_ccdc_add_on {
-    log_info "Installing CCDC Splunk add-on"
-    install_app "$GITHUB_URL/splunk/ccdc-add-on.spl"
-}
-
-function install_sysmon_add_on {
-    log_info "Installing Sysmon Splunk add-on"
-    install_app "$GITHUB_URL/splunk/linux/splunk-add-on-for-sysmon-for-linux_100.tgz"
-
-    # Sysmon monitor is included with add-on, but we need to change the index
-    log_debug "Setting monitor index to sysmon"
-    local dir="$SPLUNK_HOME/etc/apps/Splunk_TA_sysmon-for-linux/local/"
-    sudo mkdir $dir
-    sudo chown -R $SPLUNK_USERNAME:$SPLUNK_USERNAME $dir
-    download "$GITHUB_URL/splunk/linux/sysmon-inputs.conf" inputs.conf
-    sudo chown $SPLUNK_USERNAME:$SPLUNK_USERNAME inputs.conf
-    sudo mv inputs.conf "$dir"
-}
-
-function install_ccdc_app {
-    log_info "Installing CCDC Splunk app"
-    install_app "$GITHUB_URL/splunk/ccdc-app.spl"
-}
-
-function install_windows_soc_app {
-    log_info "Installing Windows SOC Splunk app"
-    install_app "$GITHUB_URL/splunk/windows-security-operations-center_20.tgz"
-}
-
-function install_sysmon_security_monitoring_app {
-    log_info "Installing Sysmon Security Monitoring Splunk app"
-    install_app "$GITHUB_URL/splunk/sysmon-security-monitoring-app-for-splunk_4013.tgz"
-}
-
-function install_audit_parse_app {
-    log_info "Installing Audit Hex Value Decoder app"
-    install_app "$GITHUB_URL/splunk/linux-audit-log-hex-value-decoder_100.tgz"
 }
 
 function install_palo_alto_apps {
@@ -878,10 +827,19 @@ function setup_indexer {
 
     log_info "Installing indexer apps"
     sudo rm /tmp/app.spl &>/dev/null
-    install_ccdc_app
-    # install_windows_soc_app
-    # install_sysmon_security_monitoring_app
-    install_audit_parse_app
+
+    log_info "Installing CCDC Splunk app"
+    install_app "$GITHUB_URL/splunk/ccdc-app.spl"
+
+    # log_info "Installing Windows SOC Splunk app"
+    # install_app "$GITHUB_URL/splunk/windows-security-operations-center_20.tgz"
+
+    # log_info "Installing Sysmon Security Monitoring Splunk app"
+    # install_app "$GITHUB_URL/splunk/sysmon-security-monitoring-app-for-splunk_4013.tgz"
+
+    log_info "Installing Audit Hex Value Decoder app"
+    install_app "$GITHUB_URL/splunk/TA-LinuxAuditDecoder.spl"
+
     install_palo_alto_apps
 }
 
@@ -926,9 +884,6 @@ function setup_splunk {
 
     if [ "$INDEXER" == true ]; then
         setup_indexer
-        # TODO: add firewall rules
-        # sudo iptables -I INPUT 1 -p tcp -m multiport --dport 8000,9443 -j ACCEPT
-        # sudo iptables -I INPUT 1 -p tcp --dport 9997 -j ACCEPT
     else
         setup_forward_server "$IP"
     fi
@@ -949,6 +904,11 @@ function add_monitor {
             sudo -H -u $SPLUNK_USERNAME $SPLUNK_HOME/bin/splunk add monitor "$source" -index "$index" -sourcetype "$sourcetype" &> /dev/null
         else
             sudo -H -u $SPLUNK_USERNAME $SPLUNK_HOME/bin/splunk add monitor "$source" -index "$index" &> /dev/null
+        fi
+        if [ $? -eq 24 ]; then
+            log_error "Failed to login; please try again"
+            add_monitor "$source" "$index" "$sourcetype"
+            return
         fi
         if [ $? -ne 0 ]; then
             log_error "Failed to add monitor for $source"
@@ -1257,7 +1217,10 @@ function setup_monitors {
     # add_ssh_key_logs
     add_web_logs
     add_mysql_logs
-    install_ccdc_add_on
+
+    log_info "Installing CCDC Splunk add-on"
+    install_app "$GITHUB_URL/splunk/ccdc-add-on.spl"
+
     add_scripts
 
     if [ "$INDEXER" == true ]; then
@@ -1307,7 +1270,7 @@ function install_auditd {
     CUSTOM_RULE_FILE='/etc/audit/rules.d/ccdc.rules'
 
     # Download custom rule file
-    download $GITHUB_URL/splunk/linux/ccdc.rules ./ccdc.rules
+    download $GITHUB_URL/log/auditd/ccdc.rules ./ccdc.rules
     sudo mv ./ccdc.rules $CUSTOM_RULE_FILE
     sudo chown root:root $CUSTOM_RULE_FILE
     sudo chmod 600 $CUSTOM_RULE_FILE
@@ -1346,7 +1309,7 @@ function install_snoopy {
     log_info "Installing Snoopy (trying version $version)"
     if sudo [ -e /usr/local/lib/libsnoopy.so ]; then
         log_info "Snoopy is already installed"
-        sudo -H -u $SPLUNK_USERNAME $SPLUNK_HOME/bin/splunk add monitor "$SNOOPY_LOG" -index "snoopy" -sourcetype "snoopy"
+        add_monitor "$SNOOPY_LOG" "snoopy" "snoopy"
         return 0
     fi
 
@@ -1395,7 +1358,7 @@ function install_snoopy {
         log_info "Snoopy installed successfully."
         log_warning "NOTE: Unless you restart the server, Snoopy may not pick up on commands from existing processes."
         # see https://github.com/a2o/snoopy/issues/212
-        sudo -H -u $SPLUNK_USERNAME $SPLUNK_HOME/bin/splunk add monitor "$SNOOPY_LOG" -index "snoopy" -sourcetype "snoopy"
+        add_monitor "$SNOOPY_LOG" "snoopy" "snoopy"
         SNOOPY_SUCCESSFUL=true
         return 0
     fi
@@ -1403,7 +1366,7 @@ function install_snoopy {
 
 function install_sysmon {
     log_info "Installing Sysmon"
-    download "$GITHUB_URL/linux/sysmon/sysmon.sh" sysmon.sh
+    download "$GITHUB_URL/log/sysmon/linux/sysmon.sh" sysmon.sh
     chmod +x sysmon.sh
 
     if [[ "$LOCAL" == true ]]; then
@@ -1414,7 +1377,19 @@ function install_sysmon {
 
     if [ $? -eq 0 ]; then
         log_info "Sysmon installed successfully"
-        install_sysmon_add_on
+
+        log_info "Installing Sysmon Splunk add-on"
+        install_app "$GITHUB_URL/splunk/linux/splunk-add-on-for-sysmon-for-linux_100.tgz"
+
+        # Sysmon monitor is included with add-on, but we need to change the index
+        log_debug "Setting monitor index to sysmon"
+        local dir="$SPLUNK_HOME/etc/apps/Splunk_TA_sysmon-for-linux/local/"
+        sudo mkdir $dir
+        sudo chown -R $SPLUNK_USERNAME:$SPLUNK_USERNAME $dir
+        download "$GITHUB_URL/splunk/linux/sysmon-inputs.conf" inputs.conf
+        sudo chown $SPLUNK_USERNAME:$SPLUNK_USERNAME inputs.conf
+        sudo mv inputs.conf "$dir"
+
         SYSMON_SUCCESSFUL=true
     else
         log_error "Sysmon installation failed"
@@ -1424,7 +1399,7 @@ function install_sysmon {
 
 function install_ossec {
     log_info "Installing OSSEC"
-    download "$GITHUB_URL/splunk/ossec.sh" ossec.sh
+    download "$GITHUB_URL/ossec/ossec.sh" ossec.sh
     chmod +x ossec.sh
 
     cmd="./ossec.sh "
@@ -1506,6 +1481,9 @@ function main {
         echo "   - snoopy (command logger)"
         echo "   - sysmon (system and network monitor)"
 
+        # if [ "$SPLUNK_PASSWORD" != "" ]; then
+        #     sudo -H -u $SPLUNK_USERNAME $SPLUNK_HOME/bin/splunk login -auth "$SPLUNK_USERNAME:$SPLUNK_PASSWORD"
+        # fi
         install_auditd
 
         # sudo $PM install -qq -y snoopy 2>/dev/null
@@ -1519,7 +1497,7 @@ function main {
                 fi
             fi
         # else
-            # sudo -H -u $SPLUNK_USERNAME $SPLUNK_HOME/bin/splunk add monitor "$SNOOPY_LOG" -index "snoopy" -sourcetype "snoopy"
+            # add_monitor "$SNOOPY_LOG" "snoopy" "snoopy"
             # SNOOPY_SUCCESSFUL=true
             # log_info "Snoopy installed successfully from package repos"
         # fi
@@ -1538,8 +1516,8 @@ function main {
     # log_info "Add future additional scripted inputs with 'sudo -H -u $SPLUNK_USERNAME $SPLUNK_HOME/bin/splunk add exec $SPLUNK_HOME/etc/apps/ccdc-add-on/bin/<SCRIPT> -interval <SECONDS> -index <INDEX>'"
     echo
     echo "Summary of installation:"
-    echo "   Auditd successful? $AUDITD_SUCCESSFUL" # TODO: colors
-    echo "   Snoopy successful? $SNOOPY_SUCCESSFUL"
+    echo "   Auditd successful? $(print_true_false $AUDITD_SUCCESSFUL)"
+    echo "   Snoopy successful? $(print_true_false $SNOOPY_SUCCESSFUL)"
     # echo "   Sysmon successful? $SYSMON_SUCCESSFUL"
     # echo "   OSSEC successful? $OSSEC_SUCCESSFUL"
     echo "   Added monitors for: "
