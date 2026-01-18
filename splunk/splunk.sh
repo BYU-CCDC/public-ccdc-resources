@@ -641,7 +641,7 @@ function install_package {
 
 function install_splunk {
     # If Splunk does not already exist:
-    if ! sudo test -e "$SPLUNK_HOME/bin/splunk" || [[ "$REINSTALL" == true ]]; then
+    if ! sudo test -e "$SPLUNK_HOME/bin/splunk" || [[ "$REINSTALL" == true ]] || [[ "$DOWNLOAD_ONLY" == true ]]; then
         # Determine package type and install
         case "$PACKAGE" in
             auto )
@@ -824,6 +824,12 @@ function setup_indexer {
     sudo chown -R $SPLUNK_USERNAME:$SPLUNK_USERNAME $SPLUNK_HOME/etc/auth/splunkweb/
     sudo $SPLUNK_HOME/bin/splunk createssl web-cert    # TODO: broken?
     sudo $SPLUNK_HOME/bin/splunk enable web-ssl
+
+    log_info "Disabling KVSTORE (causes issues on old systems with new versions of Splunk)"
+    sudo sh -c "printf '\n[kvstore]\ndisabled=true\n' >> $SPLUNK_HOME/etc/system/local/server.conf"
+
+    log_info "Fixing domain list error"
+    sudo -u $SPLUNK_USERNAME sh -c "echo allowedDomainList = allow_all >> $SPLUNK_HOME/etc/system/local/alert_actions.conf"
 
     log_info "Installing indexer apps"
     sudo rm /tmp/app.spl &>/dev/null
@@ -1322,7 +1328,7 @@ function install_snoopy {
         ;;
         dnf|zypper|yum )
             if sudo test -f "/etc/centos-release" || sudo test -f "/etc/redhat-release"; then
-                sudo "$PM" install -y -qq epel-release
+                sudo "$PM" install -y -qq epel-release --skip-unavailable
             fi
             sudo "$PM" install -y -qq gcc gzip make procps socat tar wget
         ;;
