@@ -1,7 +1,8 @@
 #!/usr/bin/bash
 NUM_WORDS=5
 WORDLIST_URL="https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main/windows/hardening/wordlist.txt"
-LOG_FILE="changed_user_passwords.log"
+EXPORT_USERS="users_zulu.txt"
+LOG_FILE="zulu.log"
 
 DO_INITIAL=false
 GENERATE_ONLY=false
@@ -265,6 +266,9 @@ echo
 
 # Generate each users's password and change it
 print_ansi "Generating passwords for ${#USERS[@]} users...\n" $GREEN $BOLD
+if [ "$GENERATE_ONLY" == false ]; then
+    > "$EXPORT_USERS"
+fi
 for user in ${USERS[@]}; do
     # Generate password
     hash=$(echo -n "$seed_phrase$user" | md5sum)
@@ -302,6 +306,7 @@ for user in ${USERS[@]}; do
         if [ $? -eq 0 ]; then
             print_ansi "Successfully changed password for $user.\n" $GREEN
             append_log "Successfully changed password for $user"
+            echo "$user" >> "$EXPORT_USERS"
         else
             print_ansi "Failed to change password for $user.\n" $RED
             append_log "Failed to change password for $user"
