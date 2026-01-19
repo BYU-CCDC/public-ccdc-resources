@@ -39,7 +39,8 @@ function Scale-Value {
 
     if ($TARGET_MAX -lt 0) { return 0 }
 
-    return [int](((($TARGET_MAX - $TARGET_MIN) * ($x - $MIN)) / ($MAX - $MIN)) + $TARGET_MIN)
+    # round down to nearest integer
+    return [int][Math]::Truncate(((($TARGET_MAX - $TARGET_MIN) * ($x - $MIN)) / ($MAX - $MIN)) + $TARGET_MIN)
 }
 
 # --- Passphrase Generation Logic ---

@@ -2,6 +2,7 @@
 
 import argparse
 import hashlib
+import math
 import sys
 import subprocess
 import os
@@ -50,20 +51,14 @@ class PasswordGenerator:
             print(f"[!] Error loading wordlist: {e}")
             sys.exit(1)
 
-    def _scale_to_wordlist_index(self, hex_value: int) -> int:
-        min_hex = 0x0000
-        max_hex = 0xFFFF
-        
-        target_max = len(self.wordlist)
-        
-        scaled_float = (target_max * hex_value) / max_hex
-        
-        index = round(scaled_float)
-        
-        if index >= len(self.wordlist):
-            index = len(self.wordlist) - 1
-            
-        return int(index)
+    def minmax_scale(self, x):
+        # https://en.wikipedia.org/wiki/Feature_scaling#Rescaling_(min-max_normalization)
+        MIN=0x0000
+        MAX=0xffff
+        TARGET_MIN=0
+        TARGET_MAX=len(self.wordlist)-1
+        # round down to nearest integer
+        return math.floor(((TARGET_MAX-TARGET_MIN)*(x-MIN)) / (MAX - MIN) + TARGET_MIN)
 
     def generate_password(self, secret: str, username: str) -> str:
         combined = secret + username
@@ -78,7 +73,7 @@ class PasswordGenerator:
                 
             hex_chunk = hash_hex[start:end]
             hex_value = int(hex_chunk, 16)
-            idx = self._scale_to_wordlist_index(hex_value)
+            idx = self.minmax_scale(hex_value)
             parts.append(self.wordlist[idx])
 
         return "-".join(parts) + "1"
