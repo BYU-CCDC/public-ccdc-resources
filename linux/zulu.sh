@@ -86,7 +86,7 @@ function print_usage {
     echo "$(set_ansi $BLUE)  -h                Show this help message$(set_ansi)"
     echo "$(set_ansi $BLUE)  -i                Perform initial setup (change root password and create ccdcuser1/2)$(set_ansi)"
     echo "$(set_ansi $BLUE)  -u <username>     Change password for a single user$(set_ansi)"
-    echo "$(set_ansi $BLUE)  -U <users_file>   Change passwords for users listed in a file$(set_ansi)"
+    echo "$(set_ansi $BLUE)  -U <users_file>   Change passwords for newline-separated users in a file $(set_ansi)"
     echo "$(set_ansi $BLUE)  -g                Generate/print passwords only, do not change them$(set_ansi)"
     echo "$(set_ansi $BLUE)  -p <pcr_file>     Output generated passwords as 'username,password' to a PCR (CSV) file$(set_ansi)"
 }
@@ -131,18 +131,24 @@ function check_prereqs {
 # Change root and create ccdc users
 function initial_change {
     print_ansi "Changing root password...\n" $GREEN
-
     passwd root
 
     print_ansi "\nCreating ccdcuser1 and ccdcuser2...\n" $GREEN
-
     useradd -m -s /bin/bash ccdcuser1
     useradd -m -s /bin/bash ccdcuser2
 
     print_ansi "\nSetting passwords for ccdcuser1 and ccdcuser2...\n" $GREEN
-
     passwd ccdcuser1
     passwd ccdcuser2
+
+    print_ansi "\nAdding ccdcuser1 to sudoers...\n" $GREEN
+    groups=$(compgen -g)
+    if echo "$groups" | grep -q '^sudo$'; then
+        sudo_group='sudo'
+    elif echo "$groups" | grep -q '^wheel$'; then
+        sudo_group='wheel'
+    fi
+    usermod -aG "$sudo_group" ccdcuser1
 }
 
 function minmax_scale {
@@ -169,7 +175,7 @@ function minmax_scale {
 }
 
 # Check prereqs
-while getopts "hu:U:gp:" opt; do
+while getopts "hiu:U:gp:" opt; do
     case $opt in
         h)
             print_usage
@@ -183,6 +189,10 @@ while getopts "hu:U:gp:" opt; do
             ;;
         U)
             USERS_FILE="$OPTARG"
+            if ! [ -f "$USERS_FILE" ]; then
+                print_ansi "Users file '$USERS_FILE' not found.\n" $RED $BOLD
+                exit 1
+            fi
             ;;
         g)
             GENERATE_ONLY=true
@@ -205,9 +215,11 @@ check_prereqs
 
 # Initial change if requested
 if [ "$DO_INITIAL" == true ]; then
+    print_ansi "Performing initial user setup...\n" $GREEN $BOLD
     initial_change
 fi
 
+print_ansi "\nPreparing to generate passwords...\n" $GREEN $BOLD
 # Get usernames
 if [ -n "$SINGLE_USER" ]; then
     RAW_USERS=("$SINGLE_USER")
@@ -288,10 +300,10 @@ for user in ${USERS[@]}; do
         echo "$user:$password" | chpasswd
 
         if [ $? -eq 0 ]; then
-            print_ansi "Successfully changed password.\n" $GREEN
+            print_ansi "Successfully changed password for $user.\n" $GREEN
             append_log "Successfully changed password for $user"
         else
-            print_ansi "Failed to change password.\n" $RED
+            print_ansi "Failed to change password for $user.\n" $RED
             append_log "Failed to change password for $user"
         fi
     elif [ "$GENERATE_ONLY" == true ] && ! [ -n "$PCR_FILE" ]; then
