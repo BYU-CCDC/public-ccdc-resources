@@ -231,7 +231,7 @@ else
 fi
 
 # Exclude users
-for user in ${RAW_USERS[@]}; do
+for user in "${RAW_USERS[@]}"; do
     if [[ ! " ${EXCLUDED_USERS[@]} " =~ " ${user} " ]]; then
         USERS+=("$user")
     fi
@@ -269,7 +269,7 @@ print_ansi "Generating passwords for ${#USERS[@]} users...\n" $GREEN $BOLD
 if [ "$GENERATE_ONLY" == false ]; then
     > "$EXPORT_USERS"
 fi
-for user in ${USERS[@]}; do
+for user in "${USERS[@]}"; do
     # Generate password
     hash=$(echo -n "$seed_phrase$user" | md5sum)
 
