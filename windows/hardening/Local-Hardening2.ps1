@@ -857,7 +857,7 @@ function Scale-HashValue {
     if ($TARGET_MAX -lt 0) { return 0 }
 
     # round down to nearest integer
-    return [int][Math]::Truncate(((($TARGET_MAX - $TARGET_MIN) * ($x - $MIN)) / ($MAX - $MIN)) + $TARGET_MIN)
+    return [int][Math]::Truncate(((($TARGET_MAX - $TARGET_MIN) * ($HashValue - $MIN)) / ($MAX - $MIN)) + $TARGET_MIN)
 }
 
 function Generate-SaltPhrase {
