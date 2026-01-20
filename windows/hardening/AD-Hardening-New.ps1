@@ -849,15 +849,15 @@ function Scale-HashValue {
         [int]$WordlistCount
     )
     
-    $MinHash = 0x0000
-    $MaxHash = 0xFFFF
-    $TargetMin = 0
-    
-    if ($WordlistCount -eq 0) { 
-        return 0 
-    }
-    
-    return [int][Math]::Truncate((((($WordlistCount - $TargetMin) * ($HashValue - $MinHash)) / ($MaxHash - $MinHash)) + $TargetMin))
+    $MIN = 0x0000
+    $MAX = 0xFFFF
+    $TARGET_MAX = $wordlistData.Count - 1
+    $TARGET_MIN = 0
+
+    if ($TARGET_MAX -lt 0) { return 0 }
+
+    # round down to nearest integer
+    return [int][Math]::Truncate(((($TARGET_MAX - $TARGET_MIN) * ($HashValue - $MIN)) / ($MAX - $MIN)) + $TARGET_MIN)
 }
 
 function Generate-SaltPhrase {
