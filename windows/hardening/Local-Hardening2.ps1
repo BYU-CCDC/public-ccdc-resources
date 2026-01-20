@@ -857,7 +857,7 @@ function Scale-HashValue {
         return 0 
     }
     
-    return [int](((($WordlistCount - $TargetMin) * ($HashValue - $MinHash)) / ($MaxHash - $MinHash)) + $TargetMin)
+    return [int][Math]::Truncate((((($WordlistCount - $TargetMin) * ($HashValue - $MinHash)) / ($MaxHash - $MinHash)) + $TargetMin))
 }
 
 function Generate-SaltPhrase {
