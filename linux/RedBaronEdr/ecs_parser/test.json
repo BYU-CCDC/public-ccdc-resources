@@ -1,0 +1,14 @@
+{
+  "Data": "syscall=SYS_EXECVE",
+  "HostName": "ip-10-0-26-86",
+  "HostPID": 34639,
+  "Operation": "Process",
+  "PID": 34639,
+  "Resource": "/usr/bin/ls --color=auto",
+  "Result": "Passed",
+  "Source": "/usr/bin/bash",
+  "Timestamp": 1735838661,
+  "Type": "HostLog",
+  "UID": 1000,
+  "UpdatedTime": "2025-01-02T17:24:21.478515Z"
+}

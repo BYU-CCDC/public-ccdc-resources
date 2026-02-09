@@ -1,0 +1,38 @@
+[rule]
+description = """
+This rule detects when a process executes the `teleport`, `webmin`, `mesh-agent`, or `mesh-agent-service` command. This may indicate unauthorized or suspicious activity.
+"""
+id = "1efdddfa-4678-6d30-a98d-1fcb24001ca8"
+license = "Apache License 2.0"
+name = "Linux Suspicious Mgmt Agent Process Execution"
+os_list = ["linux"]
+version = "1.0.0"
+
+query = '''
+event.type == "start" and event.action == "exec" and process.name in ["teleport", "webmin", "mesh-agent", "mesh-agent-service"]'''
+
+[[actions]]
+action = "kill_process"
+field = "process.pid"
+
+
+[[threat]]
+framework = "MITRE ATT&CK"
+[[threat.technique]]
+id = "T1071"
+name = "Application Layer Protocol"
+reference = "https://attack.mitre.org/techniques/T1071/"
+[[threat.technique.subtechnique]]
+id = "T1071.001"
+name = "Web Protocols"
+reference = "https://attack.mitre.org/techniques/T1071/001/"
+
+
+
+[threat.tactic]
+id = "TA0011"
+name = "Command and Control"
+reference = "https://attack.mitre.org/tactics/TA0011/"
+
+[internal]
+min_endpoint_version = "7.15.0"

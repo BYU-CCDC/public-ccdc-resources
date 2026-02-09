@@ -1,0 +1,41 @@
+[rule]
+description = """
+Monitors for the execution of different processes that might be used by attackers for malicious intent. An alert from
+this rule should be investigated further, as hack tools are commonly used by blue teamers and system administrators as
+well.
+"""
+id = "3337a10c-e950-4827-a44e-96a688fba221"
+license = "Elastic License v2"
+name = "Potential Linux Hack Tool Launched"
+os_list = ["linux"]
+version = "1.0.8"
+
+query = '''
+event.action == "exec" and process.name in [
+  "crackmapexec", "msfconsole", "msfvenom", "sliver-client", "sliver-server", "havoc",
+  "zenmap", "nuclei", "netdiscover", "legion",
+  "gobuster", "dirbuster", "dirb", "wfuzz", "ffuf", "whatweb", "eyewitness",
+  "wpscan", "joomscan", "droopescan", "nikto", 
+  "sqlmap", "commix", "yersinia",
+  "john", "hashcat", "ncrack", "cewl", "fcrackzip", "rainbowcrack",
+  "linenum.sh", "linpeas.sh", "pspy32", "pspy32s", "pspy64", "pspy64s", "evil-winrm",
+  "linux-exploit-suggester-2.pl", "linux-exploit-suggester.sh", "panix.sh"]
+'''
+
+min_endpoint_version = "7.15.0"
+optional_actions = []
+[[actions]]
+action = "kill_process"
+field = "process.parent.pid"
+state = 0
+
+[[threat]]
+framework = "MITRE ATT&CK"
+
+[threat.tactic]
+id = "TA0002"
+name = "Execution"
+reference = "https://attack.mitre.org/tactics/TA0002/"
+
+[internal]
+min_endpoint_version = "7.15.0"

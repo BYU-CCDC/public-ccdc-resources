@@ -1,0 +1,4 @@
+alert tcp any any -> any any (msg:"SSN PII"; pcre:"/[0-9]{3}-[0-9]{2}-[0-9]{4}/i"; sid:1000005; rev:1;)
+alert tcp any any -> any any (msg:"Email PII"; pcre:"/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,6}/i"; sid:1000006; rev:1;)
+alert tcp any any -> any any (msg:"Phone Number PII"; pcre:"/(\([0-9]{3}\) |[0-9]{3}[ -])[0-9]{3}[ -]?[0-9]{4}/i"; sid:1000007; rev:1;)
+alert tcp any any -> any any (msg:"Credit Card PII"; pcre:"/(?:\d{4}-?){3}\d{4}|(?:\d{4}\s?){3}\d{4}|(?:\d{4}){4}/i"; sid:1000008; rev:1;)

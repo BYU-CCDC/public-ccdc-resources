@@ -1,6 +1,13 @@
 #!/bin/bash
+<<<<<<< main
 # Unified Wazuh Agent Installation Script
 # Supports: Debian, Ubuntu, CentOS, RHEL, Rocky Linux, AlmaLinux
+=======
+
+# 1. CLEANUP: Remove any broken previous attempts
+sudo rm -f /usr/share/keyrings/wazuh.gpg
+sudo rm -f /etc/apt/sources.list.d/wazuh.list
+>>>>>>> main
 
 # Exit immediately if a command exits with a non-zero status.
 set -e
