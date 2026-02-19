@@ -22,6 +22,18 @@ if [ "$EUID" != 0 ]; then
     exit 1
 fi
 
+# Stop other firewalls, courtesy of chat
+if command -v ufw >/dev/null 2>&1; then
+    ufw disable
+fi
+
+if command -v systemctl >/dev/null 2>&1; then
+    if systemctl is-active --quiet firewalld; then
+        systemctl stop firewalld
+        systemctl disable firewalld
+    fi
+fi
+
 if [ "$(iptables --list-rules | wc -l)" -gt 3 ]; then
     echo 'It looks like there are already some firewall rules. Do you want to remove them? (y/N)'
     yesno n && iptables -F
@@ -59,6 +71,15 @@ for CHAIN in INPUT OUTPUT; do
         genPortList $CHAIN $PROTO
     done
 done
+
+echo 'Is this machine bound to the domain? (y/N)'
+yesno n && {
+    echo 'IP of the Domain Controller: '
+    read DC_IP
+    echo 'Opening AD ports...'
+    iptables -A OUTPUT -d $DC_IP -m multiport -p tcp --dports 88,389 -j ACCEPT
+    iptables -A OUTPUT -d $DC_IP -m multiport -p udp --dports 88,389 -j ACCEPT
+}
 
 echo 'Would you like to whitelist traffic to a specific IP or subnet? (y/N)'
 yesno n && {
