@@ -1,8 +1,8 @@
 #!/usr/bin/bash
 NUM_WORDS=5
 WORDLIST_URL="https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main/windows/hardening/wordlist.txt"
-EXPORT_USERS="users_zulu.txt"
-LOG_FILE="zulu.log"
+EXPORT_USERS="users.txt"
+LOG_FILE="/var/log/ccdc/zulu.log"
 
 DO_INITIAL=false
 GENERATE_ONLY=false
@@ -214,6 +214,13 @@ append_log "Script started at $(date)"
 print_ansi "The default behavior is to change passwords for all users with a shell except: ${EXCLUDED_USERS[*]}.\n"
 check_prereqs
 
+# Setup log directory
+if ! [ -e "/var/log/ccdc" ]; then
+    mkdir -p /var/log/ccdc
+    sudo chown root:root /var/log/ccdc
+    sudo chmod 700 /var/log/ccdc
+fi
+
 # Initial change if requested
 if [ "$DO_INITIAL" == true ]; then
     print_ansi "Performing initial user setup...\n" $GREEN $BOLD
@@ -225,16 +232,14 @@ print_ansi "\nPreparing to generate passwords...\n" $GREEN $BOLD
 if [ -n "$SINGLE_USER" ]; then
     RAW_USERS=("$SINGLE_USER")
 elif [ -f "$USERS_FILE" ]; then
-    mapfile -t RAW_USERS < "$USERS_FILE"
+    readarray -t RAW_USERS < "$USERS_FILE"
 else
-    RAW_USERS=$(cat /etc/passwd | grep -v "false\|nologin" | cut -d":" -f1)
+    readarray -t RAW_USERS < <(cat /etc/passwd | grep -v "false\|nologin" | cut -d":" -f1)
 fi
 
 # Exclude users
 for user in "${RAW_USERS[@]}"; do
-    if [[ ! " ${EXCLUDED_USERS[@]} " =~ " ${user} " ]]; then
-        USERS+=("$user")
-    fi
+    [[ "${EXCLUDED_USERS[@]}" == "${user}" ]] || USERS+=("$user")
 done
 
 # Ask for seed phrase (twice to confirm)
