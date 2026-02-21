@@ -51,19 +51,19 @@ iptables -A OUTPUT -p icmp --icmp-type echo-reply -j ACCEPT
 echo 'Splunk indexer IP: '
 read SPLUNK_IP
 iptables -A OUTPUT -d $SPLUNK_IP -p tcp --dport 9997 -j ACCEPT
-iptables -A OUTPUT -d $SPLUNK_IP -p udp --dport 1514 -j ACCEPT
-iptables -A OUTPUT -d $SPLUNK_IP -p udp --dport 1515 -j ACCEPT
-
-if [ -n "$SSH_CLIENT" ]; then
-    echo 'SSH Detected. Whitelist client? (Y/n)'
-    yesno y && iptables -A INPUT -s "$(cut -f1 -d' ' <<<"$SSH_CLIENT")" -p tcp --dport 22 -j ACCEPT
-fi
+# iptables -A OUTPUT -d $SPLUNK_IP -p udp --dport 1514 -j ACCEPT
+# iptables -A OUTPUT -d $SPLUNK_IP -p udp --dport 1515 -j ACCEPT
 
 echo 'DNS Server IPs: (OUTPUT udp/53)'
 read DNS_IPS
 for ip in $DNS_IPS; do
     iptables -A OUTPUT -d $ip -p udp --dport 53 -j ACCEPT
 done
+
+echo 'Would you like to allow all HTTP/HTTPS traffic? (Y/n)'
+yesno y && {
+    iptables -A OUTPUT -m multiport -p tcp --dports 80,443 -j ACCEPT
+}
 
 for CHAIN in INPUT OUTPUT; do
     for PROTO in tcp udp; do
