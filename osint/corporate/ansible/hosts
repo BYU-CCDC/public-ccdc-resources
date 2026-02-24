@@ -1,0 +1,5 @@
+# Passwords are REDACTED for security purposes, please contact IT staff for passwords if needed.
+[HOSTNAME]  ansible_host=192.168.220.[IP]  ansible_user=root ansible_password=[REDACTED]
+[HOSTNAME]  ansible_host=192.168.220.[IP]  ansible_user=root ansible_password=[REDACTED]
+[HOSTNAME]  ansible_host=192.168.220.[IP]  ansible_user=root ansible_password=[REDACTED]
+[HOSTNAME]  ansible_host=192.168.220.[IP]  ansible_user=root ansible_password=[REDACTED]
