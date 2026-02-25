@@ -823,447 +823,293 @@ function Initialize-System {
     The function downloads the wordlist if it doesn't exist locally.
 #>
 
-# Helper to load wordlist securely once.
-function Get-WordlistData {
-    [CmdletBinding()]
-    param()
-    
-    if (Test-Path ".\wordlist.txt") {
-        [string[]]$WordlistData = Get-Content -Path ".\wordlist.txt"
-        Write-Log -Level "INFO" -Message "Loaded $($WordlistData.Count) words from wordlist.txt"
-        return $WordlistData
-    } else {
-        Write-Log -Level "ERROR" -Message "wordlist.txt not found. Please Initialize Context first!"
-        throw "wordlist.txt not found"
-    }
-}
-
-# Helper function to scale hash values to wordlist indices
-function Scale-HashValue {
+function new-Zulu-Integration {
     [CmdletBinding()]
     param(
-        [Parameter(Mandatory=$true)]
-        [int]$HashValue,
-        
-        [Parameter(Mandatory=$true)]
-        [int]$WordlistCount
+        [Alias("h")][switch]$Help,
+        [Alias("i")][switch]$Initial,
+        [Alias("b")][string]$User,
+        [Alias("U")][string]$UsersFile,
+        [Alias("g")][switch]$GenerateOnly,
+        [Alias("p")][string]$PCRFile,
+        [Alias("s")][string]$Seed,
+
+        [Parameter(Mandatory=$false, HelpMessage = "If we need to download the wordlist, this is the URL to get it from")]
+        [Alias("url")]
+        [string]$WordlistUrl = "https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main/windows/wordlist.txt"
     )
-    
-    $MIN = 0x0000
-    $MAX = 0xFFFF
-    $TARGET_MAX = $wordlistData.Count - 1
-    $TARGET_MIN = 0
+    process {
+        # Script configuration
+    $NumWords = 5
+    $ExportUsersFile = "users_zulu.csv"
+    $LogFile = "zulu.log"
+    $WordlistFile = "wordlist.txt"
+    $ExcludedUsers = @("Administrator", "ccdcuser1", "ccdcuser2", "ccdcuser3")
 
-    if ($TARGET_MAX -lt 0) { return 0 }
-
-    # round down to nearest integer
-    return [int][Math]::Truncate(((($TARGET_MAX - $TARGET_MIN) * ($HashValue - $MIN)) / ($MAX - $MIN)) + $TARGET_MIN)
-}
-
-function Generate-SaltPhrase {
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory=$true)]
-        [string[]]$WordlistData
-    )
-    
-    # Define the desired number of words for the salt phrase
-    $SaltWordCount = 4
-    
-    try {
-        # Generate a cryptographically random salt phrase
-        $Rng = [System.Security.Cryptography.RNGCryptoServiceProvider]::Create()
-        $SaltPhraseWords = @()
-        
-        while ($SaltPhraseWords.Count -lt $SaltWordCount) {
-            # Generate 4 cryptographically random bytes
-            $Buffer = [byte[]]::new(4)
-            $Rng.GetBytes($Buffer)
+    function Write-Usage {
+        Write-Host "Usage: .\Set-Passwords.ps1 [options]" -ForegroundColor Green
+        Write-Host "Default behavior asks for a seed phrase and changes passwords for all auto-detected users minus excluded users."
+        Write-Host "`nOptions:" -ForegroundColor Yellow
+        @(
+            "  -Help, -h          Show this help message",
+            "  -Initial, -i       Perform initial setup (change Administrator password and create ccdcuser1/2)",
+            "  -User, -u          Change password for a single user",
+            "  -UsersFile, -U     Change passwords for newline-separated users in a file",
+            "  -GenerateOnly, -g  Generate/print passwords only, do not change them",
+            "  -PCRFile, -p       Output generated passwords as 'username,password' to a PCR (CSV) file",
+            "  -Seed, -s          Seed phrase (non-interactive; skips prompt, for testing)",
+            "  -url <url>         The url to the wordlist" 
             
-            # Use modulo to get a valid wordlist index from CSPRNG output
-            $RandomIndex = [System.BitConverter]::ToInt32($Buffer, 0) % $WordlistData.Count
-            
-            $SaltPhraseWords += $WordlistData[$RandomIndex]
-        }
-        
-        # Concatenate the words to create the final salt phrase
-        $SaltPhrase = $SaltPhraseWords -join '-'
-        Write-Log -Level "INFO" -Message "Generated new cryptographic salt phrase"
-        
-        # Return the 4-word salt phrase
-        return $SaltPhrase
-        
-    } catch {
-        $ErrorMessage = "Salt generation failed: $($_.Exception.Message)"
-        Write-Error $ErrorMessage
-        Write-Log -Level "ERROR" -Message $ErrorMessage
-        throw
+        ) | ForEach-Object { Write-Host $_ -ForegroundColor Cyan }
     }
-}
 
-function Generate-Password {
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory=$true)]
-        [ValidateNotNullOrEmpty()]
-        [string]$TargetUsername,
-
-        [Parameter(Mandatory=$true)]
-        [ValidateNotNullOrEmpty()]
-        [string]$SaltPhrase,
-        
-        [Parameter(Mandatory=$true)]
-        [ValidateNotNullOrEmpty()]
-        [string[]]$WordlistData
-    )
-    
-    try {
-        # Calculate MD5 hash from the common salt and the unique username
-        $InputString = "$SaltPhrase$TargetUsername"
-        $HashBytes = [System.Security.Cryptography.MD5]::Create().ComputeHash([System.Text.Encoding]::UTF8.GetBytes($InputString))
-        $Md5HashString = [System.BitConverter]::ToString($HashBytes) -replace '-'
-        
-        # Determine indices and generate passphrase
-        $GeneratedPasswordWords = @()
-        $WordIndices = @()
-        
-        # Process hash in 4-character segments
-        for ($i = 0; $i -lt $Md5HashString.Length; $i += 4) {
-            if ($i + 4 -le $Md5HashString.Length) {
-                $HashSegment = $Md5HashString.Substring($i, 4)
-                $IntValue = [Convert]::ToInt32($HashSegment, 16)
-                
-                $ScaledIndex = Scale-HashValue -HashValue $IntValue -WordlistCount $WordlistData.Count
-                $WordIndices += $ScaledIndex
-            }
-        }
-        
-        # Generate password words from indices
-        for ($i = 0; $i -lt $passwordWordCount; $i++) {
-            if ($i -lt $WordIndices.Count) {
-                $GeneratedPasswordWords += $WordlistData[$WordIndices[$i]]
-            } else {
-                Write-Warning "Not enough hash segments to generate $passwordWordCount words."
-                Write-Log -Level "WARNING" -Message "Not enough hash segments to generate $passwordWordCount words"
-                break
-            }
-        }
-
-        # Join words with '-' to create final password
-        $GeneratedPassword = $GeneratedPasswordWords -join '-'
-        # Append 1 to password for complexity
-        $GeneratedPassword += "1"
-        
-        return $GeneratedPassword
-        
-    } catch {
-        $ErrorMessage = "Password generation failed for user $TargetUsername : $($_.Exception.Message)"
-        Write-Error $ErrorMessage
-        Write-Log -Level "ERROR" -Message $ErrorMessage
-        throw
+    function Get-SilentInput {
+        param([string]$Prompt)
+        Write-Host -NoNewline $Prompt
+        $secure = Read-Host -AsSecureString
+        $bstr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
+        $input = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr)
+        [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
+        $input
     }
-}
 
-
-function Change-Passwords {
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory=$false)]
-        [switch]$randomSalt = $false
-    )
-    
-    try {
-        # Step a: Get wordlist data
-        Write-Host "[INFO] Retrieving wordlist data..." -ForegroundColor Cyan
-        [string[]]$WordlistData = Get-WordlistData
-        Write-Log -Level "INFO" -Message "Retrieved wordlist with $($WordlistData.Count) words"
-        
-        # Case 1: Random Salt (-RandomSalt or -sr)
-        if ($randomSalt) {
-            Write-Host "[INFO] Random salt flag detected. Generating..." -ForegroundColor Cyan
-            $SaltPhrase = Generate-SaltPhrase -WordlistData $WordlistData
-            Write-Log -Level "INFO" -Message "Generated random salt phrase"
-        }
-        # Case 2: Default Prompt (No flags used)
-        else {
-            Write-Host "[INFO] No salt phrase provided. Please enter salt phrase (DON'T LOSE IT): " -ForegroundColor Yellow
-            $SaltPhrase = Get-ValidatedPassword -salt
-        
-            Write-Log -Level "INFO" -Message "User manually entered salt phrase"
-        }
-        
-        # Step c: Get list of local user accounts
-        $ExcludedUsers = @("Administrator", "ccdcuser1", "ccdcuser2", "splunk")
-
-        $UserList = Get-ADUser -Filter * | Where-Object ObjectClass -eq "user" | Where-Object { [string]$_.SamAccountName -notin $ExcludedUsers } | Select-Object -ExpandProperty Name
-        Write-Host "[INFO] Found $($UserList.Count) domain user account(s) to process" -ForegroundColor Cyan
-        Write-Log -Level "INFO" -Message "Starting password change process for $($UserList.Count) AD users"
-        
-        # Initialize array to store user/password pairs for export
-        $UserPasswordList = @()
-        
-        # Step d: Loop through each user account
-        foreach ($Username in $UserList) {
-            try {
-                # Generate password for this user (passing wordlist and saltphrase)
-                $NewPassword = Generate-Password -TargetUsername $Username -SaltPhrase $SaltPhrase -WordlistData $WordlistData
- 
-                # Change the user's password
-                $SecurePassword = ConvertTo-SecureString -AsPlainText $NewPassword -Force
-                Get-ADUser -Filter "SamAccountName -like '$Username'"  | Set-ADAccountPassword -Reset -NewPassword $SecurePassword
-                
-                # Store for export
-                $UserPasswordList += [PSCustomObject]@{
-                    Username = $Username
-                    Password = $NewPassword
-                }
-                
-                Write-Host "[SUCCESS] Reset password for AD user: $Username" -ForegroundColor Green
-                Write-Log -Level "SUCCESS" -Message "Successfully reset password for AD user: $Username"
-                
-            } catch {
-                $ErrorMessage = "Failed to change password for user $Username : $($_.Exception.Message)"
-                Write-Host "[ERROR] $ErrorMessage" -ForegroundColor Red
-                Write-Log -Level "ERROR" -Message $ErrorMessage
-                # Continue with next user instead of failing completely
-            }
-        }
-        
-        # Export usernames only to users.txt
-        if ($UserList.Count -gt 0) {
-            Export-Users -Usernames $UserList
-        }
-        
-        # Step f: Print the salt phrase to the console
-        Write-Host "`n" + ("=" * 60) -ForegroundColor Cyan
-        Write-Host "SALT PHRASE: $SaltPhrase" -ForegroundColor Yellow
-        Write-Host ("=" * 60) -ForegroundColor Cyan        
-        Write-Log -Level "INFO" -Message "Password change process complete"
-        Write-Host "[SUCCESS] Password change process completed successfully" -ForegroundColor Green
-        
-    } catch {
-        $ErrorMessage = "User password reset failed: $($_.Exception.Message)"
-        Write-Host "[FAILED] $ErrorMessage" -ForegroundColor Red
-        Write-Log -Level "ERROR" -Message $ErrorMessage -Console
-        throw
-    }
-}
-
-function Export-Users {
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory=$true)]
-        [string[]]$Usernames
-    )
-    
-    try {
-        $ExportFilePath = ".\users.txt"
-        
-        # Export usernames to file (one per line, no passwords)
-        $Usernames | Out-File -FilePath $ExportFilePath -Encoding UTF8 -Force
-        
-        Write-Host "[SUCCESS] Exported $($Usernames.Count) username(s) to: $ExportFilePath" -ForegroundColor Green
-        Write-Log -Level "SUCCESS" -Message "Exported $($Usernames.Count) username(s) to $ExportFilePath"
-        
-    } catch {
-        $ErrorMessage = "Failed to export usernames: $($_.Exception.Message)"
-        Write-Host "[ERROR] $ErrorMessage" -ForegroundColor Red
-        Write-Log -Level "ERROR" -Message $ErrorMessage
-        throw
-    }
-}
-
-
-<#
-.SYNOPSIS
-    Adds competition-specific users with certain privileges.
-    Prompts user for new user creation (password for each).
-#>
-## Helper Function for Competition User Creation
-# This function must be defined outside the Invoke-HardeningOperation script block
-# and preferably outside the main function itself for proper scope.
-## 1. Helper Function Definition (MUST be outside the main script block)
-function New-CompetitionUser {
-    param(
-        [Parameter(Mandatory=$true)]
-        [string]$Username,
-
-        [Parameter(Mandatory=$false)]
-        [bool]$IsAdminUser = $false
-    )  
-    $success = $false
-    do {
-        $userCreated = $false   
-        # Get-ValidatedPassword handles the complexity and confirms the password
-        $Password = Get-ValidatedPassword -Username $Username
-        # Check if user already exists
-        $existingUser = Get-ADUser -Filter "SAMAccountName -like '$Username'" -ErrorAction SilentlyContinue
-        
-        if ($existingUser) {
-            Write-Host "User ${Username} already exists (skipping creation)" -ForegroundColor Yellow
-            Write-Log -Level "WARNING" -Message "User ${Username} already exists"
-            $userCreated = $true
-        } else {
-            try {
-                $splat = @{
-                    Name     = $Username
-                    AccountPassword = $Password
-                    Enabled = $true
-                }
-                
-                New-ADUser @splat -ErrorAction Stop
-                
-                # Small pause to allow the SAM database to update
-                Start-Sleep -Milliseconds 500
-                
-                if (Get-ADUser -Filter "SAMAccountName -like '$Username'" -ErrorAction SilentlyContinue) {
-                    Write-Host "User ${Username} created successfully" -ForegroundColor Green
-                    Write-Log -Level "SUCCESS" -Message "Created user: ${Username}"
-                    $userCreated = $true
-                } else {
-                    Write-Host "Failed to verify user ${Username}. Retrying..." -ForegroundColor Red
-                    continue # Looping back with the same $Username
-                }
-            } catch {
-                $errorMessage = $_.Exception.Message
-                Write-Host "Error creating user: $errorMessage" -ForegroundColor Red
-                Write-Log -Level "ERROR" -Message "Failed to create user '${Username}': $errorMessage"
-                
-                Write-Host "Please try again for user: ${Username}" -ForegroundColor Cyan
-                continue # Looping back with the same $Username
-            }
-        }
-        
-        # Group Assignment Logic
-        if ($userCreated) {
-            try {
-                # All new competition users get RDP access
-                Add-ADGroupMember -Identity "Remote Desktop Users" -Members $Username -ErrorAction SilentlyContinue
-                
-                # By default, Administrators have access to connect via Remote Desktop
-                # You can change this later through secpol.msc
-                if ($IsAdminUser) {
-                    Add-ADGroupMember -Identity "Domain Admins" -Members $Username -ErrorAction SilentlyContinue
-                }
-
-                $script:UserArray += $Username
-                $success = $true # Exit the loop
-            } catch {
-                Write-Log -Level "WARNING" -Message "Could not add ${Username} to groups: $($_.Exception.Message)"
-                $success = $true # The user exists, so we stop the loop despite group errors
-            }
-        }
-
-    } while (-not $success)
-
-    return $true
-}
-
-function Get-ValidatedPassword {
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory=$false)]
-        [string]$Username,
-
-        [Parameter(Mandatory=$false)]
-        [switch]$salt
-    )
-
-    while ($true) {
-        if ($salt){
-            $securedValue = Read-Host -AsSecureString "Enter a salt phrase"
-            $confirmValue = Read-Host -AsSecureString "Confirm salt"
-        }
-        else{
-            $securedValue = Read-Host -AsSecureString "Create a Password for ${Username}"
-            $confirmValue = Read-Host -AsSecureString "Confirm password"
-        }
-        # Convert to plain text temporarily for validation
-        $bstr1 = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($securedValue)
-        $bstr2 = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($confirmValue)
-        
+    function Get-FileFromUrl {
+        param([string]$Url, [string]$OutputPath)
         try {
-            $pass1 = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr1)
-            $pass2 = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr2)
-
-            # Validation Logic
-            if ($pass1 -ne $pass2) {
-                Write-Host "Error: Passwords do not match. Please try again." -ForegroundColor Red
-                continue
-            }
-
-            if ($pass1.Length -lt 8) {
-                Write-Host "Error: Password must be at least 8 characters. Please try again." -ForegroundColor Red
-                continue
-            }
-
-            # If we reach here, validation passed
-            if ($salt){
-                Write-Host "Salt phrase confirmed." -ForegroundColor Green
-                return [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($securedValue))
-
-            }
-            else{
-                Write-Host "Password confirmed." -ForegroundColor Green
-                return $securedValue}
-            }
-        finally {
-            # Critical: Clear plain text from memory
-            [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr1)
-            [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr2)
+            Write-Host "Downloading from $Url..." -ForegroundColor Green
+            $ProgressPreference = 'SilentlyContinue'
+            Invoke-WebRequest -Uri $Url -OutFile $OutputPath -UseBasicParsing
+            $ProgressPreference = 'Continue'
+            $true
+        } catch {
+            Write-Host "Failed to download file from $Url`nError: $($_.Exception.Message)" -ForegroundColor Red
+            $false
         }
+    }
+
+    function Add-LogEntry {
+        param([string]$Message)
+        if (-not $GenerateOnly) { Add-Content -Path $LogFile -Value $Message }
+    }
+
+    function Test-Prerequisites {
+        $principal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
+        if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+            Write-Host "Please run script as Administrator." -ForegroundColor Red
+            exit 1
+        }
+        if (-not (Test-Path $WordlistFile)) {
+            Write-Host "Downloading wordlist file..." -ForegroundColor Green
+            if (-not (Get-FileFromUrl -Url $WordlistUrl -OutputPath $WordlistFile)) { exit 1 }
+        }
+    }
+
+    function Test-IsDomainController {
+        try {
+            $ntds = Get-Service -Name ntds -ErrorAction SilentlyContinue
+            return $ntds -ne $null
+        } catch {
+            return $false
+        }
+    }
+
+
+    function Set-UserPassword {
+        param(
+            [string]$Username,
+            [string]$PasswordPrompt,
+            [string]$Password,           # new optional parameter
+            [switch]$AddToAdmins
+        )
+
+        if (-not $Password) {
+            $Password = Get-SilentInput $PasswordPrompt
+            $confirmPassword = Get-SilentInput "Confirm password: "
+            if ($Password -ne $confirmPassword) {
+                Write-Host "Passwords do not match." -ForegroundColor Red
+                Set-UserPassword -Username $Username -PasswordPrompt $PasswordPrompt
+            }
+        }
+
+        $securePassword = ConvertTo-SecureString -AsPlainText $Password -Force
+        try{
+            if ($IsDomainController) {
+                Set-ADAccountPassword -Identity $Username -Reset -NewPassword $securePassword -ErrorAction Stop
+                if ($AddToAdmins) { Add-ADGroupMember -Identity "Domain Admins" -Members $Username -ErrorAction SilentlyContinue }
+            } else {
+                Get-LocalUser -Name $Username | Set-LocalUser -Password $securePassword -ErrorAction Stop
+                if ($AddToAdmins) { Add-LocalGroupMember -Group "Administrators" -Member $Username -ErrorAction SilentlyContinue }
+            }
+        }
+        catch
+        {
+            Write-Host "Error setting password for ${Username}: $($_.Exception.Message)" -ForegroundColor Red
+            Write-Host "Please try a different password (likely complexity requirements)." -ForegroundColor Yellow
+            
+            Set-UserPassword -Username $Username -PasswordPrompt $PasswordPrompt -Password $null -AddToAdmins:$AddToAdmins
+        }
+    }
+
+    function Initialize-Users {
+        Write-Host "Changing Administrator password..." -ForegroundColor Green
+        Set-UserPassword -Username "Administrator" -PasswordPrompt "Enter new password for Administrator: "
+        
+        Write-Host "`nCreating local ccdcuser1 and ccdcuser2..."
+
+        @("ccdcuser1", "ccdcuser2") | ForEach-Object {
+            if (-not (Get-LocalUser -Name $_ -ErrorAction SilentlyContinue)) {
+                New-LocalUser -Name $_ -NoPassword
+            }
+        }
+        Write-Host "`nSetting passwords for CCDC users..."
+        Set-UserPassword -Username "ccdcuser1" -PasswordPrompt "Enter password for ccdcuser1: " -AddToAdmins
+        Set-UserPassword -Username "ccdcuser2" -PasswordPrompt "Enter password for ccdcuser2: "
+        
+        #AD specific
+        if ($IsDomainController) {
+            New-ADUser -Name "ccdcuser3" -SamAccountName "ccdcuser3"
+            @("ccdcuser3") | ForEach-Object {
+                if (-not (Get-ADUser -Identity $_ -ErrorAction SilentlyContinue)) {
+                    Write-Host "Domain user '$_' not found. Please create it before setting a password, or create it now using 'New-ADUser'." -ForegroundColor Yellow
+                }
+            }
+            
+            Write-Host "`nSetting passwords for CCDC domain admin..."
+            foreach ($u in @("ccdcuser3")) {
+                if (Get-ADUser -Identity $u -ErrorAction SilentlyContinue) {
+                    Set-UserPassword -Username $u -PasswordPrompt "Enter password for ccdcuser3: " -AddToAdmins
+                    Enable-ADAccount "ccdcuser3"
+                }
+            }
+        }
+    }
+
+    function Scale-HashValue {
+        param([Parameter(Mandatory=$true)][int]$HashValue, [Parameter(Mandatory=$true)][int]$WordlistCount)
+        $TARGET_MAX = $wordlistData.Count - 1
+        if ($TARGET_MAX -lt 0) { return 0 }
+        return [int][Math]::Truncate(((($TARGET_MAX) * ($HashValue - 0x0000)) / (0xFFFF - 0x0000)))
+    }
+
+    function New-Password {
+        param([string]$Username, [string]$SeedPhrase, [string[]]$WordlistData)
+        
+        $inputString = "$SeedPhrase$Username"
+        $md5 = [System.Security.Cryptography.MD5]::Create()
+        $hashBytes = $md5.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($inputString))
+        $hashString = [System.BitConverter]::ToString($hashBytes) -replace '-', ''
+        
+        $password = ""
+        for ($i = 0; $i -lt ($NumWords * 4); $i += 4) {
+            if ($i -ne 0) { $password += "-" }
+            $hex = $hashString.Substring($i, 4)
+            $dec = [Convert]::ToInt32($hex, 16)
+            $index = Scale-HashValue -HashValue $dec -WordlistCount $WordlistData.Count
+            $password += $WordlistData[$index]
+        }
+        $password + "1"
+    }
+
+    if ($Help) { Write-Usage; exit 0 }
+
+    Write-Host "Starting Zulu Password Generator Script..." -ForegroundColor Green
+    Add-LogEntry "Script started at $(Get-Date)"
+    Write-Host "The default behavior is to change passwords for all users except: $($ExcludedUsers -join ', ')."
+
+    Test-Prerequisites
+
+    #Determine if this machine is a Domain Controller and set a flag for later use
+    $IsDomainController = Test-IsDomainController
+    if ($IsDomainController) {
+        Write-Host "Domain Controller detected - AD password operations will be used." -ForegroundColor Green
+    }
+
+    if ($Initial) {
+        Write-Host "Performing initial user setup..." -ForegroundColor Green
+        Initialize-Users
+    }
+
+    Write-Host "`nPreparing to generate passwords..."
+
+    $rawUsers = if ($User) { @($User) } 
+                elseif ($UsersFile) { 
+                    if (-not (Test-Path $UsersFile)) { Write-Host "Users file '$UsersFile' not found." -ForegroundColor Red; exit 1 }
+                    Get-Content $UsersFile 
+                }
+                elseif ($IsDomainController) { 
+                    Get-ADUser -Filter * | Where-Object { $_.Enabled } | Select-Object -ExpandProperty SamAccountName 
+                }
+                else { 
+                    Get-LocalUser | Where-Object { $_.Enabled } | Select-Object -ExpandProperty Name 
+                }
+
+    $users = $rawUsers | Where-Object { $_ -notin $ExcludedUsers }
+
+    if ($Seed) {
+        if ($Seed.Length -lt 8) {
+            Write-Host "Seed phrase must be at least 8 characters long." -ForegroundColor Red
+            exit 1
+        }
+        $seedPhrase = $Seed
+    } else {
+        while ($true) {
+            $seedPhrase = Get-SilentInput "Enter seed phrase: "
+            $confirmSeedPhrase = Get-SilentInput "Confirm seed phrase: "
+            
+            if ($seedPhrase -ne $confirmSeedPhrase) {
+                Write-Host "Seed phrases do not match. Please retry." -ForegroundColor Yellow
+                continue
+            }
+            if ($seedPhrase.Length -lt 8) {
+                Write-Host "Seed phrase must be at least 8 characters long. Please retry." -ForegroundColor Yellow
+                continue
+            }
+            break
+        }
+    }
+
+    $wordlistData = Get-Content $WordlistFile
+    Write-Host "Generating passwords for $($users.Count) users..." -ForegroundColor Green
+
+    if (-not $GenerateOnly) {
+        Remove-Item $ExportUsersFile -ErrorAction SilentlyContinue
+        New-Item -ItemType File -Path $ExportUsersFile -Force | Out-Null
+    }
+
+    foreach ($username in $users) {
+        $password = New-Password -Username $username -SeedPhrase $seedPhrase -WordlistData $wordlistData
+        
+        if (-not $GenerateOnly) {
+            Write-Host "Changing password for user $username..."
+            try {
+                Set-UserPassword -Username $username -Password $password
+                if ($IsDomainController) {
+                    Write-Host "Successfully changed AD password for ${username}." -ForegroundColor Green
+                    Add-LogEntry "Successfully changed AD password for ${username}."
+                } else {
+                    Write-Host "Successfully changed password for ${username}." -ForegroundColor Green
+                    Add-LogEntry "Successfully changed password for ${username}."
+                }
+                Add-Content -Path $ExportUsersFile -Value $username
+            } catch {
+                Write-Host "Failed to change password for ${username}. $($_.Exception.Message)" -ForegroundColor Red
+                Add-LogEntry "Failed to change password for ${username}.: $($_.Exception.Message)"
+            }
+        } elseif (-not $PCRFile) {
+            Write-Host "Generated password for user '${username}': ${password}"
+        }
+        
+        if ($PCRFile) {
+            Add-Content -Path $PCRFile -Value "${username},${password}"
+        }
+    }
+
+    Write-Host "`nDone!" -ForegroundColor Green
+    Write-Host "PLEASE REMEMBER TO CHANGE THE ADMINISTRATOR PASSWORD IF NOT DONE EARLIER." -ForegroundColor Yellow
     }
 }
 
-## 2. Main Function Definition (Uses the Helper Function)
 
-function Add-Competition-Users {
-    [CmdletBinding()]
-    param()
-    
-    Invoke-HardeningOperation -OperationName "Add Competition Users" -ScriptBlock {
-        # Initialize array to store the 2 competition users and success counter
-        [string[]]$script:UserArray = @()
-        $successCount = 0
-        $totalUsers = 2
-                
-        # Prompt for and create User 1
-        $user1Name = "ccdcuser1"        
-        if (New-CompetitionUser -Username $user1Name -IsAdminUser $true) {
-            $successCount++
-        }
-        
-        # Prompt for and create User 2
-        Write-Host ""
-        $user2Name = "ccdcuser2"
-        
-        if (New-CompetitionUser -Username $user2Name -IsAdminUser $false) {
-            $successCount++
-        }
-        
-        # Export user permissions to file
-        if ($script:UserArray.Count -gt 0) {
-            # NOTE: Print-Users must also be defined externally or its definition must be removed.
-            $userOutput = Print-Users
-            if ($userOutput -ne $null) {
-                $outputText = $userOutput -join "`n`n"
-                $outputText | Out-File -FilePath "UserPerms.txt" -Encoding UTF8
-                Write-Host "`nUser permissions have been exported to .\UserPerms.txt" -ForegroundColor Green
-                Write-Log -Level "SUCCESS" -Message "Exported user permissions to UserPerms.txt"
-            }
-        }
-        
-        # Summary
-        Write-Host ""
-        if ($successCount -eq $totalUsers) {
-            Write-Host "$successCount/$totalUsers users created successfully" -ForegroundColor Green
-            Write-Log -Level "SUCCESS" -Message "All $totalUsers users created successfully"
-        } else {
-            Write-Host "$successCount/$totalUsers users created successfully" -ForegroundColor Yellow
-            Write-Log -Level "WARNING" -Message "Only $successCount out of $totalUsers users were created successfully"
-        }
-    }
-}
 
 <#
 .SYNOPSIS
@@ -1827,31 +1673,36 @@ function Quick-Harden {
         # Step 1: Upgrade SMB
         Write-Host "`nStep 1/8: Upgrading SMB..." -ForegroundColor Cyan
         Upgrade-SMB
+
+
+
         
         # Step 2: Change Passwords (skip if requested)
-        if (-not $SkipPasswordChange -and $SaltRandom) {
-            Write-Host "`nStep 2/8: Changing Passwords using a random Salt..." -ForegroundColor Cyan
-            Change-Passwords -randomSalt   
-        } elseif (-not $SkipPasswordChange ) {
-            Write-Host "`nStep 2/8: Changing Passwords..." -ForegroundColor Cyan
-            Change-Passwords
+        #if (-not $SkipPasswordChange -and $SaltRandom) {
+        #    Write-Host "`nStep 2/8: Changing Passwords using a random Salt..." -ForegroundColor Cyan
+        #    Change-Passwords -randomSalt   
+        if (-not $SkipPasswordChange ) {
+                Write-Host "Step 2/8: Creating competiton users and changing passwords..." -ForegroundColor Green
+                New-Zulu-Integration -Initial
         } else {
             Write-Host "`n[SKIPPED] Step 2/8: Password change step skipped (using -qp parameter)" -ForegroundColor Yellow
             Write-Log -Level "INFO" -Message "Password change step skipped per -qp parameter"
         }
         
-        # Step 3: Configure Firewall
-        Write-Host "`nStep 3/8: Configuring Firewall..." -ForegroundColor Cyan
+        Write-Host "`nStep 3/8: No step 3 for now..." -ForegroundColor Cyan
+
+        # Step 4: Configure Firewall
+        Write-Host "`nStep 4/8: Configuring Firewall..." -ForegroundColor Cyan
         Configure-Firewall -FromQuickHarden
         
-        # Step 4: Disable unnecessary services
-        Write-Host "`nStep 4/8: Disabling Unnecessary Services..." -ForegroundColor Cyan
+        # Step 5: Disable unnecessary services
+        Write-Host "`nStep 5/8: Disabling Unnecessary Services..." -ForegroundColor Cyan
         Disable-Unnecessary-Services
         
         # Step 5: Add Competition Users (USER INPUT REQUIRED)
-        Write-Host "`nStep 5/8: Adding Competition Users..." -ForegroundColor Cyan
-        Write-Host "  [NOTE] User input will be required for usernames/passwords" -ForegroundColor Yellow
-        Add-Competition-Users
+        #Write-Host "`nStep 5/8: Adding Competition Users..." -ForegroundColor Cyan
+        #Write-Host "  [NOTE] User input will be required for usernames/passwords" -ForegroundColor Yellow
+        #Add-Competition-Users
         
         # Step 6: Remove non-administrator users from Remote Desktop Users group
         if (-not $skipRDP) {
@@ -2138,7 +1989,7 @@ function Show-Main-Menu {
     Write-Host "  A) Initialize Context (download files, set variables)"
     Write-Host "  1) Quick Harden (essential steps only)"
     Write-Host "  2) Change Passwords"
-    Write-Host "  3) Add Competition Users"
+    Write-Host "  3) Add Competition Users (also resets all user passwords)"
     Write-Host "  4) Remove RDP Users (reset RDP access - removes all users except ours)"
     Write-Host "  5) Add RDP Users (interactively add users to RDP group)"
     Write-Host "  6) Configure Firewall"
@@ -2234,8 +2085,8 @@ while ($true) {
             '0' { Print-Log }
             'A' { Initialize-System }
             '1' { Write-Host "`n***Quick Hardening (Essential Steps Only)...***" -ForegroundColor Magenta; Quick-Harden }
-            '2' { Write-Host "`n***Changing Passwords...***" -ForegroundColor Magenta;Change-Passwords }
-            '3' { Write-Host "`n***Adding Competition Users...***" -ForegroundColor Magenta; Add-Competition-Users }
+            '2' { Write-Host "`n***Changing Passwords...***" -ForegroundColor Magenta; New-Zulu-Integration}
+            '3' { Write-Host "`n***Adding Competition Users and Change Admin Password...***" -ForegroundColor Magenta; New-Zulu-Integration -Initial }
             '4' { Write-Host "`n***Removing all users from RDP group (resetting RDP access)...***" -ForegroundColor Magenta; Remove-RDP-Users }
             '5' { Write-Host "`n***Adding users to RDP group (interactive)...***" -ForegroundColor Magenta; Add-RDP-Users }
             '6' { Write-Host "`n***Configuring firewall...***" -ForegroundColor Magenta; Configure-Firewall }
