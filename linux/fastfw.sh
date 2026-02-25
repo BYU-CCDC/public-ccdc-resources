@@ -22,6 +22,18 @@ if [ "$EUID" != 0 ]; then
     exit 1
 fi
 
+# Stop other firewalls, courtesy of chat
+if command -v ufw >/dev/null 2>&1; then
+    ufw disable
+fi
+
+if command -v systemctl >/dev/null 2>&1; then
+    if systemctl is-active --quiet firewalld; then
+        systemctl stop firewalld
+        systemctl disable firewalld
+    fi
+fi
+
 if [ "$(iptables --list-rules | wc -l)" -gt 3 ]; then
     echo 'It looks like there are already some firewall rules. Do you want to remove them? (y/N)'
     yesno n && iptables -F
@@ -39,13 +51,8 @@ iptables -A OUTPUT -p icmp --icmp-type echo-reply -j ACCEPT
 echo 'Splunk indexer IP: '
 read SPLUNK_IP
 iptables -A OUTPUT -d $SPLUNK_IP -p tcp --dport 9997 -j ACCEPT
-iptables -A OUTPUT -d $SPLUNK_IP -p udp --dport 1514 -j ACCEPT
-iptables -A OUTPUT -d $SPLUNK_IP -p udp --dport 1515 -j ACCEPT
-
-if [ -n "$SSH_CLIENT" ]; then
-    echo 'SSH Detected. Whitelist client? (Y/n)'
-    yesno y && iptables -A INPUT -s "$(cut -f1 -d' ' <<<"$SSH_CLIENT")" -p tcp --dport 22 -j ACCEPT
-fi
+# iptables -A OUTPUT -d $SPLUNK_IP -p udp --dport 1514 -j ACCEPT
+# iptables -A OUTPUT -d $SPLUNK_IP -p udp --dport 1515 -j ACCEPT
 
 echo 'DNS Server IPs: (OUTPUT udp/53)'
 read DNS_IPS
@@ -53,12 +60,26 @@ for ip in $DNS_IPS; do
     iptables -A OUTPUT -d $ip -p udp --dport 53 -j ACCEPT
 done
 
+echo 'Would you like to allow all HTTP/HTTPS traffic? (Y/n)'
+yesno y && {
+    iptables -A OUTPUT -m multiport -p tcp --dports 80,443 -j ACCEPT
+}
+
 for CHAIN in INPUT OUTPUT; do
     for PROTO in tcp udp; do
         echo "Space-seperated list of $CHAIN $PROTO ports/services:"
         genPortList $CHAIN $PROTO
     done
 done
+
+echo 'Is this machine bound to the domain? (y/N)'
+yesno n && {
+    echo 'IP of the Domain Controller: '
+    read DC_IP
+    echo 'Opening AD ports...'
+    iptables -A OUTPUT -d $DC_IP -m multiport -p tcp --dports 88,389 -j ACCEPT
+    iptables -A OUTPUT -d $DC_IP -m multiport -p udp --dports 88,389 -j ACCEPT
+}
 
 echo 'Would you like to whitelist traffic to a specific IP or subnet? (y/N)'
 yesno n && {
