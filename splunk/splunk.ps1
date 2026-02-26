@@ -129,6 +129,21 @@ function print_usage {
     Write-Host "Flags:" -ForegroundColor Green
     Write-Host "  -h                 Show this help message" -ForegroundColor Yellow
     Write-Host "  -WindowsVersion    Specify Windows version (auto-detected if not provided)" -ForegroundColor Yellow
+    Write-Host "    Options:" -ForegroundColor Yellow
+    Write-Host "      - Windows XP" -ForegroundColor Yellow
+    Write-Host "      - Windows Vista" -ForegroundColor Yellow
+    Write-Host "      - Windows Server 2008" -ForegroundColor Yellow
+    Write-Host "      - Windows Server 2008 R2" -ForegroundColor Yellow
+    Write-Host "      - Windows 7" -ForegroundColor Yellow  
+    Write-Host "      - Windows 8" -ForegroundColor Yellow
+    Write-Host "      - Windows Server 2012" -ForegroundColor Yellow
+    Write-Host "      - Windows Server 2012 R2" -ForegroundColor Yellow
+    Write-Host "      - Windows Server 2016" -ForegroundColor Yellow
+    Write-Host "      - Windows 10" -ForegroundColor Yellow
+    Write-Host "      - Windows 11" -ForegroundColor Yellow
+    Write-Host "      - Windows Server 2019" -ForegroundColor Yellow
+    Write-Host "      - Windows Server 2022" -ForegroundColor Yellow
+    Write-Host "      - Windows Server 2025" -ForegroundColor Yellow
     Write-Host "  -arch              Specify architecture (32 or 64; default: 64)" -ForegroundColor Yellow
     Write-Host "  -GithubUrl         Specify custom GitHub URL to download resources from" -ForegroundColor Yellow
     Write-Host "  -local             Specify local path to repository for offline installation" -ForegroundColor Yellow
@@ -192,20 +207,20 @@ function detect_version {
                 $role = (Get-WmiObject -Class Win32_ComputerSystem).DomainRole
             }
             switch -Regex ($osInfo.Caption) {
-                "Windows XP" { $script:WindowsVersion = "Windows XP"; break }
-                "Windows Vista" { $script:WindowsVersion = "Windows Vista"; break }
-                "Windows Server 2008" { $script:WindowsVersion = "Windows Server 2008"; break }
-                "Windows Server 2008 R2" { $script:WindowsVersion = "Windows Server 2008 R2"; break }
-                "Windows 7" { $script:WindowsVersion = "Windows 7"; break }
-                "Windows 8" { $script:WindowsVersion = "Windows 8"; break }
-                "Windows Server 2012" { $script:WindowsVersion = "Windows Server 2012"; break }
-                "Windows Server 2012 R2" { $script:WindowsVersion = "Windows Server 2012 R2"; break }
-                "Windows Server 2016" { $script:WindowsVersion = "Windows Server 2016"; break }
-                "Windows 10" { $script:WindowsVersion = "Windows 10"; break }
-                "Windows 11" { $script:WindowsVersion = "Windows 11"; break }
-                "Windows Server 2019" { $script:WindowsVersion = "Windows Server 2019"; break }
-                "Windows Server 2022" { $script:WindowsVersion = "Windows Server 2022"; break }
-                "Windows Server 2025" { $script:WindowsVersion = "Windows Server 2025"; break }
+                ".*Windows XP.*" { $script:WindowsVersion = "Windows XP"; break }
+                ".*Windows Vista.*" { $script:WindowsVersion = "Windows Vista"; break }
+                ".*Windows Server 2008.*" { $script:WindowsVersion = "Windows Server 2008"; break }
+                ".*Windows Server 2008 R2.*" { $script:WindowsVersion = "Windows Server 2008 R2"; break }
+                ".*Windows 7.*" { $script:WindowsVersion = "Windows 7"; break }
+                ".*Windows 8.*" { $script:WindowsVersion = "Windows 8"; break }
+                ".*Windows Server 2012.*" { $script:WindowsVersion = "Windows Server 2012"; break }
+                ".*Windows Server 2012 R2.*" { $script:WindowsVersion = "Windows Server 2012 R2"; break }
+                ".*Windows Server 2016.*" { $script:WindowsVersion = "Windows Server 2016"; break }
+                ".*Windows 10.*" { $script:WindowsVersion = "Windows 10"; break }
+                ".*Windows 11.*" { $script:WindowsVersion = "Windows 11"; break }
+                ".*Windows Server 2019.*" { $script:WindowsVersion = "Windows Server 2019"; break }
+                ".*Windows Server 2022.*" { $script:WindowsVersion = "Windows Server 2022"; break }
+                ".*Windows Server 2025.*" { $script:WindowsVersion = "Windows Server 2025"; break }
                 default {
                     warning "Detected unrecognized OS version: $($osInfo.Caption)"
                     select_version
