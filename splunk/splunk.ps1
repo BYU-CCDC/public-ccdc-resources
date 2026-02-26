@@ -128,6 +128,9 @@ function print_usage {
     Write-Host
     Write-Host "Flags:" -ForegroundColor Green
     Write-Host "  -h                 Show this help message" -ForegroundColor Yellow
+    Write-Host "  -ip                IP address of Splunk indexer to forward to" -ForegroundColor Yellow
+    Write-Host "  -indexer           Install Splunk indexer instead of forwarder" -ForegroundColor Yellow
+    Write-Host "  -ResetPassword     Reset the Splunk admin password" -ForegroundColor Yellow
     Write-Host "  -WindowsVersion    Specify Windows version (auto-detected if not provided)" -ForegroundColor Yellow
     Write-Host "    Options:" -ForegroundColor Yellow
     Write-Host "      - Windows XP" -ForegroundColor Yellow
@@ -148,7 +151,6 @@ function print_usage {
     Write-Host "  -GithubUrl         Specify custom GitHub URL to download resources from" -ForegroundColor Yellow
     Write-Host "  -local             Specify local path to repository for offline installation" -ForegroundColor Yellow
     Write-Host "  -run               Run a specific function and exit" -ForegroundColor Yellow
-    Write-Host "  -ResetPassword     Reset the Splunk admin password" -ForegroundColor Yellow
     Write-Host
 
     exit 0
