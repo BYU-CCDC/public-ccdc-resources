@@ -16,4 +16,4 @@ if [ ! -f /opt/splunkforwarder/bin/splunk ]; then
     exit 1
 fi
 
-sudo /opt/splunkforwarder/bin/splunk add monitor "$LOG_PATH" -index edr
+sudo /opt/splunkforwarder/bin/splunk add monitor "$LOG_PATH" -index edr -sourcetype json_no_timestamp
