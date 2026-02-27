@@ -1,12 +1,10 @@
 #!/bin/bash
-<<<<<<< main
 # Universal Headless Wazuh Manager Installer
 # Works on: Debian/Ubuntu (apt), RHEL/CentOS/Alma/Rocky (dnf/yum)
 =======
 
 
     sudo apt install curl
->>>>>>> main
 
 set -e
 
