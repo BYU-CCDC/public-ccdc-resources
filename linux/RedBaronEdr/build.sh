@@ -5,7 +5,7 @@ else
     # from https://github.com/docker/docker-install
     echo "Docker not found. Installing now..."
     curl -fsSL https://get.docker.com -o get-docker.sh
-    sh get-docker.sh
+    sh get-docker.sh || echo "Failed to install Docker. Please do so manually before re-running this script."
 fi
 
 # build for amd64 architecture

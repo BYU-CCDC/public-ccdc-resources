@@ -181,9 +181,12 @@ func ScanProcesses(ctx context.Context) {
 								utils.Logger.Errorf("Error logging YARA detection for rule %s on file %s: %v", match.Rule, exePath, err)
 							}
 
-							// Quarantine the file if a match is found
-							if err := QuarantineFile(exePath); err != nil {
-								utils.Logger.Errorf("Failed to quarantine file %s: %v", exePath, err)
+							// Quarantine the file if a match is found - only if the file actually exists
+							//	Quarantine is in run MonitorYARAFiles then ScanProcesses, so the file can get deleted before this
+							if _, err := os.Stat(exePath); err == nil {
+								if err := rule_utils.QuarantineFile(exePath); err != nil {
+									utils.Logger.Errorf("Failed to quarantine file %s: %v", exePath, err)
+								}
 							}
 
 							// Kill the process
