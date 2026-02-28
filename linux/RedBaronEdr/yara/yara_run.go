@@ -1,10 +1,7 @@
 package yara
 
 import (
-	"fmt"
 	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 
 	"red-baron-edr/rule_engine2/rule_utils"
@@ -15,30 +12,6 @@ import (
 )
 
 const TypeDetectedEvent = "event:detected"
-
-// QuarantineFile moves the file to a quarantine directory and modifies its header.
-func QuarantineFile(filePath string) error {
-	quarantineDir := "/tmp/quarantine"
-
-	// Create the quarantine directory if it doesn't exist
-	if err := os.MkdirAll(quarantineDir, os.ModePerm); err != nil {
-		return fmt.Errorf("failed to create quarantine directory: %v", err)
-	}
-
-	// Move the file to the quarantine directory
-	destPath := filepath.Join(quarantineDir, filepath.Base(filePath))
-	if err := os.Rename(filePath, destPath); err != nil {
-		return fmt.Errorf("failed to move file to quarantine: %v", err)
-	}
-
-	// Use sed to remove the binary header
-	cmd := exec.Command("sed", "-i", "1s/.*/REMOVED_HEADER/", destPath)
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to modify file header: %v", err)
-	}
-
-	return nil
-}
 
 // RunYARARules processes a file using pre-compiled YARA rules and logs detected events.
 func RunYARARules(filePath string) {
@@ -71,8 +44,11 @@ func RunYARARules(filePath string) {
 			rule_utils.LogYaraDetection(match.Rule, filePath)
 
 			// Quarantine the file if a match is found
-			if err := QuarantineFile(filePath); err != nil {
-				utils.Logger.Errorf("Failed to quarantine file %s: %v", filePath, err)
+			//	Quarantine is in run MonitorYARAFiles then ScanProcesses, so the file can get deleted before this
+			if _, err := os.Stat(filePath); err == nil {
+				if err := rule_utils.QuarantineFile(filePath); err != nil {
+					utils.Logger.Errorf("Failed to quarantine file %s: %v", filePath, err)
+				}
 			}
 		}
 	}

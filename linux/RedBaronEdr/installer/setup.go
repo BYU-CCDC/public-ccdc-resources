@@ -3,6 +3,7 @@ package installer
 import (
 	"io"
 	"os"
+	"fmt"
 	"path/filepath"
 
 	"red-baron-edr/utils"
@@ -53,6 +54,32 @@ func setupService() error {
 	}
 
 	log.Info("Service installed successfully.")
+	return nil
+}
+
+func removeService() error {
+	svcConfig := &service.Config{
+		Name:        "redbaronedr",
+		DisplayName: "Red Baron Service",
+		Description: "This is a service for Red Baron EDR.",
+		Executable:  utils.RedBaronBinDir + "redbaron", // Use the directory from utils
+	}
+
+	prg := &program{}
+	s, err := service.New(prg, svcConfig)
+	if err != nil {
+		log.Error("Failed to create service", "error", err)
+		return err
+	}
+
+	_ = s.Stop()
+
+	if err := s.Uninstall(); err != nil {
+		log.Error("Failed to uninstall service", "error", err)
+		return err
+	}
+
+	log.Info("Service uninstalled successfully.")
 	return nil
 }
 
@@ -107,6 +134,48 @@ func RunInstallation() error {
 	}
 
 	log.Info("Installation completed successfully.")
+	return nil
+}
+
+// I also want to add an uninstaller so I can better test it
+func Uninstall() error {
+	log.Info("Uninstalling...")
+
+	// Remove moved rule directories first
+	dirsToRemove := []string{
+		utils.YaraRulesDir,
+		utils.RulesV2Dir,
+		utils.WebRulesDir,
+	}
+
+	for _, dir := range dirsToRemove {
+		if err := os.RemoveAll(dir); err != nil {
+			return fmt.Errorf("failed to remove %s: %w", dir, err)
+		}
+	}
+
+	// Remove top-level directories last
+	directories := []string{
+		utils.RedBaronBinDir,
+		// utils.LogDir, // leave the logs there :+1:
+		utils.EtcDir,
+		utils.VarLibDir,
+	}
+
+	// This also removes the redbaron executable
+	for _, dir := range directories {
+		if err := os.RemoveAll(dir); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("failed to remove %s: %w", dir, err)
+		}
+	}
+
+	// Setup the service
+	if err := removeService(); err != nil {
+		log.Error("Failed to remove service", "error", err)
+		return err
+	}
+
+	log.Info("Uninstall completed successfully.")
 	return nil
 }
 

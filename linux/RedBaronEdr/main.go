@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"path/filepath"
 
 	"github.com/charmbracelet/log"
 
@@ -27,6 +28,7 @@ func main() {
 	runFlag := flag.String("run", "all", "Specify which wait group(s) to run (ka, auditd,yara). Separate multiple values with commas.")
 	debugFlag := flag.Bool("debug", false, "Enable debug mode")
 	installFlag := flag.Bool("install", false, "Run the installer")
+	uninstallFlag := flag.Bool("uninstall", false, "Uninstall the service")
 	flag.Parse()
 
 	// Determine default run options if no flags are passed
@@ -54,6 +56,15 @@ func main() {
 			utils.Logger.Fatalf("Installation failed: %v", err)
 		}
 		utils.Logger.Info("Installation completed successfully.")
+		os.Exit(0)
+	}
+
+	if *uninstallFlag {
+		err := installer.Uninstall()
+		if err != nil {
+			utils.Logger.Fatalf("Uninstallation failed: %v", err)
+		}
+		utils.Logger.Info("Uninstallation completed successfully.")
 		os.Exit(0)
 	}
 
@@ -109,6 +120,36 @@ func main() {
 			defer wg.Done()
 			yara.ScanProcesses(ctx)
 		}()
+
+		// don't wg.add this goroutine, tbh it doesn't matter if it fails or how long it takes
+		//   just let it run in the background and do its thing
+		go func() {
+			// LogDir isn't deleted on uninstall, so it's the best location
+			markerPath := filepath.Join(utils.LogDir, "scan_done.marker")
+
+			if _, err := os.Stat(markerPath); err == nil {
+				utils.Logger.Info("Static filesystem scan already completed.")
+				return
+			}
+
+            utils.Logger.Info("Starting initial static filesystem scan...")
+            for _, dir := range directories {
+                // Check if context is cancelled before starting next directory
+                select {
+                case <-ctx.Done():
+                    return
+                default:
+                    yara.RunStaticScan(ctx, dir) 
+                }
+            }
+
+			// Create a marker file to indicate that the initial scan has completed
+			if err := os.WriteFile(markerPath, []byte("scan completed"), 0644); err != nil {
+				utils.Logger.Errorf("Failed to create scan marker file: %v", err)
+			}
+
+            utils.Logger.Info("Initial static filesystem scan complete.")
+        }()
 	}
 
 	// if runWeb {
