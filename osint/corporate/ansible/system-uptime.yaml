@@ -1,0 +1,10 @@
+- name: Fetch system uptime
+  hosts: all
+  tasks:
+    - name: Get system uptime
+      shell: "uptime"
+      register: uptime
+
+    - name: Display system uptime
+      debug:
+        msg: "System uptime {{ uptime }}"

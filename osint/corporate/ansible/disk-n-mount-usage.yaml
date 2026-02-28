@@ -1,0 +1,8 @@
+- hosts: all
+  tasks:
+    - name: Disk & Mount Usage
+      shell: "df -h"
+      register: disk_n_mount_usage
+    - name: Display Disk & Mount Usage
+      debug:
+        msg: "Disk usage is {{ disk_n_mount_usage.stdout_lines }}%"

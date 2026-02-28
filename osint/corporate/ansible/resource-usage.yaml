@@ -1,0 +1,14 @@
+- hosts: all
+  tasks:
+    - name: CPU Usage
+      shell: "top -bn 1 | grep 'Cpu(s)'"
+      register: cpu_usage
+    - name: Display CPU usage
+      debug:
+        msg: "CPU usage is {{ cpu_usage.stdout }}%"
+    - name: Memory Usage
+      shell: "free -m | grep Mem"
+      register: mem_usage
+    - name: Display Memory usage
+      debug:
+        msg: "Memory usage is {{ mem_usage.stdout }}%"
