@@ -110,7 +110,7 @@ function warning {
     Write-Warning $msg
 }
 
-function error {
+function _error {
     param (
         [string]$msg
     )
@@ -128,12 +128,29 @@ function print_usage {
     Write-Host
     Write-Host "Flags:" -ForegroundColor Green
     Write-Host "  -h                 Show this help message" -ForegroundColor Yellow
+    Write-Host "  -ip                IP address of Splunk indexer to forward to" -ForegroundColor Yellow
+    Write-Host "  -indexer           Install Splunk indexer instead of forwarder" -ForegroundColor Yellow
+    Write-Host "  -ResetPassword     Reset the Splunk admin password" -ForegroundColor Yellow
     Write-Host "  -WindowsVersion    Specify Windows version (auto-detected if not provided)" -ForegroundColor Yellow
+    Write-Host "    Options:" -ForegroundColor Yellow
+    Write-Host "      - Windows XP" -ForegroundColor Yellow
+    Write-Host "      - Windows Vista" -ForegroundColor Yellow
+    Write-Host "      - Windows Server 2008" -ForegroundColor Yellow
+    Write-Host "      - Windows Server 2008 R2" -ForegroundColor Yellow
+    Write-Host "      - Windows 7" -ForegroundColor Yellow  
+    Write-Host "      - Windows 8" -ForegroundColor Yellow
+    Write-Host "      - Windows Server 2012" -ForegroundColor Yellow
+    Write-Host "      - Windows Server 2012 R2" -ForegroundColor Yellow
+    Write-Host "      - Windows Server 2016" -ForegroundColor Yellow
+    Write-Host "      - Windows 10" -ForegroundColor Yellow
+    Write-Host "      - Windows 11" -ForegroundColor Yellow
+    Write-Host "      - Windows Server 2019" -ForegroundColor Yellow
+    Write-Host "      - Windows Server 2022" -ForegroundColor Yellow
+    Write-Host "      - Windows Server 2025" -ForegroundColor Yellow
     Write-Host "  -arch              Specify architecture (32 or 64; default: 64)" -ForegroundColor Yellow
     Write-Host "  -GithubUrl         Specify custom GitHub URL to download resources from" -ForegroundColor Yellow
     Write-Host "  -local             Specify local path to repository for offline installation" -ForegroundColor Yellow
     Write-Host "  -run               Run a specific function and exit" -ForegroundColor Yellow
-    Write-Host "  -ResetPassword     Reset the Splunk admin password" -ForegroundColor Yellow
     Write-Host
 
     exit 0
@@ -170,7 +187,7 @@ function download {
         $wc.Downloadfile($url, $path) 2>$null
 
         if (-not $?) {
-            error "Download failed; trying with wget"
+            _error "Download failed; trying with wget"
             wget $url -OutFile $path
         }
     }
@@ -192,20 +209,20 @@ function detect_version {
                 $role = (Get-WmiObject -Class Win32_ComputerSystem).DomainRole
             }
             switch -Regex ($osInfo.Caption) {
-                "Windows XP" { $script:WindowsVersion = "Windows XP"; break }
-                "Windows Vista" { $script:WindowsVersion = "Windows Vista"; break }
-                "Windows Server 2008" { $script:WindowsVersion = "Windows Server 2008"; break }
-                "Windows Server 2008 R2" { $script:WindowsVersion = "Windows Server 2008 R2"; break }
-                "Windows 7" { $script:WindowsVersion = "Windows 7"; break }
-                "Windows 8" { $script:WindowsVersion = "Windows 8"; break }
-                "Windows Server 2012" { $script:WindowsVersion = "Windows Server 2012"; break }
-                "Windows Server 2012 R2" { $script:WindowsVersion = "Windows Server 2012 R2"; break }
-                "Windows Server 2016" { $script:WindowsVersion = "Windows Server 2016"; break }
-                "Windows 10" { $script:WindowsVersion = "Windows 10"; break }
-                "Windows 11" { $script:WindowsVersion = "Windows 11"; break }
-                "Windows Server 2019" { $script:WindowsVersion = "Windows Server 2019"; break }
-                "Windows Server 2022" { $script:WindowsVersion = "Windows Server 2022"; break }
-                "Windows Server 2025" { $script:WindowsVersion = "Windows Server 2025"; break }
+                ".*Windows XP.*" { $script:WindowsVersion = "Windows XP"; break }
+                ".*Windows Vista.*" { $script:WindowsVersion = "Windows Vista"; break }
+                ".*Windows Server 2008.*" { $script:WindowsVersion = "Windows Server 2008"; break }
+                ".*Windows Server 2008 R2.*" { $script:WindowsVersion = "Windows Server 2008 R2"; break }
+                ".*Windows 7.*" { $script:WindowsVersion = "Windows 7"; break }
+                ".*Windows 8.*" { $script:WindowsVersion = "Windows 8"; break }
+                ".*Windows Server 2012.*" { $script:WindowsVersion = "Windows Server 2012"; break }
+                ".*Windows Server 2012 R2.*" { $script:WindowsVersion = "Windows Server 2012 R2"; break }
+                ".*Windows Server 2016.*" { $script:WindowsVersion = "Windows Server 2016"; break }
+                ".*Windows 10.*" { $script:WindowsVersion = "Windows 10"; break }
+                ".*Windows 11.*" { $script:WindowsVersion = "Windows 11"; break }
+                ".*Windows Server 2019.*" { $script:WindowsVersion = "Windows Server 2019"; break }
+                ".*Windows Server 2022.*" { $script:WindowsVersion = "Windows Server 2022"; break }
+                ".*Windows Server 2025.*" { $script:WindowsVersion = "Windows Server 2025"; break }
                 default {
                     warning "Detected unrecognized OS version: $($osInfo.Caption)"
                     select_version
@@ -213,7 +230,7 @@ function detect_version {
             }
             info "Detected Windows version: $script:WindowsVersion"
         } catch {
-            error "Failed to detect Windows version: $($_.Exception.Message)"
+            _error "Failed to detect Windows version: $($_.Exception.Message)"
             exit 1
         }
     } else {
@@ -248,7 +265,7 @@ function detect_version {
             }
             
         } else {
-            error "Indexer installation not supported on 32-bit systems"
+            _error "Indexer installation not supported on 32-bit systems"
             exit 1
         }
     } else {
@@ -292,7 +309,7 @@ function detect_version {
     try {
         return $version_map[$script:WindowsVersion]
     } catch {
-        error "Unknown operating system: $script:WindowsVersion"
+        _error "Unknown operating system: $script:WindowsVersion"
         exit 1
     }
 }
@@ -322,7 +339,7 @@ function select_version {
             $script:WindowsVersion = $versions[$selection]
             break
         } else {
-            error "Invalid selection. Please try again."
+            _error "Invalid selection. Please try again."
         }
     }
 }
@@ -338,10 +355,10 @@ function get_password {
         $confirm_password = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr)
 
         if ($password -ne $confirm_password) {
-            error "Passwords do not match"
+            _error "Passwords do not match"
         }
         elseif ($password.Length -lt 8) {
-            error "Password must be at least 8 characters"
+            _error "Password must be at least 8 characters"
         } else {
             return $password
         }
@@ -363,7 +380,7 @@ function handle_args {
             & $run
             exit 0
         } else {
-            error "Function '$run' not found."
+            _error "Function '$run' not found."
             exit 1
         }
     }
@@ -374,7 +391,7 @@ function handle_args {
         $script:SPLUNK_SERVICE = "Splunkd"
     } else {
         if ($ip -eq "" -and -not $ResetPassword) {
-            error "Please provide the IP address of the Splunk indexer to forward to using the -ip parameter."
+            _error "Please provide the IP address of the Splunk indexer to forward to using the -ip parameter."
             exit 1
         }
     }
@@ -417,14 +434,25 @@ function install_splunk {
         return
     }
 
-    if ($msi -eq $null) {
-        error "Unsupported operating system for this script; please install Splunk manually"
+    if ($null -eq $msi) {
+        _error "Unsupported operating system for this script; please install Splunk manually"
         exit 1
     }
 
     info "Downloading the Splunk installer..."
     $installer_path = "$pwd\splunk.msi"
-    download $msi $installer_path
+    if (Test-Path $installer_path) {
+        warning "Installer already exists at $installer_path. Would you like to re-download it? (y/N) "
+        $response = Read-Host
+        if ($response -eq "y") {
+            Remove-Item $installer_path -Force
+            download $msi $installer_path
+        } else {
+            info "Using existing installer at $installer_path"
+        }
+    } else {
+        download $msi $installer_path
+    }
 
     info "Please enter a password for the $SPLUNK_USERNAME user."
     warning "This needs to be at least 8 characters and match system password complexity requirements or else the install will fail!"
@@ -443,7 +471,7 @@ function install_splunk {
     if (Test-Path "$SPLUNKDIR\bin\splunk.exe") {
         info "Splunk installed successfully"
     } else {
-        error "Splunk installation failed"
+        _error "Splunk installation failed"
         exit 1
     }
 }
@@ -513,7 +541,7 @@ function install_app {
 ######################## MAIN #######################
 # Check for administrator privileges
 if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    error "Please run this script in an Administrator prompt."
+    _error "Please run this script in an Administrator prompt."
     exit 1
 }
 

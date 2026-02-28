@@ -538,8 +538,8 @@ function check_prereqs {
     # Check if home directory exists for current user. Home directory is needed for running splunk commands
     # since the commands are aliases for http request methods. The .splunk directory contains this auth
     # token, so without it, splunk fails to install.
-    if [ ! -d /home/"$(whoami)" ]; then
-        log_warn "No home directory for current user $(whoami). Creating home directory"
+    if [ ! -d "$HOME" ]; then
+        log_warning "No home directory for current user $(whoami). Creating home directory"
         sudo mkdir -p /home/"$(whoami)"
         sudo chown "$(whoami)":"$(whoami)" /home/"$(whoami)"
     fi
@@ -1328,7 +1328,11 @@ function install_snoopy {
         ;;
         dnf|zypper|yum )
             if sudo test -f "/etc/centos-release" || sudo test -f "/etc/redhat-release"; then
-                sudo "$PM" install -y -qq epel-release --skip-unavailable
+                if [ "$PM" == "yum" ]; then
+                    sudo "$PM" install -y -qq epel-release --skip-unavailable
+                else
+                    sudo "$PM" install -y -qq epel-release
+                fi
             fi
             sudo "$PM" install -y -qq gcc gzip make procps socat tar wget
         ;;
