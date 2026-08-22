@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright (C) 2025 deltabluejay
+# Copyright (C) 2026 deltabluejay and BYU CCDC
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -227,7 +227,7 @@ function log_debug {
     _log_with_color "DEBUG" $(set_ansi "$MAGENTA") "$@"
 }
 
-function setup_logging {
+function enable_script_logs {
     log_path=$(dirname "$LOG")
 
     sudo mkdir -p "$log_path"
@@ -314,7 +314,7 @@ function print_usage {
   $(set_ansi $YELLOW $BOLD)-V            $(set_ansi)Show verbose output"
     echo
     echo "$(set_ansi $GREEN $BOLD)Available packages:$(set_ansi)
-  $(set_ansi $MAGENTA $BOLD)auto $(set_ansi)(default; autodetects best package format based on package manager)
+  $(set_ansi $MAGENTA $BOLD)auto $(set_ansi)(default; autodetects best package format based on OS)
   $(set_ansi $MAGENTA $BOLD)* $(set_ansi)(catch-all; replace with any variable in the script)
 
   $(set_ansi $GREEN $BOLD)Forwarder:
@@ -385,37 +385,53 @@ function download {
 
 function autodetect_os {
     log_info "Autodetecting OS / package manager"
-    # Borrowed from harden.sh
-    sudo which apt-get &> /dev/null
-    apt=$?
-    sudo which dnf &> /dev/null
-    dnf=$?
-    sudo which zypper &> /dev/null
-    zypper=$?
-    sudo which yum &> /dev/null
-    yum=$?
 
-    if [ $apt == 0 ]; then
-        log_info "apt/apt-get detected (Debian-based OS)"
-        if ps -C unattended-upgrades > /dev/null 2>&1; then
-            log_warning "Unattended upgrades service is running. This may interfere with the installation. Consider disabling it temporarily with \`systemctl stop unattended-upgrades\`."
-        fi
-        log_debug "Updating package list"
-        sudo apt-get update -q
-        PM="apt-get"
-    elif [ $dnf == 0 ]; then
-        log_info "dnf detected (Fedora-based OS)"
-        PM="dnf"
-    elif [ $zypper == 0 ]; then
-        log_info "zypper detected (OpenSUSE-based OS)"
-        PM="zypper"
-    elif [ $yum == 0 ]; then
-        log_info "yum detected (RHEL-based OS)"
-        PM="yum"
+    source /etc/os-release
+
+    if [[ -z "$ID_LIKE" ]]; then
+        os_family="$ID"
     else
-        log_warning "Could not detect package manager / OS"
-        # exit 1
+        os_family="$ID_LIKE"
     fi
+
+    case "$os_family" in
+        *debian* )
+            log_info "Debian-based OS detected"
+            PM="apt-get"
+        ;;
+        *fedora*|*rhel*|*centos* )
+            log_info "RHEL/Fedora-based OS detected"
+            sudo which dnf &> /dev/null
+            if [ $? == 0 ]; then
+                PM="dnf"
+            else
+                PM="yum"
+            fi
+        ;;
+        *suse*|*opensuse* )
+            log_info "OpenSUSE-based OS detected"
+            PM="zypper"
+        ;;
+        *arch* )
+            log_info "Arch-based OS detected"
+            PM="pacman"
+            # TODO: add support for Arch-based OSes
+            log_error "Arch is not supported by this script. Try installing the .tgz package"
+            exit 1
+        ;;
+        *alpine* )
+            log_info "Alpine-based OS detected"
+            PM="apk"
+            log_error "Alpine is not supported by Splunk. Install auditd manually and hope for the best."
+            exit 1
+        ;;
+        * )
+            log_error "Could not detect OS: $os_family"
+            exit 1
+        ;;
+    esac
+
+    log_debug "Detected OS: $os_family, Package Manager: $PM"
 }
 
 function debug_installation {
@@ -535,16 +551,16 @@ function check_prereqs {
         exit 1
     fi
 
-    # Check if home directory exists for current user. Home directory is needed for running splunk commands
-    # since the commands are aliases for http request methods. The .splunk directory contains this auth
-    # token, so without it, splunk fails to install.
+    # Check if home directory exists for current user. Splunk commands 
+    # are aliases for http request methods, and ~/.splunk contains the 
+    # auth tokens, so without it, Splunk fails to install.
     if [ ! -d "$HOME" ]; then
         log_warning "No home directory for current user $(whoami). Creating home directory"
         sudo mkdir -p /home/"$(whoami)"
         sudo chown "$(whoami)":"$(whoami)" /home/"$(whoami)"
     fi
 
-    # user needs write permissions for current directory
+    # Check that user has write permissions for current directory (for downloading things)
     if [ ! -w . ]; then
         log_error "User does not have write permissions for current directory"
         exit 1
@@ -849,53 +865,6 @@ function setup_indexer {
     install_palo_alto_apps
 }
 
-# Installs splunk
-function setup_splunk {
-    print_banner "Configuring Splunk"
-
-    if [ "$INDEXER" != true ]; then
-        if [[ $IP == "" ]]; then 
-            log_error "Please provide the IP of the central Splunk instance"
-            exit 1
-        fi
-    fi
-    install_splunk
-
-    if sudo [ ! -e $SPLUNK_HOME/bin/splunk ]; then
-        log_error "Splunk failed to install"
-        exit 1
-    else
-        log_info "Splunk installed successfully"
-    fi
-
-    create_splunk_user
-
-    log_info "Starting splunk"
-    # For some reason, splunk start doesn't work on Ubuntu 14 without a tty...
-    # faketty sudo -H -u splunk $SPLUNK_HOME/bin/splunk start --accept-license --no-prompt
-    sudo -H -u $SPLUNK_USERNAME $SPLUNK_HOME/bin/splunk start --accept-license --no-prompt
-
-    # Make sure the correct username/password is provided before continuing
-    # (this will do nothing if already logged in)
-    res=-1
-    while [ $res -ne 0 ]; do
-        if [ "$SPLUNK_PASSWORD" == "" ]; then
-            # TODO: verify this twice
-            # TODO: also try passing -auth to every splunk command
-            SPLUNK_PASSWORD=$(get_silent_input_string "Enter the password for $SPLUNK_USERNAME user: ")
-        fi
-        sudo -H -u $SPLUNK_USERNAME $SPLUNK_HOME/bin/splunk login -auth "$SPLUNK_USERNAME:$SPLUNK_PASSWORD"
-        res=$?
-    done
-
-    if [ "$INDEXER" == true ]; then
-        setup_indexer
-    else
-        setup_forward_server "$IP"
-    fi
-    sudo chown -R $SPLUNK_USERNAME:$SPLUNK_USERNAME $SPLUNK_HOME
-}
-
 # Checks for existence of a file or directory and add it as a monitor if it exists
 # Arguments:
 #   $1: Path of log source
@@ -949,8 +918,8 @@ function add_script {
     fi
 }
 
-function setup_forward_server {
-    log_info "Adding Forward Server"
+function setup_forwarder {
+    log_info "Configuring forwarder"
     sudo -H -u $SPLUNK_USERNAME $SPLUNK_HOME/bin/splunk add forward-server "$1":9997
     # sudo -H -u $SPLUNK_USERNAME $SPLUNK_HOME/bin/splunk enable deploy-client
     # sudo -H -u $SPLUNK_USERNAME $SPLUNK_HOME/bin/splunk set deploy-poll "$1":8089
@@ -1142,13 +1111,56 @@ function install_sysmon {
 function main {
     # log_info "CURRENT TIME: $(date +"%Y-%m-%d_%H:%M:%S")"
     check_prereqs
-    setup_logging
+    enable_script_logs
     print_banner "Installing dependencies..."
     autodetect_os
     install_dependencies
 
-    setup_splunk
+    print_banner "Configuring Splunk"
 
+    # Install Splunk package
+    install_splunk
+
+    # Check if Splunk installed successfully
+    if sudo [ ! -e $SPLUNK_HOME/bin/splunk ]; then
+        log_error "Splunk failed to install"
+        exit 1
+    else
+        log_info "Splunk installed successfully"
+    fi
+
+    # Create splunk system user and splunk service user
+    create_splunk_user
+
+    log_info "Starting splunk"
+    # For some reason, splunk start doesn't work on Ubuntu 14 without a tty...
+    # faketty sudo -H -u splunk $SPLUNK_HOME/bin/splunk start --accept-license --no-prompt
+    sudo -H -u $SPLUNK_USERNAME $SPLUNK_HOME/bin/splunk start --accept-license --no-prompt
+
+    # Make sure the correct username/password is provided before continuing
+    # (this will do nothing if already logged in)
+    res=-1
+    while [ $res -ne 0 ]; do
+        if [ "$SPLUNK_PASSWORD" == "" ]; then
+            # TODO: verify this twice
+            # TODO: also try passing -auth to every splunk command
+            SPLUNK_PASSWORD=$(get_silent_input_string "Enter the password for $SPLUNK_USERNAME user: ")
+        fi
+        sudo -H -u $SPLUNK_USERNAME $SPLUNK_HOME/bin/splunk login -auth "$SPLUNK_USERNAME:$SPLUNK_PASSWORD"
+        res=$?
+    done
+
+    # Setup indexer or forwarder-specific configurations
+    if [ "$INDEXER" == true ]; then
+        setup_indexer
+    else
+        setup_forwarder "$IP"
+    fi
+
+    # Addresses a bug where Splunk may not have the correct permissions
+    sudo chown -R $SPLUNK_USERNAME:$SPLUNK_USERNAME $SPLUNK_HOME
+
+    # Install Add-ons - these provide monitors for the logs we want to collect
     log_info "Installing Nix Add-on"
     install_app "$GITHUB_URL/splunk/linux/Splunk_TA_nix.spl"
 
@@ -1160,6 +1172,7 @@ function main {
         add_monitor "$SPLUNK_HOME/var/log/splunk/web_access.log" "web"
     fi
 
+    # Install additional software for more logs
     print_banner "Installing Additional Logging Sources"
     log_info "Installing:"
     echo "   - auditd (file monitor)"
@@ -1199,6 +1212,7 @@ function main {
         fi
     else
         log_debug "Not a systemd machine; using splunk start"
+        log_warning "Splunk will not start automatically on boot"
         sudo -H -u $SPLUNK_USERNAME $SPLUNK_HOME/bin/splunk start
     fi
 
