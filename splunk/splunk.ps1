@@ -63,8 +63,8 @@ $InformationPreference = "Continue"
 #####################################################
 
 ################### DOWNLOAD URLS ###################
-$indexer_x64 = "https://download.splunk.com/products/splunk/releases/10.0.5/windows/splunk-10.0.5-3d2e2618f448-windows-x64.msi"
-$uf_x64 = "https://download.splunk.com/products/universalforwarder/releases/10.0.5/windows/splunkforwarder-10.0.5-3d2e2618f448-windows-x64.msi"
+$indexer_x64 = "https://download.splunk.com/products/splunk/releases/10.4.2/windows/splunk-10.4.2-33c3bf42cd73-windows-x64.msi"
+$uf_x64 = "https://download.splunk.com/products/universalforwarder/releases/10.4.2/windows/splunkforwarder-10.4.2-33c3bf42cd73-windows-x64.msi"
 
 $indexer_9_2_11_x64 = "https://download.splunk.com/products/splunk/releases/9.2.11/windows/splunk-9.2.11-45e7d4c09780-x64-release.msi"
 $9_2_11_x64 = "https://download.splunk.com/products/universalforwarder/releases/9.2.11/windows/splunkforwarder-9.2.11-45e7d4c09780-x64-release.msi"

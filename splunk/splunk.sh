@@ -43,17 +43,17 @@ SPLUNK_PASSWORD=""
 PACKAGE_TYPES=("indexer_deb" "indexer_rpm" "indexer_tgz" "deb" "rpm" "tgz" "arm_deb" "arm_rpm" "arm_tgz")
 
 # Indexer
-indexer_deb="https://download.splunk.com/products/splunk/releases/10.0.4/linux/splunk-10.0.4-5ea723e837ec-linux-amd64.deb"
-indexer_rpm="https://download.splunk.com/products/splunk/releases/10.0.4/linux/splunk-10.0.4-5ea723e837ec.x86_64.rpm"
-indexer_tgz="https://download.splunk.com/products/splunk/releases/10.0.4/linux/splunk-10.0.4-5ea723e837ec-linux-amd64.tgz"
+indexer_deb="https://download.splunk.com/products/splunk/releases/10.4.2/linux/splunk-10.4.2-33c3bf42cd73-linux-amd64.deb"
+indexer_rpm="https://download.splunk.com/products/splunk/releases/10.4.2/linux/splunk-10.4.2-33c3bf42cd73.x86_64.rpm"
+indexer_tgz="https://download.splunk.com/products/splunk/releases/10.4.2/linux/splunk-10.4.2-33c3bf42cd73-linux-amd64.tgz"
 
 # Forwarder
-deb="https://download.splunk.com/products/universalforwarder/releases/10.0.4/linux/splunkforwarder-10.0.4-5ea723e837ec-linux-amd64.deb"
-rpm="https://download.splunk.com/products/universalforwarder/releases/10.0.4/linux/splunkforwarder-10.0.4-5ea723e837ec.x86_64.rpm"
-tgz="https://download.splunk.com/products/universalforwarder/releases/10.0.4/linux/splunkforwarder-10.0.4-5ea723e837ec-linux-amd64.tgz"
-arm_deb="https://download.splunk.com/products/universalforwarder/releases/10.0.4/linux/splunkforwarder-10.0.4-5ea723e837ec-linux-arm64.deb"
-arm_rpm="https://download.splunk.com/products/universalforwarder/releases/10.0.4/linux/splunkforwarder-10.0.4-5ea723e837ec.aarch64.rpm"
-arm_tgz="https://download.splunk.com/products/universalforwarder/releases/10.0.4/linux/splunkforwarder-10.0.4-5ea723e837ec-linux-arm64.tgz"
+deb="https://download.splunk.com/products/universalforwarder/releases/10.4.2/linux/splunkforwarder-10.4.2-33c3bf42cd73-linux-amd64.deb"
+rpm="https://download.splunk.com/products/universalforwarder/releases/10.4.2/linux/splunkforwarder-10.4.2-33c3bf42cd73.x86_64.rpm"
+tgz="https://download.splunk.com/products/universalforwarder/releases/10.4.2/linux/splunkforwarder-10.4.2-33c3bf42cd73-linux-amd64.tgz"
+arm_deb="https://download.splunk.com/products/universalforwarder/releases/10.4.2/linux/splunkforwarder-10.4.2-33c3bf42cd73-linux-arm64.deb"
+arm_rpm="https://download.splunk.com/products/universalforwarder/releases/10.4.2/linux/splunkforwarder-10.4.2-33c3bf42cd73.aarch64.rpm"
+arm_tgz="https://download.splunk.com/products/universalforwarder/releases/10.4.2/linux/splunkforwarder-10.4.2-33c3bf42cd73-linux-arm64.tgz"
 
 ### 9.2.10 ###
 # Indexer
