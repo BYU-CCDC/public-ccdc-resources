@@ -620,11 +620,13 @@ function install_package {
         *.deb )
             prep_install "$link" splunk.deb
             log_info "Installing package..."
+            log_info "Even though it may look hung, please be patient - this may take several minutes"
             sudo dpkg -i ./splunk.deb
         ;;
         *.rpm )
             prep_install "$link" splunk.rpm
             log_info "Installing package..."
+            log_info "Even though it may look hung, please be patient - this may take several minutes"
             case "$PM" in
                 zypper )
                     sudo zypper --no-gpg-checks install -y -qq ./splunk.rpm
