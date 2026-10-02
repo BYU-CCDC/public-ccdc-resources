@@ -128,11 +128,6 @@ function check_prereqs {
         print_ansi "Downloading wordlist file...\n" $GREEN
         download "$WORDLIST_URL" "$WORDLIST_FILE"
     fi
-
-    if ! [ -d $(dirname "$LOG_FILE") ]; then
-        mkdir -p /var/log/ccdc
-        chmod 700 /var/log/ccdc
-    fi
 }
 
 # Change root and create ccdc users
@@ -216,6 +211,13 @@ while getopts "hiu:U:gp:" opt; do
 done
 
 print_ansi "Starting Zulu Password Generator Script...\n" $GREEN $BOLD
+
+# Create log directory if it doesn't exist
+if ! [ -d $(dirname "$LOG_FILE") ]; then
+    mkdir -p /var/log/ccdc
+    chmod 700 /var/log/ccdc
+fi
+
 append_log "Script started at $(date)"
 print_ansi "The default behavior is to change passwords for all users with a shell except: ${EXCLUDED_USERS[*]}.\n"
 check_prereqs
