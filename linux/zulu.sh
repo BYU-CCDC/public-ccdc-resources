@@ -247,7 +247,16 @@ fi
 
 # Exclude users
 for user in "${RAW_USERS[@]}"; do
-    [[ "${EXCLUDED_USERS[@]}" == "${user}" ]] || USERS+=("$user")
+    excluded=false
+
+    for excluded_user in "${EXCLUDED_USERS[@]}"; do
+        if [[ "$user" == "$excluded_user" ]]; then
+            excluded=true
+            break
+        fi
+    done
+
+    [[ "$excluded" == false ]] && USERS+=("$user")
 done
 
 # Ask for seed phrase (twice to confirm)
