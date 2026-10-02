@@ -1,4 +1,5 @@
 #!/usr/bin/bash
+set -o pipefail
 NUM_WORDS=5
 WORDLIST_URL="https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main/windows/hardening/wordlist.txt"
 EXPORT_USERS="users.txt"
@@ -126,6 +127,11 @@ function check_prereqs {
     if ! [ -f "$WORDLIST_FILE" ]; then
         print_ansi "Downloading wordlist file...\n" $GREEN
         download "$WORDLIST_URL" "$WORDLIST_FILE"
+    fi
+
+    if ! [ -d $(dirname "$LOG_FILE") ]; then
+        mkdir -p /var/log/ccdc
+        chmod 700 /var/log/ccdc
     fi
 }
 
