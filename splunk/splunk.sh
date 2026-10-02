@@ -986,6 +986,7 @@ function install_auditd {
         sudo auditctl -l
     fi
 
+    # TODO: switch to splunk group instead of splunk user
     sudo setfacl -Rm g:$SPLUNK_USERNAME:rx /var/log/audit/
     sudo setfacl -Rdm g:$SPLUNK_USERNAME:rx /var/log/audit/
     AUDITD_SUCCESSFUL=true
