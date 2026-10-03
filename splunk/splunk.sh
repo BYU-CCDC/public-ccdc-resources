@@ -849,6 +849,9 @@ function setup_indexer {
     log_info "Fixing domain list error"
     sudo -u $SPLUNK_USERNAME sh -c "echo allowedDomainList = allow_all >> $SPLUNK_HOME/etc/system/local/alert_actions.conf"
 
+    log_info "Disabling new UI"
+    sudo -u $SPLUNK_USERNAME sh -c "printf '[feature:modern-nav]\nenable_nav_vnext = false\n' > /opt/splunk/etc/system/local/web-features.conf"
+
     log_info "Installing indexer apps"
     sudo rm /tmp/app.spl &>/dev/null
 
