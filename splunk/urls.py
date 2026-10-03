@@ -1,9 +1,13 @@
 import requests
 from bs4 import BeautifulSoup
 import sys
+import argparse
 
-versions = ['latest']
 oses = ['windows', 'linux', 'solaris', 'osx', 'freebsd', 'aix']
+
+argparse = argparse.ArgumentParser(description='Scrape Splunk download URLs')
+argparse.add_argument('version', help='Version to scrape (e.g. "latest" or "8.2.5")', default='latest')
+args = argparse.parse_args()
 
 class SplunkDownload:
     def __init__(self, extension, filename, url):
@@ -100,31 +104,31 @@ def scrape(scrape_version, type):
             results.append(splunk_version)
     return results
 
-for version in versions:
-    indexer_results = scrape(version, 'indexer')
-    uf_results = scrape(version, 'uf')
+print("Scraping Splunk download URLs...")
+indexer_results = scrape(args.version, 'indexer')
+uf_results = scrape(args.version, 'uf')
 
-    indexer_markdown = "\n".join(str(result) for result in indexer_results)
-    uf_markdown = "\n".join(str(result) for result in uf_results)
+indexer_markdown = "\n".join(str(result) for result in indexer_results)
+uf_markdown = "\n".join(str(result) for result in uf_results)
 
-    markdown = f"""# Splunk Download URLs
-Version: [{indexer_results[0].version}](https://docs.splunk.com/Documentation/Splunk/{version}/Installation/Systemrequirements)
+markdown = f"""# Splunk Download URLs
+Version: [{indexer_results[0].version}](https://docs.splunk.com/Documentation/Splunk/{args.version}/Installation/Systemrequirements)
 
 ## Indexer
 {indexer_markdown}
 ## Universal Forwarder
 {uf_markdown}"""
 
-    if input("Write to README.md? (y/n): ").lower() == 'y':
-        with open(f'README.md', 'w') as f:
-            f.write(markdown)
-        print("Wrote to README.md")
-    
-    if input("Output bash variables? (y/n): ").lower() == 'y':
-        linux_indexer = next(res for res in indexer_results if 'linux' in res.os.lower() and res.bits == '64-bit')
-        linux_uf_64 = next(res for res in uf_results if 'linux' in res.os.lower() and res.bits == '64-bit')
-        linux_uf_arm = next(res for res in uf_results if 'linux' in res.os.lower() and res.bits == 'ARM')
-        bash_vars = f"""# Indexer
+if input("Write to README.md? (y/n): ").lower() == 'y':
+    with open(f'README.md', 'w') as f:
+        f.write(markdown)
+    print("Wrote to README.md")
+
+if input("Output bash variables? (y/n): ").lower() == 'y':
+    linux_indexer = next(res for res in indexer_results if 'linux' in res.os.lower() and res.bits == '64-bit')
+    linux_uf_64 = next(res for res in uf_results if 'linux' in res.os.lower() and res.bits == '64-bit')
+    linux_uf_arm = next(res for res in uf_results if 'linux' in res.os.lower() and res.bits == 'ARM')
+    bash_vars = f"""# Indexer
 indexer_deb="{next(d.url for d in linux_indexer.downloads if d.extension.endswith('deb'))}"
 indexer_rpm="{next(d.url for d in linux_indexer.downloads if d.extension.endswith('rpm'))}"
 indexer_tgz="{next(d.url for d in linux_indexer.downloads if d.extension.endswith('tgz'))}"
@@ -137,4 +141,12 @@ arm_deb="{next(d.url for d in linux_uf_arm.downloads if d.extension.endswith('de
 arm_rpm="{next(d.url for d in linux_uf_arm.downloads if d.extension.endswith('rpm'))}"
 arm_tgz="{next(d.url for d in linux_uf_arm.downloads if d.extension.endswith('tgz'))}"
 """
-        print(bash_vars)
+    print(bash_vars)
+
+if input("Output PowerShell variables? (y/n): ").lower() == 'y':
+    windows_indexer = next(res for res in indexer_results if 'windows' in res.os.lower() and res.bits == '64-bit')
+    windows_uf = next(res for res in uf_results if 'windows' in res.os.lower() and res.bits == '64-bit')
+    ps_vars = f"""$indexer_x64 = "{next(d.url for d in windows_indexer.downloads if d.extension.endswith('msi'))}"
+$uf_x64 = "{next(d.url for d in windows_uf.downloads if d.extension.endswith('msi'))}"
+"""
+    print(ps_vars)

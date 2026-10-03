@@ -63,19 +63,17 @@ $InformationPreference = "Continue"
 #####################################################
 
 ################### DOWNLOAD URLS ###################
-$indexer_10_0_2_x64 = "https://download.splunk.com/products/splunk/releases/10.0.2/windows/splunk-10.0.2-e2d18b4767e9-windows-x64.msi"
-$indexer_9_2_11_x64 = "https://download.splunk.com/products/splunk/releases/9.2.11/windows/splunk-9.2.11-45e7d4c09780-x64-release.msi"
-$latest_indexer_x64 = $indexer_10_0_2_x64
+$indexer_x64 = "https://download.splunk.com/products/splunk/releases/10.4.2/windows/splunk-10.4.2-33c3bf42cd73-windows-x64.msi"
+$uf_x64 = "https://download.splunk.com/products/universalforwarder/releases/10.4.2/windows/splunkforwarder-10.4.2-33c3bf42cd73-windows-x64.msi"
 
-$10_0_2_x64 = "https://download.splunk.com/products/universalforwarder/releases/10.0.2/windows/splunkforwarder-10.0.2-e2d18b4767e9-windows-x64.msi"
+$indexer_9_2_11_x64 = "https://download.splunk.com/products/splunk/releases/9.2.11/windows/splunk-9.2.11-45e7d4c09780-x64-release.msi"
 $9_2_11_x64 = "https://download.splunk.com/products/universalforwarder/releases/9.2.11/windows/splunkforwarder-9.2.11-45e7d4c09780-x64-release.msi"
 $9_2_11_x86 = "https://download.splunk.com/products/universalforwarder/releases/9.2.11/windows/splunkforwarder-9.2.11-45e7d4c09780-x86-release.msi"
 $9_1_6_x64 = "https://download.splunk.com/products/universalforwarder/releases/9.1.6/windows/splunkforwarder-9.1.6-a28f08fac354-x64-release.msi"
 $9_1_6_x86 = "https://download.splunk.com/products/universalforwarder/releases/9.1.6/windows/splunkforwarder-9.1.6-a28f08fac354-x86-release.msi"
 $7_3_9_x64 = "https://download.splunk.com/products/universalforwarder/releases/7.3.9/windows/splunkforwarder-7.3.9-39a78bf1bc5b-x64-release.msi"
 $7_3_9_x86 = "https://download.splunk.com/products/universalforwarder/releases/7.3.9/windows/splunkforwarder-7.3.9-39a78bf1bc5b-x86-release.msi"
-$newest_x64 = $10_0_2_x64
-$newest_x86 = $9_2_11_x86
+$uf_x86 = $9_2_11_x86
 #####################################################
 
 ##################### FUNCTIONS #####################
@@ -256,12 +254,12 @@ function detect_version {
                 "Windows 8" = $null
                 "Windows Server 2012" = $null
                 "Windows Server 2012 R2" = $null
-                "Windows Server 2016" = $latest_indexer_x64   # technically not supported
-                "Windows 10" = $latest_indexer_x64            # technically not supported
-                "Windows 11" = $latest_indexer_x64            # technically not supported
-                "Windows Server 2019" = $latest_indexer_x64
-                "Windows Server 2022" = $latest_indexer_x64
-                "Windows Server 2025" = $latest_indexer_x64
+                "Windows Server 2016" = $indexer_x64   # technically not supported
+                "Windows 10" = $indexer_x64            # technically not supported
+                "Windows 11" = $indexer_x64            # technically not supported
+                "Windows Server 2019" = $indexer_x64
+                "Windows Server 2022" = $indexer_x64
+                "Windows Server 2025" = $indexer_x64
             }
             
         } else {
@@ -280,11 +278,11 @@ function detect_version {
                 "Windows Server 2012" = $9_1_6_x64
                 "Windows Server 2012 R2" = $9_1_6_x64
                 "Windows Server 2016" = $10_0_2_x64
-                "Windows 10" = $newest_x64
-                "Windows 11" = $newest_x64
-                "Windows Server 2019" = $newest_x64
-                "Windows Server 2022" = $newest_x64
-                "Windows Server 2025" = $newest_x64
+                "Windows 10" = $uf_x64
+                "Windows 11" = $uf_x64
+                "Windows Server 2019" = $uf_x64
+                "Windows Server 2022" = $uf_x64
+                "Windows Server 2025" = $uf_x64
             }
         } else {
             $version_map = @{
@@ -297,11 +295,11 @@ function detect_version {
                 "Windows Server 2012" = $9_1_6_x86
                 "Windows Server 2012 R2" = $9_1_6_x86
                 "Windows Server 2016" = $10_0_2_x86
-                "Windows 10" = $newest_x86
-                "Windows 11" = $newest_x86
-                "Windows Server 2019" = $newest_x86
-                "Windows Server 2022" = $newest_x86
-                "Windows Server 2025" = $newest_x86
+                "Windows 10" = $uf_x86
+                "Windows 11" = $uf_x86
+                "Windows Server 2019" = $uf_x86
+                "Windows Server 2022" = $uf_x86
+                "Windows Server 2025" = $uf_x86
             }
         }
     }

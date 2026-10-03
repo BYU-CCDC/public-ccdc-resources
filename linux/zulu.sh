@@ -1,4 +1,5 @@
 #!/usr/bin/bash
+set -o pipefail
 NUM_WORDS=5
 WORDLIST_URL="https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main/windows/hardening/wordlist.txt"
 EXPORT_USERS="users.txt"
@@ -139,7 +140,9 @@ function initial_change {
     useradd -m -s /bin/bash ccdcuser2
 
     print_ansi "\nSetting passwords for ccdcuser1 and ccdcuser2...\n" $GREEN
+    print_ansi "ccdcuser1:\n" $YELLOW
     passwd ccdcuser1
+    print_ansi "ccdcuser2:\n" $YELLOW
     passwd ccdcuser2
 
     print_ansi "\nAdding ccdcuser1 to sudoers...\n" $GREEN
@@ -210,6 +213,13 @@ while getopts "hiu:U:gp:" opt; do
 done
 
 print_ansi "Starting Zulu Password Generator Script...\n" $GREEN $BOLD
+
+# Create log directory if it doesn't exist
+if ! [ -d $(dirname "$LOG_FILE") ]; then
+    mkdir -p /var/log/ccdc
+    chmod 700 /var/log/ccdc
+fi
+
 append_log "Script started at $(date)"
 print_ansi "The default behavior is to change passwords for all users with a shell except: ${EXCLUDED_USERS[*]}.\n"
 check_prereqs
@@ -239,7 +249,16 @@ fi
 
 # Exclude users
 for user in "${RAW_USERS[@]}"; do
-    [[ "${EXCLUDED_USERS[@]}" == "${user}" ]] || USERS+=("$user")
+    excluded=false
+
+    for excluded_user in "${EXCLUDED_USERS[@]}"; do
+        if [[ "$user" == "$excluded_user" ]]; then
+            excluded=true
+            break
+        fi
+    done
+
+    [[ "$excluded" == false ]] && USERS+=("$user")
 done
 
 # Ask for seed phrase (twice to confirm)

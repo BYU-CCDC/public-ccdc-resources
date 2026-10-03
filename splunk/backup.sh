@@ -1,7 +1,7 @@
 #!/bin/bash
 # https://help.splunk.com/en/splunk-enterprise/administer/manage-indexers-and-indexer-clusters/10.0/back-up-and-archive-your-indexes/back-up-indexed-data
 
-INDEXES=( 'system' 'web' 'network' 'windows' 'misc' 'snoopy' 'ossec' 'edr' )
+INDEXES=( 'nix' 'windows' 'web' 'network' 'snoopy' 'ossec' 'edr' )
 mode=$1
 
 if [[ "$mode" = "backup" ]]; then
