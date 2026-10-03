@@ -1005,6 +1005,7 @@ function install_snoopy {
     log_info "Installing Snoopy (trying version $version)"
     if sudo [ -e /usr/local/lib/libsnoopy.so ]; then
         log_info "Snoopy is already installed"
+        SNOOPY_SUCCESSFUL=true
         return 0
     fi
 
