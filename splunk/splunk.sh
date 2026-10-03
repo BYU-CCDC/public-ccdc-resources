@@ -1172,7 +1172,7 @@ function main {
     install_app "$GITHUB_URL/splunk/linux/Splunk_TA_nix.spl"
 
     log_info "Installing CCDC Add-on"
-    install_app "$GITHUB_URL/splunk/ccdc-add-on.spl"
+    install_app "$GITHUB_URL/splunk/linux/ccdc-add-on.spl"
 
     if [ "$INDEXER" == true ]; then
         log_info "Adding monitors for Splunk web logs"
