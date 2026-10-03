@@ -494,8 +494,9 @@ function install_dependencies {
         sudo "$PM" install -qq -y wget curl acl unzip
         if [ "$PM" == "apt-get" ]; then
             sudo "$PM" install -qq -y debsums
+            DEBIAN_FRONTEND=noninteractive sudo "$PM" install -qq -y aide
         else
-            sudo "$PM" install -qq -y rpm
+            sudo "$PM" install -qq -y rpm aide
         fi
 
         syslog_installed=false
