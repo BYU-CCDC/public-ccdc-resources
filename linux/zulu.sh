@@ -140,7 +140,9 @@ function initial_change {
     useradd -m -s /bin/bash ccdcuser2
 
     print_ansi "\nSetting passwords for ccdcuser1 and ccdcuser2...\n" $GREEN
+    print_ansi "ccdcuser1:\n" $YELLOW
     passwd ccdcuser1
+    print_ansi "ccdcuser2:\n" $YELLOW
     passwd ccdcuser2
 
     print_ansi "\nAdding ccdcuser1 to sudoers...\n" $GREEN
