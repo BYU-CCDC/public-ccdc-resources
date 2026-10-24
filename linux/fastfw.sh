@@ -109,7 +109,7 @@ yesno n && {
     done
 }
 
-iptables -A OUTPUT -j LOG --log-prefix "iptables: "
+iptables -A OUTPUT -j LOG --log-prefix "iptables OUTPUT DROP: "
 
 echo 'Changing policy...'
 iptables -P INPUT DROP
