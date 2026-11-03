@@ -395,8 +395,8 @@ function autodetect_os {
     fi
 
     case "$os_family" in
-        *debian* )
-            log_info "Debian-based OS detected"
+        *debian*|*ubuntu* )
+            log_info "Debian/Ubuntu-based OS detected"
             PM="apt-get"
         ;;
         *fedora*|*rhel*|*centos* )
