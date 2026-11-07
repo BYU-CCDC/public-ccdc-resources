@@ -1143,7 +1143,7 @@ function main {
     log_info "Starting splunk"
     # For some reason, splunk start doesn't work on Ubuntu 14 without a tty...
     # faketty sudo -H -u splunk $SPLUNK_HOME/bin/splunk start --accept-license --no-prompt
-    until sudo -H -u $SPLUNK_USERNAME $SPLUNK_HOME/bin/splunk start --accept-license --no-prompt; do
+    until sudo -H -u $SPLUNK_USERNAME $SPLUNK_HOME/bin/splunk restart --accept-license --no-prompt; do
         log_error "Splunk failed to start, retrying..."
         sleep 1
     done
