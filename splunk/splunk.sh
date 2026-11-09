@@ -1015,18 +1015,8 @@ function install_snoopy {
     # Install snoopy dependencies
     log_info "Installing Snoopy dependencies"
     case "$PM" in
-        apt-get|dnf|yum)
-            if ! sudo "$PM" install -y gcc gzip make procps socat tar wget; then
-                log_error "Failed to install snoopy dependencies"
-                return 1
-            fi
-        ;;
-        zypper)
-            if ! sudo zypper --non-interactive install \
-                awk findutils gcc gzip make procps socat tar wget; then
-                log_error "Failed to install snoopy dependencies"
-                return 1
-            fi
+        apt-get|dnf|yum|zypper)
+            sudo "$PM" install -y gcc gzip make procps socat tar wget
         ;;
         * )
             log_error "Unsupported package manager for Snoopy: $PM"
