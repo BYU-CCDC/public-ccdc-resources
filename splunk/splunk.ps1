@@ -54,7 +54,7 @@ param (
 #####################################################
 
 ###################### GLOBALS ######################
-$SPLUNK_USERNAME = "splunk"
+$SPLUNK_USERNAME = "splunkfwd"
 $INDEXES = @("system", "web", "network", "windows", "misc", "snoopy", "ossec", "edr")
 $SPLUNKDIR = "C:\Program Files\SplunkUniversalForwarder"
 $SPLUNK_SERVICE = "SplunkForwarder"

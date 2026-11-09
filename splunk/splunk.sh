@@ -1012,21 +1012,15 @@ function install_snoopy {
     download https://github.com/a2o/snoopy/raw/install/install/install-snoopy.sh "install-snoopy.sh"
     chmod 755 install-snoopy.sh
     
-    # Install dependencies
+    # Install snoopy dependencies
+    log_info "Installing Snoopy dependencies"
     case "$PM" in
-        apt )
-        ;;
-        dnf|zypper|yum )
-            if sudo test -f "/etc/centos-release" || sudo test -f "/etc/redhat-release"; then
-                if [ "$PM" == "yum" ]; then
-                    sudo "$PM" install -y -qq epel-release --skip-unavailable
-                else
-                    sudo "$PM" install -y -qq epel-release
-                fi
-            fi
-            sudo "$PM" install -y -qq gcc gzip make procps socat tar wget
+        apt-get|dnf|yum|zypper)
+            sudo "$PM" install -y gcc gzip make procps socat tar wget
         ;;
         * )
+            log_error "Unsupported package manager for Snoopy: $PM"
+            return 1
         ;;
     esac
 
@@ -1143,7 +1137,7 @@ function main {
     log_info "Starting splunk"
     # For some reason, splunk start doesn't work on Ubuntu 14 without a tty...
     # faketty sudo -H -u splunk $SPLUNK_HOME/bin/splunk start --accept-license --no-prompt
-    until sudo -H -u $SPLUNK_USERNAME $SPLUNK_HOME/bin/splunk start --accept-license --no-prompt; do
+    until sudo -H -u $SPLUNK_USERNAME $SPLUNK_HOME/bin/splunk restart --accept-license --no-prompt; do
         log_error "Splunk failed to start, retrying..."
         sleep 1
     done
