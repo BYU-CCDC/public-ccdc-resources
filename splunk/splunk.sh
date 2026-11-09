@@ -1012,21 +1012,25 @@ function install_snoopy {
     download https://github.com/a2o/snoopy/raw/install/install/install-snoopy.sh "install-snoopy.sh"
     chmod 755 install-snoopy.sh
     
-    # Install dependencies
+    # Install snoopy dependencies
+    log_info "Installing Snoopy dependencies"
     case "$PM" in
-        apt )
-        ;;
-        dnf|zypper|yum )
-            if sudo test -f "/etc/centos-release" || sudo test -f "/etc/redhat-release"; then
-                if [ "$PM" == "yum" ]; then
-                    sudo "$PM" install -y -qq epel-release --skip-unavailable
-                else
-                    sudo "$PM" install -y -qq epel-release
-                fi
+        apt-get|dnf|yum)
+            if ! sudo "$PM" install -y gcc gzip make procps socat tar wget; then
+                log_error "Failed to install snoopy dependencies"
+                return 1
             fi
-            sudo "$PM" install -y -qq gcc gzip make procps socat tar wget
+        ;;
+        zypper)
+            if ! sudo zypper --non-interactive install \
+                awk findutils gcc gzip make procps socat tar wget; then
+                log_error "Failed to install snoopy dependencies"
+                return 1
+            fi
         ;;
         * )
+            log_error "Unsupported package manager for Snoopy: $PM"
+            return 1
         ;;
     esac
 
