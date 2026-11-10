@@ -27,6 +27,7 @@ DEFAULT_BG=49
 NC='\x1B[0m'
 
 function get_os_info {
+    # See https://github.com/chef/os_release for examples of /etc/os-release files
     source /etc/os-release
 
     if [[ -z "$ID_LIKE" ]]; then
@@ -36,17 +37,20 @@ function get_os_info {
     fi
 
     case "$OS_FAMILY" in
-        *debian* )
+        *debian*|*ubuntu* )
             PM="apt-get"
             function install_package {
                 apt-get update
-                apt-get install -y "$1"
+                apt-get install -qq -y "$@"
+                return $?
             }
             function remove_package {
-                apt-get remove -y "$1"
+                # apt-get remove -y "$@"
+                apt-get purge -y "$@"
+                return $?
             }
             function detect_package {
-                dpkg -s "$1" &> /dev/null
+                dpkg -s "$@" &> /dev/null
                 return $?
             }
         ;;
@@ -55,25 +59,29 @@ function get_os_info {
             if [ $? == 0 ]; then
                 PM="dnf"
                 function install_package {
-                    dnf install -y "$1"
+                    dnf install --nogpgcheck -qq -y "$@"
+                    return $?
                 }
                 function remove_package {
-                    dnf remove -y "$1"
+                    dnf remove -y "$@"
+                    return $?
                 }
                 function detect_package {
-                    rpm -q "$1" &> /dev/null
+                    rpm -q "$@" &> /dev/null
                     return $?
                 }
             else
                 PM="yum"
                 function install_package {
-                    yum install -y "$1"
+                    yum install --nogpgcheck -qq -y "$@"
+                    return $?
                 }
                 function remove_package {
-                    yum remove -y "$1"
+                    yum remove -y "$@"
+                    return $?
                 }
                 function detect_package {
-                    rpm -q "$1" &> /dev/null
+                    rpm -q "$@" &> /dev/null
                     return $?
                 }
             fi
@@ -81,39 +89,45 @@ function get_os_info {
         *suse*|*opensuse* )
             PM="zypper"
             function install_package {
-                zypper install -y "$1"
+                zypper --no-gpg-checks install -qq -y "$@"
+                return $?
             }
             function remove_package {
-                zypper remove -y "$1"
+                zypper remove -y "$@"
+                return $?
             }
             function detect_package {
-                rpm -q "$1" &> /dev/null
+                rpm -q "$@" &> /dev/null
                 return $?
             }
         ;;
         *arch* )
             PM="pacman"
             function install_package {
-                pacman -S --noconfirm "$1"
+                pacman -S --noconfirm "$@"
+                return $?
             }
             function remove_package {
-                pacman -R --noconfirm "$1"
+                pacman -R --noconfirm "$@"
+                return $?
             }
             function detect_package {
-                pacman -Q "$1" &> /dev/null
+                pacman -Q "$@" &> /dev/null
                 return $?
             }
         ;;
         *alpine* )
             PM="apk"
             function install_package {
-                apk add "$1"
+                apk add "$@"
+                return $?
             }
             function remove_package {
-                apk del "$1"
+                apk del "$@"
+                return $?
             }
             function detect_package {
-                apk info "$1" &> /dev/null
+                apk info "$@" &> /dev/null
                 return $?
             }
         ;;
@@ -128,9 +142,9 @@ function download {
     local output="$2"
 
     if command -v wget > /dev/null 2>&1; then
-        wget -O "$output" --no-check-certificate "$url" --progress=dot:mega 2>&1 | grep -Eo ' [0-9]0% ' | uniq
+        wget -O "$output" --no-check-certificate "$url" -q --progress=dot:giga
     elif command -v curl > /dev/null 2>&1; then
-        curl -L -o "$output" -k "$url"
+        curl -# -L -o "$output" -k "$url"
     else
         return 1
     fi
@@ -299,32 +313,12 @@ function get_input_string {
     echo "$input"
 }
 
-function get_password {
-    min_length=${1:-8}
-
-    while true; do
-        password=""
-        confirm_password=""
-
-        # Ask for password
-        password=$(get_silent_input_string "Password: ")
-        echo
-
-        # Confirm password
-        confirm_password=$(get_silent_input_string "Confirm password: ")
-        echo
-
-        if [ "$password" != "$confirm_password" ]; then
-            echo "Passwords do not match. Please retry."
-            continue
-        fi
-
-        if [ "${#password}" -lt $min_length ]; then
-            echo "Password must be at least $min_length characters long. Please retry."
-            continue
-        fi
-
-        break
-    done
-    return "$password"
+function enable_start_service {
+    local service="$1"
+    if command -v systemctl &> /dev/null; then
+        systemctl enable --now "$service"
+    elif command -v service &> /dev/null; then
+        service "$service" start
+    fi
+    # TODO: implement for alpine
 }
