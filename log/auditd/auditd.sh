@@ -94,7 +94,10 @@ fi
 
 # Download custom rule file
 custom_rule_file="/etc/audit/rules.d/ccdc.rules"
-download_or_local "$GITHUB_URL/log/auditd/ccdc.rules" "$custom_rule_file"
+if ! download_or_local "$GITHUB_URL/log/auditd/ccdc.rules" "$custom_rule_file"; then
+    log_error "Failed to retrieve custom audit rules"
+    exit 1
+fi
 chown root:root "$custom_rule_file"
 chmod 600 "$custom_rule_file"
 
