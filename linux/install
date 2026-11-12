@@ -1,0 +1,249 @@
+#!/usr/bin/env bash
+
+if [ -n "$ZSH_VERSION" ]; then
+    EXEC_SHELL="zsh"
+    IFS='.' read -A EXEC_SHELL_VERSION <<< "$ZSH_VERSION"
+elif [ -n "$KSH_VERSION" ]; then
+    EXEC_SHELL="ksh"
+    __exec_shell_version="${.sh.version##*/}"
+    IFS='.' read -a EXEC_SHELL_VERSION <<< "${__exec_shell_version%% *}"
+else
+    EXEC_SHELL="bash"
+    EXEC_SHELL_VERSION=("${BASH_VERSINFO[0]}" "${BASH_VERSINFO[1]}" "${BASH_VERSINFO[2]}")
+fi
+__VERBOSITY_0=0
+__GITHUB_URL_1="https://raw.githubusercontent.com/BYU-CCDC/linux-hardening-public/refs/heads/main/"
+__MOD_DIR_3="/usr/lib/ccdc/modules/"
+__CCDC_SCRIPT_PATH_4="/usr/bin/ccdc"
+# log(message: Text, level: Int)
+log__0_v0() {
+    local message_22="${1}"
+    local level_23="${2}"
+    local log_levels_24=("[INFO]	" "[VERBOSE]	" "[DEBUG]	")
+    if [ "$(( $(( __VERBOSITY_0 >= level_23 )) && $(( __VERBOSITY_0 != -1 )) ))" != 0 ]; then
+        printf '%s\n' "${log_levels_24[${level_23}]?"Index out of bounds (at src/utils/utils.ab:8:25)"}"" ""${message_22}"
+    fi
+}
+
+# error(message: Text)
+error__1_v0() {
+    local message_15="${1}"
+    echo "[ERROR]: ""${message_15}"
+}
+
+# ends_with(text: Text, suffix: Text)
+ends_with__27_v0() {
+    local text_52="${1}"
+    local suffix_53="${2}"
+    [[ "${text_52}" == *"${suffix_53}" ]]
+    __status=$?
+    ret_ends_with27_v0="$(( __status == 0 ))"
+    return 0
+}
+
+# slice(text: Text, index: Int, length: Int)
+slice__28_v0() {
+    local text_54="${1}"
+    local index_55="${2}"
+    local length_56="${3}"
+    local result_57=""
+    if [ "$(( length_56 == 0 ))" != 0 ]; then
+        local __length_1="${text_54}"
+        length_56="$(( ${#__length_1} - index_55 ))"
+    fi
+    if [ "$(( length_56 <= 0 ))" != 0 ]; then
+        ret_slice28_v0="${result_57}"
+        return 0
+    fi
+    result_57="${text_54: ${index_55}: ${length_56}}"
+    __status=$?
+    ret_slice28_v0="${result_57}"
+    return 0
+}
+
+# dir_exists(path: Text)
+dir_exists__42_v0() {
+    local path_32="${1}"
+    [ -d "${path_32}" ]
+    __status=$?
+    ret_dir_exists42_v0="$(( __status == 0 ))"
+    return 0
+}
+
+# dir_create(path: Text)
+dir_create__48_v0() {
+    local path_31="${1}"
+    dir_exists__42_v0 "${path_31}"
+    local ret_dir_exists42_v0__87_12="${ret_dir_exists42_v0}"
+    if [ "$(( ! ret_dir_exists42_v0__87_12 ))" != 0 ]; then
+        mkdir -p "${path_31}"
+        __status=$?
+        if [ "${__status}" != 0 ]; then
+            ret_dir_create48_v0=''
+            return "${__status}"
+        fi
+    fi
+}
+
+# build_url(relative_path: Text)
+build_url__69_v0() {
+    local relative_path_50="${1}"
+    local base_51="${__GITHUB_URL_1}"
+    local __length_2="${base_51}"
+    while [ "$(( ${#__length_2} > 0 ))" != 0 ]; do
+        ends_with__27_v0 "${base_51}" "/"
+        local ret_ends_with27_v0__9_16="${ret_ends_with27_v0}"
+        if [ "$(( ! ret_ends_with27_v0__9_16 ))" != 0 ]; then
+            break
+        fi
+        local __length_3="${base_51}"
+        slice__28_v0 "${base_51}" 0 "$(( ${#__length_3} - 1 ))"
+        base_51="${ret_slice28_v0}"
+    done
+    ret_build_url69_v0="${base_51}""/""${relative_path_50}"
+    return 0
+}
+
+command_5="$(id -u)"
+__status=$?
+if [ "${__status}" != 0 ]; then
+code_13="${__status}"
+    error__1_v0 "INSTALL: Could not determine effective user ID (exit ${code_13})"
+    exit "${code_13}"
+fi
+user_id_16="${command_5}"
+if [ "$([ "_${user_id_16}" == "_0" ]; echo $?)" != 0 ]; then
+    command -v sudo > /dev/null
+    __status=$?
+    if [ "${__status}" != 0 ]; then
+        error__1_v0 "INSTALL: sudo is required to install ccdc"
+        exit 1
+    fi
+    sudo -v
+    __status=$?
+    if [ "${__status}" != 0 ]; then
+    code_17="${__status}"
+        error__1_v0 "INSTALL: Could not obtain sudo access (exit ${code_17})"
+        exit "${code_17}"
+    fi
+    exec sudo -- bash "$0" "$@"
+    __status=$?
+    if [ "${__status}" != 0 ]; then
+    code_18="${__status}"
+        error__1_v0 "INSTALL: Could not restart with sudo (exit ${code_18})"
+        exit "${code_18}"
+    fi
+fi
+log__0_v0 "INSTALL: Starting installation" 0
+log__0_v0 "INSTALL: Effective user ID = ${user_id_16}" 2
+log__0_v0 "INSTALL: Checking download tools" 1
+has_curl_25=1
+command -v curl > /dev/null
+__status=$?
+if [ "${__status}" != 0 ]; then
+    has_curl_25=0
+fi
+has_wget_26=1
+command -v wget > /dev/null
+__status=$?
+if [ "${__status}" != 0 ]; then
+    has_wget_26=0
+fi
+log__0_v0 "INSTALL: curl available = ${has_curl_25}; wget available = ${has_wget_26}" 2
+if [ "$(( $(( ! has_curl_25 )) && $(( ! has_wget_26 )) ))" != 0 ]; then
+    error__1_v0 "Install curl or wget before running this installer"
+    exit 1
+fi
+command_6="$(dirname -- "${__CCDC_SCRIPT_PATH_4}")"
+__status=$?
+if [ "${__status}" != 0 ]; then
+    exit "${__status}"
+fi
+script_dir_27="${command_6}"
+log__0_v0 "INSTALL: Loader destination = ${__CCDC_SCRIPT_PATH_4}" 2
+dir_create__48_v0 "${script_dir_27}"
+__status=$?
+if [ "${__status}" != 0 ]; then
+code_33="${__status}"
+    error__1_v0 "INSTALL: Failed to create ${script_dir_27} (exit ${code_33})"
+    exit "${code_33}"
+fi
+command_7="$(mktemp "${script_dir_27}/.ccdc.XXXXXX")"
+__status=$?
+if [ "${__status}" != 0 ]; then
+code_34="${__status}"
+    error__1_v0 "INSTALL: Failed to create a temporary download in ${script_dir_27} (exit ${code_34})"
+    exit "${code_34}"
+fi
+temp_path_35="${command_7}"
+log__0_v0 "INSTALL: Temporary download = ${temp_path_35}" 2
+build_url__69_v0 "ccdc"
+url_58="${ret_build_url69_v0}"
+log__0_v0 "INSTALL: Downloading ${url_58}" 0
+download_status_59=0
+if [ "${has_curl_25}" != 0 ]; then
+    log__0_v0 "INSTALL: Using curl" 1
+    curl --fail --silent --show-error --location --output "${temp_path_35}" "${url_58}"
+    __status=$?
+    if [ "${__status}" != 0 ]; then
+    code_60="${__status}"
+        download_status_59="${code_60}"
+    fi
+else
+    log__0_v0 "INSTALL: Using wget" 1
+    wget --quiet --output-document="${temp_path_35}" "${url_58}"
+    __status=$?
+    if [ "${__status}" != 0 ]; then
+    code_61="${__status}"
+        download_status_59="${code_61}"
+    fi
+fi
+if [ "$(( download_status_59 != 0 ))" != 0 ]; then
+    rm -f -- "${temp_path_35}"
+    __status=$?
+    if [ "${__status}" != 0 ]; then
+        exit "${__status}"
+    fi
+    error__1_v0 "INSTALL: Failed to download ${url_58} (exit ${download_status_59}); the existing loader was not replaced"
+    exit "${download_status_59}"
+fi
+log__0_v0 "INSTALL: Validating Bash and preparing directories" 1
+log__0_v0 "INSTALL: Module directory = ${__MOD_DIR_3}; directory mode = 755; loader mode = 755" 2
+preparation_status_62=0
+command_8="$(dirname -- "${__MOD_DIR_3}")"
+__status=$?
+if [ "${__status}" != 0 ]; then
+    exit "${__status}"
+fi
+ccdc_dir_63="${command_8}"
+test -s "${temp_path_35}" && bash -n "${temp_path_35}" && chmod 755 "${temp_path_35}" && install -d -o root -g root -m 755 -- "${ccdc_dir_63}" "${__MOD_DIR_3}" && find "${__MOD_DIR_3}" -maxdepth 1 -type f -exec chown root:root -- {\} + && find "${__MOD_DIR_3}" -maxdepth 1 -type f -exec chmod 644 -- {\} +
+__status=$?
+if [ "${__status}" != 0 ]; then
+code_64="${__status}"
+    preparation_status_62="${code_64}"
+fi
+if [ "$(( preparation_status_62 != 0 ))" != 0 ]; then
+    rm -f -- "${temp_path_35}"
+    __status=$?
+    if [ "${__status}" != 0 ]; then
+        exit "${__status}"
+    fi
+    error__1_v0 "INSTALL: Could not prepare the loader or module directory (exit ${preparation_status_62}); the existing loader was not replaced"
+    exit "${preparation_status_62}"
+fi
+log__0_v0 "INSTALL: Installing loader at ${__CCDC_SCRIPT_PATH_4}" 0
+mv -fT -- "${temp_path_35}" "${__CCDC_SCRIPT_PATH_4}"
+__status=$?
+if [ "${__status}" != 0 ]; then
+code_65="${__status}"
+    rm -f -- "${temp_path_35}"
+    __status=$?
+    if [ "${__status}" != 0 ]; then
+        exit "${__status}"
+    fi
+    error__1_v0 "Could not install ccdc at ${__CCDC_SCRIPT_PATH_4}"
+    exit "${code_65}"
+fi
+echo "Successfully installed ccdc at ${__CCDC_SCRIPT_PATH_4}"
+echo "Modules directory: ${__MOD_DIR_3}"
+echo "Run ccdc -h to view usage"

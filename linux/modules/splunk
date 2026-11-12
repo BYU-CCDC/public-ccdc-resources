@@ -1,0 +1,154 @@
+#!/usr/bin/env bash
+# @module_name: splunk
+# @mod-imports:
+
+if [ -n "$ZSH_VERSION" ]; then
+    EXEC_SHELL="zsh"
+    IFS='.' read -A EXEC_SHELL_VERSION <<< "$ZSH_VERSION"
+elif [ -n "$KSH_VERSION" ]; then
+    EXEC_SHELL="ksh"
+    __exec_shell_version="${.sh.version##*/}"
+    IFS='.' read -a EXEC_SHELL_VERSION <<< "${__exec_shell_version%% *}"
+else
+    EXEC_SHELL="bash"
+    EXEC_SHELL_VERSION=("${BASH_VERSINFO[0]}" "${BASH_VERSINFO[1]}" "${BASH_VERSINFO[2]}")
+fi
+# dir_exists(path: Text)
+dir_exists__38_v0() {
+    local path_18="${1}"
+    [ -d "${path_18}" ]
+    __status=$?
+    ret_dir_exists38_v0="$(( __status == 0 ))"
+    return 0
+}
+
+# dir_create(path: Text)
+dir_create__44_v0() {
+    local path_17="${1}"
+    dir_exists__38_v0 "${path_17}"
+    local ret_dir_exists38_v0__87_12="${ret_dir_exists38_v0}"
+    if [ "$(( ! ret_dir_exists38_v0__87_12 ))" != 0 ]; then
+        mkdir -p "${path_17}"
+        __status=$?
+        if [ "${__status}" != 0 ]; then
+            ret_dir_create44_v0=''
+            return "${__status}"
+        fi
+    fi
+}
+
+__VERBOSITY_3=0
+__SPLUNK_URL_5="https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/refs/heads/main/splunk/splunk.sh"
+__MOD_DIR_6="/usr/lib/ccdc/modules/"
+# log(message: Text, level: Int)
+log__54_v0() {
+    local message_29="${1}"
+    local level_30="${2}"
+    local log_levels_31=("[INFO]	" "[VERBOSE]	" "[DEBUG]	")
+    if [ "$(( $(( __VERBOSITY_3 >= level_30 )) && $(( __VERBOSITY_3 != -1 )) ))" != 0 ]; then
+        printf '%s\n' "${log_levels_31[${level_30}]?"Index out of bounds (at src/modules/../utils/utils.ab:8:25)"}"" ""${message_29}"
+    fi
+}
+
+# error(message: Text)
+error__55_v0() {
+    local message_21="${1}"
+    echo "[ERROR]: ""${message_21}"
+}
+
+typeset -r args_11=("$0" "$@")
+script_path_12="${__MOD_DIR_6}""splunk.sh"
+cached_13=1
+test -f "${script_path_12}" && test -s "${script_path_12}" && bash -n "${script_path_12}"
+__status=$?
+if [ "${__status}" != 0 ]; then
+    cached_13=0
+fi
+if [ "$(( ! cached_13 ))" != 0 ]; then
+    dir_create__44_v0 "${__MOD_DIR_6}"
+    __status=$?
+    if [ "${__status}" != 0 ]; then
+    code_19="${__status}"
+        error__55_v0 "SPLUNK: Could not create ${__MOD_DIR_6} (exit ${code_19})"
+        exit "${code_19}"
+    fi
+    command_2="$(mktemp "${script_path_12}.XXXXXX")"
+    __status=$?
+    if [ "${__status}" != 0 ]; then
+    code_22="${__status}"
+        error__55_v0 "SPLUNK: Could not create a temporary file beside ${script_path_12} (exit ${code_22})"
+        exit "${code_22}"
+    fi
+    temp_path_23="${command_2}"
+    download_status_24=0
+    has_curl_25=1
+    command -v curl > /dev/null
+    __status=$?
+    if [ "${__status}" != 0 ]; then
+        has_curl_25=0
+    fi
+    if [ "${has_curl_25}" != 0 ]; then
+        log__54_v0 "SPLUNK: Downloading ${__SPLUNK_URL_5} with curl" 0
+        curl --fail --location --silent --show-error --output "${temp_path_23}" "${__SPLUNK_URL_5}"
+        __status=$?
+        if [ "${__status}" != 0 ]; then
+        code_32="${__status}"
+            download_status_24="${code_32}"
+        fi
+    else
+        has_wget_33=1
+        command -v wget > /dev/null
+        __status=$?
+        if [ "${__status}" != 0 ]; then
+            has_wget_33=0
+        fi
+        if [ "${has_wget_33}" != 0 ]; then
+            log__54_v0 "SPLUNK: Downloading ${__SPLUNK_URL_5} with wget" 0
+            wget --quiet --output-document="${temp_path_23}" "${__SPLUNK_URL_5}"
+            __status=$?
+            if [ "${__status}" != 0 ]; then
+            code_34="${__status}"
+                download_status_24="${code_34}"
+            fi
+        else
+            download_status_24=1
+            error__55_v0 "SPLUNK: curl or wget is required to download ${__SPLUNK_URL_5}"
+        fi
+    fi
+    if [ "$(( download_status_24 != 0 ))" != 0 ]; then
+        rm -f -- "${temp_path_23}"
+        __status=$?
+        if [ "${__status}" != 0 ]; then
+            exit "${__status}"
+        fi
+        error__55_v0 "SPLUNK: Download failed (exit ${download_status_24}); ${script_path_12} was not replaced"
+        exit "${download_status_24}"
+    fi
+    test -s "${temp_path_23}" && bash -n "${temp_path_23}" && chmod 644 -- "${temp_path_23}" && mv -fT -- "${temp_path_23}" "${script_path_12}"
+    __status=$?
+    if [ "${__status}" != 0 ]; then
+    code_35="${__status}"
+        rm -f -- "${temp_path_23}"
+        __status=$?
+        if [ "${__status}" != 0 ]; then
+            exit "${__status}"
+        fi
+        error__55_v0 "SPLUNK: Downloaded script was empty, invalid, or could not be saved (exit ${code_35}); ${script_path_12} was not replaced"
+        exit "${code_35}"
+    fi
+else
+    log__54_v0 "SPLUNK: Reusing ${script_path_12}" 1
+fi
+__length_4=("${args_11[@]}")
+slice_upper_3="${#__length_4[@]}"
+slice_offset_5=1
+slice_offset_5=$((${slice_offset_5} > 0 ? ${slice_offset_5} : 0))
+slice_length_6="$(( slice_upper_3 - slice_offset_5 ))"
+slice_length_6=$((${slice_length_6} > 0 ? ${slice_length_6} : 0))
+script_args_36=("${args_11[@]:${slice_offset_5}:${slice_length_6}}")
+log__54_v0 "SPLUNK: Executing ${script_path_12}" 0
+exec bash -p -- "${script_path_12}" "${script_args_36[@]}"
+__status=$?
+if [ "${__status}" != 0 ]; then
+    exit "${__status}"
+fi

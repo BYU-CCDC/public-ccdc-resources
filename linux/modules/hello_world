@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# @module_name: hello_world
+# @mod-imports:
+
+__VERBOSITY_0=0
+# log(message: Text, level: Int)
+log__0_v0() {
+    local message_9="${1}"
+    local level_10="${2}"
+    local log_levels_11=("[INFO]	" "[VERBOSE]	" "[DEBUG]	")
+    if [ "$(( $(( __VERBOSITY_0 >= level_10 )) && $(( __VERBOSITY_0 != -1 )) ))" != 0 ]; then
+        printf '%s\n' "${log_levels_11[${level_10}]?"Index out of bounds (at src/modules/../utils/utils.ab:8:25)"}"" ""${message_9}"
+    fi
+}
+
+log__0_v0 "Hello, World"'!'"" 0

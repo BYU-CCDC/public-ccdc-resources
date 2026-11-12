@@ -1,0 +1,1143 @@
+#!/usr/bin/env bash
+# @module_name: initial-hardening
+# @mod-imports: zulu, fastfw, splunk
+
+if [ -n "$ZSH_VERSION" ]; then
+    EXEC_SHELL="zsh"
+    IFS='.' read -A EXEC_SHELL_VERSION <<< "$ZSH_VERSION"
+elif [ -n "$KSH_VERSION" ]; then
+    EXEC_SHELL="ksh"
+    __exec_shell_version="${.sh.version##*/}"
+    IFS='.' read -a EXEC_SHELL_VERSION <<< "${__exec_shell_version%% *}"
+else
+    EXEC_SHELL="bash"
+    EXEC_SHELL_VERSION=("${BASH_VERSINFO[0]}" "${BASH_VERSINFO[1]}" "${BASH_VERSINFO[2]}")
+fi
+# replace(source: Text, search: Text, replace: Text)
+replace__0_v0() {
+    local source_1009="${1}"
+    local search_1010="${2}"
+    local replace_1011="${3}"
+    local result_1012=""
+    left_comp=("${EXEC_SHELL_VERSION[@]}")
+    right_comp=(4 3)
+    local comp
+    comp="$(
+        # Compare if left array >= right array
+        len_comp="$( (( "${#left_comp[@]}" < "${#right_comp[@]}" )) && echo "${#left_comp[@]}"|| echo "${#right_comp[@]}")"
+        for (( i=0; i<len_comp; i++ )); do
+            left="${left_comp[i]?"Index out of bounds (at unknown)"}"
+            right="${right_comp[i]?"Index out of bounds (at unknown)"}"
+            if (( "${left}" > "${right}" )); then
+                echo 1
+                exit
+            elif (( "${left}" < "${right}" )); then
+                echo 0
+                exit
+            fi
+        done
+        (( "${#left_comp[@]}" == "${#right_comp[@]}" || "${#left_comp[@]}" > "${#right_comp[@]}" )) && echo 1 || echo 0
+)"
+    if [ "$(( $([ "_${EXEC_SHELL}" != "_ksh" ]; echo $?) || $(( $([ "_${EXEC_SHELL}" != "_bash" ]; echo $?) && comp )) ))" != 0 ]; then
+        result_1012="${source_1009//"${search_1010}"/"${replace_1011}"}"
+        __status=$?
+    else
+        result_1012="${source_1009//"${search_1010}"/${replace_1011}}"
+        __status=$?
+    fi
+    ret_replace0_v0="${result_1012}"
+    return 0
+}
+
+__SED_VERSION_UNKNOWN_0=0
+__SED_VERSION_GNU_1=1
+__SED_VERSION_BUSYBOX_2=2
+# sed_version()
+sed_version__2_v0() {
+    re='Copyright.+Free Software Foundation'; [[ $(sed --version 2>/dev/null) =~ $re ]]
+    __status=$?
+    if [ "$(( __status == 0 ))" != 0 ]; then
+        ret_sed_version2_v0="${__SED_VERSION_GNU_1}"
+        return 0
+    fi
+    re='BusyBox'; [[ $(sed --help 2>&1) =~ $re ]]
+    __status=$?
+    if [ "$(( __status == 0 ))" != 0 ]; then
+        ret_sed_version2_v0="${__SED_VERSION_BUSYBOX_2}"
+        return 0
+    fi
+    ret_sed_version2_v0="${__SED_VERSION_UNKNOWN_0}"
+    return 0
+}
+
+# split(text: Text, delimiter: Text)
+split__4_v0() {
+    local text_756="${1}"
+    local delimiter_757="${2}"
+    local result_758=()
+    if [ "$([ "_${EXEC_SHELL}" != "_zsh" ]; echo $?)" != 0 ]; then
+        IFS="${delimiter_757}" read -rd '' -A result_758 < <(printf %s "$text_756")
+        __status=$?
+    elif [ "$([ "_${EXEC_SHELL}" != "_ksh" ]; echo $?)" != 0 ]; then
+        if [ "$([ "_${delimiter_757}" != "_
+" ]; echo $?)" != 0 ]; then
+            while read -r -d $'\n'; do result_758+=("$REPLY"); done < <(echo "$text_756")
+            __status=$?
+        else
+            IFS="${delimiter_757}" read -rd '' -a result_758 < <(printf %s "$text_756")
+            __status=$?
+        fi
+    elif [ "$([ "_${EXEC_SHELL}" != "_bash" ]; echo $?)" != 0 ]; then
+        IFS="${delimiter_757}" read -rd '' -a result_758 < <(printf %s "$text_756")
+        __status=$?
+    fi
+    ret_split4_v0=("${result_758[@]}")
+    return 0
+}
+
+# split_lines(text: Text)
+split_lines__5_v0() {
+    local text_755="${1}"
+    split__4_v0 "${text_755}" "
+"
+    ret_split_lines5_v0=("${ret_split4_v0[@]}")
+    return 0
+}
+
+# trim(text: Text)
+trim__10_v0() {
+    local text_760="${1}"
+    local result_761=""
+    result_761="${text_760#${text_760%%[![:space:]]*}}"
+    __status=$?
+    result_761="${result_761%${result_761##*[![:space:]]}}"
+    __status=$?
+    ret_trim10_v0="${result_761}"
+    return 0
+}
+
+# lowercase(text: Text)
+lowercase__11_v0() {
+    local text_814="${1}"
+    left_comp=("${EXEC_SHELL_VERSION[@]}")
+    right_comp=(4 3)
+    local comp
+    comp="$(
+        # Compare if left array < right array
+        len_comp="$( (( "${#left_comp[@]}" < "${#right_comp[@]}" )) && echo "${#left_comp[@]}"|| echo "${#right_comp[@]}")"
+        for (( i=0; i<len_comp; i++ )); do
+            left="${left_comp[i]?"Index out of bounds (at unknown)"}"
+            right="${right_comp[i]?"Index out of bounds (at unknown)"}"
+            if (( "${left}" < "${right}" )); then
+                echo 1
+                exit
+            elif (( "${left}" > "${right}" )); then
+                echo 0
+                exit
+            fi
+        done
+        (( "${#left_comp[@]}" < "${#right_comp[@]}" )) && echo 1 || echo 0
+)"
+    if [ "$(( $([ "_${EXEC_SHELL}" != "_bash" ]; echo $?) && comp ))" != 0 ]; then
+        text_814="$(printf '%s' "${text_814}" | tr '[:upper:]' '[:lower:]')"
+        __status=$?
+    else
+        typeset -l text_814
+            text_814="${text_814}"
+        __status=$?
+    fi
+    ret_lowercase11_v0="${text_814}"
+    return 0
+}
+
+# parse_int(text: Text)
+parse_int__13_v0() {
+    local text_1016="${1}"
+    [ -n "${text_1016}" ] && [ "${text_1016}" -eq "${text_1016}" ] 2>/dev/null
+    __status=$?
+    if [ "${__status}" != 0 ]; then
+        ret_parse_int13_v0=''
+        return "${__status}"
+    fi
+    ret_parse_int13_v0="${text_1016}"
+    return 0
+}
+
+# text_contains(source: Text, search: Text)
+text_contains__16_v0() {
+    local source_1019="${1}"
+    local search_1020="${2}"
+    [[ "${source_1019}" == *"${search_1020}"* ]]
+    __status=$?
+    ret_text_contains16_v0="$(( __status == 0 ))"
+    return 0
+}
+
+# match_regex(source: Text, search: Text, extended: Bool)
+match_regex__19_v0() {
+    local source_1005="${1}"
+    local search_1006="${2}"
+    local extended_1007="${3}"
+    sed_version__2_v0 
+    local sed_version_1008="${ret_sed_version2_v0}"
+    replace__0_v0 "${search_1006}" "/" "\\/"
+    search_1006="${ret_replace0_v0}"
+    local output_1013=""
+    if [ "$(( $(( sed_version_1008 == __SED_VERSION_GNU_1 )) || $(( sed_version_1008 == __SED_VERSION_BUSYBOX_2 )) ))" != 0 ]; then
+        replace__0_v0 "${search_1006}" "\\b" "\\\\b"
+        search_1006="${ret_replace0_v0}"
+    fi
+    if [ "${extended_1007}" != 0 ]; then
+        if [ "$(( sed_version_1008 == __SED_VERSION_GNU_1 ))" != 0 ]; then
+            replace__0_v0 "${search_1006}" "\\b" "\\b"
+            search_1006="${ret_replace0_v0}"
+            local command_3
+            command_3="$(sed -r -ne "/${search_1006}/p" <<<"${source_1005}")"
+            __status=$?
+            output_1013="${command_3}"
+        else
+            local command_4
+            command_4="$(sed -E -ne "/${search_1006}/p" <<<"${source_1005}")"
+            __status=$?
+            output_1013="${command_4}"
+        fi
+    else
+        if [ "$(( $(( sed_version_1008 == __SED_VERSION_GNU_1 )) || $(( sed_version_1008 == __SED_VERSION_BUSYBOX_2 )) ))" != 0 ]; then
+            replace__0_v0 "${search_1006}" "\\|" "|"
+            search_1006="${ret_replace0_v0}"
+        fi
+        local command_5
+        command_5="$(sed -ne "/${search_1006}/p" <<<"${source_1005}")"
+        __status=$?
+        output_1013="${command_5}"
+    fi
+    if [ "$([ "_${output_1013}" == "_" ]; echo $?)" != 0 ]; then
+        ret_match_regex19_v0=1
+        return 0
+    fi
+    ret_match_regex19_v0=0
+    return 0
+}
+
+# starts_with(text: Text, prefix: Text)
+starts_with__22_v0() {
+    local text_764="${1}"
+    local prefix_765="${2}"
+    [[ "${text_764}" == "${prefix_765}"* ]]
+    __status=$?
+    ret_starts_with22_v0="$(( __status == 0 ))"
+    return 0
+}
+
+# ends_with(text: Text, suffix: Text)
+ends_with__23_v0() {
+    local text_724="${1}"
+    local suffix_725="${2}"
+    [[ "${text_724}" == *"${suffix_725}" ]]
+    __status=$?
+    ret_ends_with23_v0="$(( __status == 0 ))"
+    return 0
+}
+
+# slice(text: Text, index: Int, length: Int)
+slice__24_v0() {
+    local text_726="${1}"
+    local index_727="${2}"
+    local length_728="${3}"
+    local result_729=""
+    if [ "$(( length_728 == 0 ))" != 0 ]; then
+        local __length_6="${text_726}"
+        length_728="$(( ${#__length_6} - index_727 ))"
+    fi
+    if [ "$(( length_728 <= 0 ))" != 0 ]; then
+        ret_slice24_v0="${result_729}"
+        return 0
+    fi
+    result_729="${text_726: ${index_727}: ${length_728}}"
+    __status=$?
+    ret_slice24_v0="${result_729}"
+    return 0
+}
+
+# fw_prompt(message: Text)
+fw_prompt__45_v0() {
+    local message_813="${1}"
+    printf '%s\n' "${message_813}"
+    local command_7
+    command_7="$(IFS= read -r answer && printf '%s' "$answer")"
+    __status=$?
+    if [ "${__status}" != 0 ]; then
+        ret_fw_prompt45_v0=''
+        return "${__status}"
+    fi
+    ret_fw_prompt45_v0="${command_7}"
+    return 0
+}
+
+# fw_yesno(message: Text, default_yes: Bool)
+fw_yesno__46_v0() {
+    local message_811="${1}"
+    local default_yes_812="${2}"
+    while :
+    do
+        fw_prompt__45_v0 "${message_811}"
+        __status=$?
+        if [ "${__status}" != 0 ]; then
+            ret_fw_yesno46_v0=''
+            return "${__status}"
+        fi
+        local ret_fw_prompt45_v0__12_39="${ret_fw_prompt45_v0}"
+        trim__10_v0 "${ret_fw_prompt45_v0__12_39}"
+        local ret_trim10_v0__12_34="${ret_trim10_v0}"
+        lowercase__11_v0 "${ret_trim10_v0__12_34}"
+        local answer_815="${ret_lowercase11_v0}"
+        if [ "$([ "_${answer_815}" != "_" ]; echo $?)" != 0 ]; then
+            ret_fw_yesno46_v0="${default_yes_812}"
+            return 0
+        fi
+        if [ "$(( $([ "_${answer_815}" != "_y" ]; echo $?) || $([ "_${answer_815}" != "_yes" ]; echo $?) ))" != 0 ]; then
+            ret_fw_yesno46_v0=1
+            return 0
+        fi
+        if [ "$(( $([ "_${answer_815}" != "_n" ]; echo $?) || $([ "_${answer_815}" != "_no" ]; echo $?) ))" != 0 ]; then
+            ret_fw_yesno46_v0=0
+            return 0
+        fi
+        echo "Please answer yes or no."
+    done
+}
+
+# fw_address(address: Text)
+fw_address__47_v0() {
+    local address_1004="${1}"
+    match_regex__19_v0 "${address_1004}" "^[0-9]+[.][0-9]+[.][0-9]+[.][0-9]+(/[0-9]+)?\$" 1
+    local ret_match_regex19_v0__22_12="${ret_match_regex19_v0}"
+    if [ "$(( ! ret_match_regex19_v0__22_12 ))" != 0 ]; then
+        ret_fw_address47_v0=0
+        return 0
+    fi
+    split__4_v0 "${address_1004}" "/"
+    local parts_1014=("${ret_split4_v0[@]}")
+    split__4_v0 "${parts_1014[0]?"Index out of bounds (at src/modules/../utils/firewall.ab:24:30)"}" "."
+    local ret_split4_v0__24_18=("${ret_split4_v0[@]}")
+    for octet_1015 in "${ret_split4_v0__24_18[@]}"; do
+        match_regex__19_v0 "${octet_1015}" "^(0|[1-9][0-9]{0,2})\$" 1
+        local ret_match_regex19_v0__25_16="${ret_match_regex19_v0}"
+        if [ "$(( ! ret_match_regex19_v0__25_16 ))" != 0 ]; then
+            ret_fw_address47_v0=0
+            return 0
+        fi
+        parse_int__13_v0 "${octet_1015}"
+        __status=$?
+        if [ "${__status}" != 0 ]; then
+            ret_fw_address47_v0=0
+            return 0
+        fi
+        local value_1017="${ret_parse_int13_v0}"
+        if [ "$(( $(( value_1017 < 0 )) || $(( value_1017 > 255 )) ))" != 0 ]; then
+            ret_fw_address47_v0=0
+            return 0
+        fi
+    done
+    local __length_10=("${parts_1014[@]}")
+    if [ "$(( ${#__length_10[@]} == 2 ))" != 0 ]; then
+        match_regex__19_v0 "${parts_1014[1]?"Index out of bounds (at src/modules/../utils/firewall.ab:30:34)"}" "^(0|[1-9][0-9]?)\$" 1
+        local ret_match_regex19_v0__30_16="${ret_match_regex19_v0}"
+        if [ "$(( ! ret_match_regex19_v0__30_16 ))" != 0 ]; then
+            ret_fw_address47_v0=0
+            return 0
+        fi
+        parse_int__13_v0 "${parts_1014[1]?"Index out of bounds (at src/modules/../utils/firewall.ab:31:40)"}"
+        __status=$?
+        if [ "${__status}" != 0 ]; then
+            ret_fw_address47_v0=0
+            return 0
+        fi
+        local prefix_1018="${ret_parse_int13_v0}"
+        if [ "$(( $(( prefix_1018 < 0 )) || $(( prefix_1018 > 32 )) ))" != 0 ]; then
+            ret_fw_address47_v0=0
+            return 0
+        fi
+    fi
+    ret_fw_address47_v0=1
+    return 0
+}
+
+# dir_exists(path: Text)
+dir_exists__59_v0() {
+    local path_719="${1}"
+    [ -d "${path_719}" ]
+    __status=$?
+    ret_dir_exists59_v0="$(( __status == 0 ))"
+    return 0
+}
+
+# file_exists(path: Text)
+file_exists__60_v0() {
+    local path_706="${1}"
+    [ -f "${path_706}" ]
+    __status=$?
+    ret_file_exists60_v0="$(( __status == 0 ))"
+    return 0
+}
+
+# file_read(path: Text)
+file_read__61_v0() {
+    local path_707="${1}"
+    local command_11
+    command_11="$(< "${path_707}")"
+    __status=$?
+    if [ "${__status}" != 0 ]; then
+        ret_file_read61_v0=''
+        return "${__status}"
+    fi
+    ret_file_read61_v0="${command_11}"
+    return 0
+}
+
+# file_write(path: Text, content: Text)
+file_write__62_v0() {
+    local path_746="${1}"
+    local content_747="${2}"
+    local command_12
+    command_12="$(printf '%s
+' "${content_747}" > "${path_746}")"
+    __status=$?
+    if [ "${__status}" != 0 ]; then
+        ret_file_write62_v0=''
+        return "${__status}"
+    fi
+    ret_file_write62_v0="${command_12}"
+    return 0
+}
+
+# dir_create(path: Text)
+dir_create__65_v0() {
+    local path_718="${1}"
+    dir_exists__59_v0 "${path_718}"
+    local ret_dir_exists59_v0__87_12="${ret_dir_exists59_v0}"
+    if [ "$(( ! ret_dir_exists59_v0__87_12 ))" != 0 ]; then
+        mkdir -p "${path_718}"
+        __status=$?
+        if [ "${__status}" != 0 ]; then
+            ret_dir_create65_v0=''
+            return "${__status}"
+        fi
+    fi
+}
+
+__VERBOSITY_3=0
+__GITHUB_URL_4="https://raw.githubusercontent.com/BYU-CCDC/linux-hardening-public/refs/heads/main/"
+__MOD_DIR_6="/usr/lib/ccdc/modules/"
+# log(message: Text, level: Int)
+log__84_v0() {
+    local message_703="${1}"
+    local level_704="${2}"
+    local log_levels_705=("[INFO]	" "[VERBOSE]	" "[DEBUG]	")
+    if [ "$(( $(( __VERBOSITY_3 >= level_704 )) && $(( __VERBOSITY_3 != -1 )) ))" != 0 ]; then
+        printf '%s\n' "${log_levels_705[${level_704}]?"Index out of bounds (at src/modules/../utils/utils.ab:8:25)"}"" ""${message_703}"
+    fi
+}
+
+# error(message: Text)
+error__85_v0() {
+    local message_697="${1}"
+    echo "[ERROR]: ""${message_697}"
+}
+
+# build_url(relative_path: Text)
+build_url__88_v0() {
+    local relative_path_722="${1}"
+    local base_723="${__GITHUB_URL_4}"
+    local __length_14="${base_723}"
+    while [ "$(( ${#__length_14} > 0 ))" != 0 ]; do
+        ends_with__23_v0 "${base_723}" "/"
+        local ret_ends_with23_v0__9_16="${ret_ends_with23_v0}"
+        if [ "$(( ! ret_ends_with23_v0__9_16 ))" != 0 ]; then
+            break
+        fi
+        local __length_15="${base_723}"
+        slice__24_v0 "${base_723}" 0 "$(( ${#__length_15} - 1 ))"
+        base_723="${ret_slice24_v0}"
+    done
+    ret_build_url88_v0="${base_723}""/""${relative_path_722}"
+    return 0
+}
+
+# validate_module(mod_name: Text, mod_code: Text)
+validate_module__89_v0() {
+    local mod_name_711="${1}"
+    local mod_code_712="${2}"
+    local name_pattern_713="^# @module_name: [^[:space:]]+[[:space:]]*\$"
+    local imports_pattern_714="^# @mod-imports:([[:space:]]*| [^[:space:],]+(, [^[:space:],]+)*)\$"
+    printf '%s
+' "${mod_code_712}" | (
+        IFS= read -r module_shebang || exit 1
+        case "$module_shebang" in
+            '#!/bin/bash'|'#!/usr/bin/bash'|'#!/usr/bin/env bash') ;;
+            *) exit 1 ;;
+        esac
+        IFS= read -r module_name && [[ "$module_name" =~ ${name_pattern_713} ]] || exit 2
+        IFS= read -r module_imports && [[ "$module_imports" =~ ${imports_pattern_714} ]] || exit 3
+    )
+    __status=$?
+    if [ "${__status}" != 0 ]; then
+    line_number_715="${__status}"
+        local fields_716=("Bash shebang" "@module_name" "@mod-imports")
+        error__85_v0 "VALIDATE_MODULE: ${mod_name_711}: missing or invalid ${fields_716[$(( line_number_715 - 1 ))]?"Index out of bounds (at src/modules/../utils/modules.ab:30:72)"} on line ${line_number_715}"
+        ret_validate_module89_v0=''
+        return 1
+    fi
+    printf '%s
+' "${mod_code_712}" | bash -n
+    __status=$?
+    if [ "${__status}" != 0 ]; then
+    code_717="${__status}"
+        error__85_v0 "VALIDATE_MODULE: ${mod_name_711}: invalid Bash syntax (exit ${code_717})"
+        ret_validate_module89_v0=''
+        return "${code_717}"
+    fi
+    log__84_v0 "VALIDATE_MODULE: ${mod_name_711}: header and Bash syntax valid" 2
+}
+
+# is_downloaded(mod_name: Text)
+is_downloaded__90_v0() {
+    local mod_name_701="${1}"
+    local mod_path_702="${__MOD_DIR_6}""${mod_name_701}"
+    log__84_v0 "IS_DOWNLOADED: Resolved mod_name = ${mod_path_702}" 2
+    log__84_v0 "IS_DOWNLOADED: Checking if ${mod_path_702} is downloaded" 1
+    file_exists__60_v0 "${__MOD_DIR_6}""${mod_name_701}"
+    local ret_file_exists60_v0__46_8="${ret_file_exists60_v0}"
+    if [ "${ret_file_exists60_v0__46_8}" != 0 ]; then
+        log__84_v0 "IS_DOWNLOADED: ${mod_path_702} is downloaded" 1
+        ret_is_downloaded90_v0=1
+        return 0
+    else
+        log__84_v0 "IS_DOWNLOADED: ${mod_path_702} not downloaded" 1
+        ret_is_downloaded90_v0=0
+        return 0
+    fi
+}
+
+# download(mod_name: Text)
+download__91_v0() {
+    local mod_name_721="${1}"
+    build_url__88_v0 "modules/""${mod_name_721}"
+    local url_730="${ret_build_url88_v0}"
+    local destination_731="${__MOD_DIR_6}""${mod_name_721}"
+    log__84_v0 "DOWNLOAD: Downloading ${mod_name_721}" 0
+    log__84_v0 "DOWNLOAD: URL = ${url_730}; destination = ${destination_731}" 2
+    local mod_code_732=""
+    local download_status_733=0
+    local has_curl_734=1
+    command -v curl > /dev/null
+    __status=$?
+    if [ "${__status}" != 0 ]; then
+        has_curl_734=0
+    fi
+    if [ "${has_curl_734}" != 0 ]; then
+        local command_17
+        command_17="$(curl --fail --location --silent --show-error "${url_730}")"
+        __status=$?
+        if [ "${__status}" != 0 ]; then
+        code_735="${__status}"
+            download_status_733="${code_735}"
+        fi
+        mod_code_732="${command_17}"
+    else
+        local has_wget_736=1
+        command -v wget > /dev/null
+        __status=$?
+        if [ "${__status}" != 0 ]; then
+            has_wget_736=0
+        fi
+        if [ "$(( ! has_wget_736 ))" != 0 ]; then
+            error__85_v0 "DOWNLOAD: ${mod_name_721}: no curl or wget; URL = ${url_730}; destination = ${destination_731}; exit 1"
+            ret_download91_v0=''
+            return 1
+        fi
+        local command_18
+        command_18="$(wget --no-verbose --output-document=- "${url_730}")"
+        __status=$?
+        if [ "${__status}" != 0 ]; then
+        code_737="${__status}"
+            download_status_733="${code_737}"
+        fi
+        mod_code_732="${command_18}"
+    fi
+    if [ "$(( download_status_733 != 0 ))" != 0 ]; then
+        error__85_v0 "DOWNLOAD: ${mod_name_721}: failed; URL = ${url_730}; destination = ${destination_731}; exit ${download_status_733}"
+        ret_download91_v0=''
+        return "${download_status_733}"
+    fi
+    validate_module__89_v0 "${mod_name_721}" "${mod_code_732}"
+    __status=$?
+    if [ "${__status}" != 0 ]; then
+    code_738="${__status}"
+        error__85_v0 "DOWNLOAD: ${mod_name_721}: invalid response; URL = ${url_730}; destination = ${destination_731}; exit ${code_738}"
+        ret_download91_v0=''
+        return "${code_738}"
+    fi
+    log__84_v0 "DOWNLOAD: Downloaded and validated ${mod_name_721}" 1
+    ret_download91_v0="${mod_code_732}"
+    return 0
+}
+
+# write_dep(mod_name: Text, dep_code: Text)
+write_dep__92_v0() {
+    local mod_name_740="${1}"
+    local dep_code_741="${2}"
+    local dep_path_742="${__MOD_DIR_6}""${mod_name_740}"
+    log__84_v0 "WRITE_DEP: Resolved dep_path = ${dep_path_742}" 2
+    log__84_v0 "WRITE_DEP: Writing ${dep_path_742}" 0
+    local command_19
+    command_19="$(mktemp "${dep_path_742}.XXXXXX")"
+    __status=$?
+    if [ "${__status}" != 0 ]; then
+    code_743="${__status}"
+        error__85_v0 "WRITE_DEP: Failed to create temporary file for ${dep_path_742} (exit ${code_743})"
+        ret_write_dep92_v0=''
+        return "${code_743}"
+    fi
+    local temp_path_744="${command_19}"
+    local write_status_745=0
+    file_write__62_v0 "${temp_path_744}" "${dep_code_741}"
+    __status=$?
+    if [ "${__status}" != 0 ]; then
+    code_748="${__status}"
+        write_status_745="${code_748}"
+    fi
+    if [ "$(( write_status_745 == 0 ))" != 0 ]; then
+        chmod 644 -- "${temp_path_744}" && mv -fT -- "${temp_path_744}" "${dep_path_742}"
+        __status=$?
+        if [ "${__status}" != 0 ]; then
+        code_749="${__status}"
+            write_status_745="${code_749}"
+        fi
+    fi
+    if [ "$(( write_status_745 != 0 ))" != 0 ]; then
+        rm -f -- "${temp_path_744}"
+        __status=$?
+        if [ "${__status}" != 0 ]; then
+            ret_write_dep92_v0=''
+            return "${__status}"
+        fi
+        error__85_v0 "WRITE_DEP: Failed to save ${dep_path_742} (exit ${write_status_745}); existing cache unchanged"
+        ret_write_dep92_v0=''
+        return "${write_status_745}"
+    fi
+    log__84_v0 "WRITE_DEP: Saved ${dep_path_742}" 1
+}
+
+# make_ccdc_dir()
+make_ccdc_dir__93_v0() {
+    log__84_v0 "MAKE_CCDC_DIR: Creating ${__MOD_DIR_6}" 0
+    dir_create__65_v0 "${__MOD_DIR_6}"
+    __status=$?
+    if [ "${__status}" != 0 ]; then
+    code_720="${__status}"
+        error__85_v0 "MAKE_CCDC_DIR: Failed to create ${__MOD_DIR_6} (exit ${code_720})"
+        ret_make_ccdc_dir93_v0=''
+        return "${code_720}"
+    fi
+    log__84_v0 "MAKE_CCDC_DIR: Directory ready" 1
+}
+
+# extract_imports(mod_name: Text)
+extract_imports__94_v0() {
+    local mod_name_750="${1}"
+    local mod_path_751="${__MOD_DIR_6}""${mod_name_750}"
+    log__84_v0 "EXTRACT_IMPORTS: Reading header from ${mod_path_751}" 2
+    file_exists__60_v0 "${mod_path_751}"
+    local ret_file_exists60_v0__135_12="${ret_file_exists60_v0}"
+    if [ "$(( ! ret_file_exists60_v0__135_12 ))" != 0 ]; then
+        error__85_v0 "EXTRACT_IMPORTS: Module file missing: ${mod_path_751}"
+        ret_extract_imports94_v0=()
+        return 1
+    fi
+    file_read__61_v0 "${mod_path_751}"
+    __status=$?
+    if [ "${__status}" != 0 ]; then
+    code_752="${__status}"
+        error__85_v0 "EXTRACT_IMPORTS: Failed to read ${mod_path_751} (exit ${code_752})"
+        ret_extract_imports94_v0=()
+        return "${code_752}"
+    fi
+    local mod_code_753="${ret_file_read61_v0}"
+    local imports_754=()
+    split_lines__5_v0 "${mod_code_753}"
+    local ret_split_lines5_v0__144_17=("${ret_split_lines5_v0[@]}")
+    for line_759 in "${ret_split_lines5_v0__144_17[@]}"; do
+        trim__10_v0 "${line_759}"
+        local header_line_762="${ret_trim10_v0}"
+        if [ "$([ "_${header_line_762}" != "_" ]; echo $?)" != 0 ]; then
+            continue
+        fi
+        local comment_763=""
+        starts_with__22_v0 "${header_line_762}" "//"
+        local ret_starts_with22_v0__151_13="${ret_starts_with22_v0}"
+        starts_with__22_v0 "${header_line_762}" "#"
+        local ret_starts_with22_v0__152_13="${ret_starts_with22_v0}"
+        if [ "${ret_starts_with22_v0__151_13}" != 0 ]; then
+            slice__24_v0 "${header_line_762}" 2 0
+            local ret_slice24_v0__151_61="${ret_slice24_v0}"
+            trim__10_v0 "${ret_slice24_v0__151_61}"
+            comment_763="${ret_trim10_v0}"
+        elif [ "${ret_starts_with22_v0__152_13}" != 0 ]; then
+            slice__24_v0 "${header_line_762}" 1 0
+            local ret_slice24_v0__152_60="${ret_slice24_v0}"
+            trim__10_v0 "${ret_slice24_v0__152_60}"
+            comment_763="${ret_trim10_v0}"
+        else
+            break
+        fi
+        local prefix_766="@mod-imports:"
+        starts_with__22_v0 "${comment_763}" "${prefix_766}"
+        local ret_starts_with22_v0__156_12="${ret_starts_with22_v0}"
+        if [ "${ret_starts_with22_v0__156_12}" != 0 ]; then
+            local __length_23="${prefix_766}"
+            slice__24_v0 "${comment_763}" "${#__length_23}" 0
+            local import_list_767="${ret_slice24_v0}"
+            split__4_v0 "${import_list_767}" ","
+            local ret_split4_v0__158_26=("${ret_split4_v0[@]}")
+            for entry_768 in "${ret_split4_v0__158_26[@]}"; do
+                trim__10_v0 "${entry_768}"
+                local imported_module_769="${ret_trim10_v0}"
+                if [ "$([ "_${imported_module_769}" == "_" ]; echo $?)" != 0 ]; then
+                    log__84_v0 "EXTRACT_IMPORTS: Found import ${imported_module_769}" 2
+                    imports_754+=("${imported_module_769}")
+                fi
+            done
+            ret_extract_imports94_v0=("${imports_754[@]}")
+            return 0
+        fi
+    done
+    log__84_v0 "EXTRACT_IMPORTS: No import declaration in ${mod_name_750}" 2
+    ret_extract_imports94_v0=("${imports_754[@]}")
+    return 0
+}
+
+# ensure_module(mod_name: Text)
+ensure_module__95_v0() {
+    local mod_name_699="${1}"
+    local mod_path_700="${__MOD_DIR_6}""${mod_name_699}"
+    is_downloaded__90_v0 "${mod_name_699}"
+    local ret_is_downloaded90_v0__175_8="${ret_is_downloaded90_v0}"
+    if [ "${ret_is_downloaded90_v0__175_8}" != 0 ]; then
+        file_read__61_v0 "${__MOD_DIR_6}""${mod_name_699}"
+        __status=$?
+        if [ "${__status}" != 0 ]; then
+        code_708="${__status}"
+            error__85_v0 "CACHE: Cannot read ${mod_path_700} (exit ${code_708})"
+            ret_ensure_module95_v0=''
+            return "${code_708}"
+        fi
+        local cached_code_709="${ret_file_read61_v0}"
+        local valid_710=1
+        validate_module__89_v0 "${mod_name_699}" "${cached_code_709}"
+        __status=$?
+        if [ "${__status}" != 0 ]; then
+            valid_710=0
+        fi
+        if [ "${valid_710}" != 0 ]; then
+            log__84_v0 "CACHE: Keeping validated ${mod_name_699}" 1
+            ret_ensure_module95_v0=''
+            return 0
+        fi
+        log__84_v0 "CACHE: Replacing invalid ${mod_path_700}" 0
+    fi
+    make_ccdc_dir__93_v0 
+    __status=$?
+    if [ "${__status}" != 0 ]; then
+        ret_ensure_module95_v0=''
+        return "${__status}"
+    fi
+    download__91_v0 "${mod_name_699}"
+    __status=$?
+    if [ "${__status}" != 0 ]; then
+        ret_ensure_module95_v0=''
+        return "${__status}"
+    fi
+    local mod_code_739="${ret_download91_v0}"
+    write_dep__92_v0 "${mod_name_699}" "${mod_code_739}"
+    __status=$?
+    if [ "${__status}" != 0 ]; then
+        ret_ensure_module95_v0=''
+        return "${__status}"
+    fi
+}
+
+# prepare_module(mod_name: Text, chain: [Text], prepared: [Text])
+prepare_module__96_v0() {
+    local mod_name_691="${1}"
+    local chain_692=("${!2}")
+    local -n prepared_693="${3}"
+    for ancestor_694 in "${chain_692[@]}"; do
+        if [ "$([ "_${ancestor_694}" != "_${mod_name_691}" ]; echo $?)" != 0 ]; then
+            local cycle_695=""
+            for entry_696 in "${chain_692[@]}"; do
+                cycle_695+="${entry_696}"" -> "
+            done
+            error__85_v0 "IMPORT_MODULE: Dependency cycle: ${cycle_695}${mod_name_691}"
+            ret_prepare_module96_v0=''
+            return 1
+        fi
+    done
+    for ready_698 in "${prepared_693[@]}"; do
+        if [ "$([ "_${ready_698}" != "_${mod_name_691}" ]; echo $?)" != 0 ]; then
+            ret_prepare_module96_v0=''
+            return 0
+        fi
+    done
+    ensure_module__95_v0 "${mod_name_691}"
+    __status=$?
+    if [ "${__status}" != 0 ]; then
+        ret_prepare_module96_v0=''
+        return "${__status}"
+    fi
+    extract_imports__94_v0 "${mod_name_691}"
+    __status=$?
+    if [ "${__status}" != 0 ]; then
+        ret_prepare_module96_v0=''
+        return "${__status}"
+    fi
+    local imports_770=("${ret_extract_imports94_v0[@]}")
+    local array_33=("${mod_name_691}")
+    local next_chain_771=("${chain_692[@]}" "${array_33[@]}")
+    for dependency_772 in "${imports_770[@]}"; do
+        prepare_module__96_v0 "${dependency_772}" next_chain_771[@] "${!prepared_693}"
+        __status=$?
+        if [ "${__status}" != 0 ]; then
+            ret_prepare_module96_v0=''
+            return "${__status}"
+        fi
+    done
+    prepared_693+=("${mod_name_691}")
+}
+
+# import_module(module_name: Text)
+import_module__97_v0() {
+    local module_name_689="${1}"
+    local prepared_690=()
+    local array_39=()
+    prepare_module__96_v0 "${module_name_689}" array_39[@] "prepared_690"
+    __status=$?
+    if [ "${__status}" != 0 ]; then
+        ret_import_module97_v0=''
+        return "${__status}"
+    fi
+}
+
+# run_module(module_name: Text, module_args: [Text])
+run_module__98_v0() {
+    local module_name_804="${1}"
+    local module_args_805=("${!2}")
+    import_module__97_v0 "${module_name_804}"
+    __status=$?
+    if [ "${__status}" != 0 ]; then
+        ret_run_module98_v0=''
+        return "${__status}"
+    fi
+    local mod_path_806="${__MOD_DIR_6}""${module_name_804}"
+    log__84_v0 "RUN_MODULE: Executing ${mod_path_806}" 0
+    local __length_40=("${module_args_805[@]}")
+    local argument_count_807="${#__length_40[@]}"
+    log__84_v0 "RUN_MODULE: Forwarding ${argument_count_807} arguments" 2
+    bash -p -- "${mod_path_806}" "${module_args_805[@]}"
+    __status=$?
+    if [ "${__status}" != 0 ]; then
+    code_808="${__status}"
+        error__85_v0 "RUN_MODULE: ${module_name_804} failed (exit ${code_808})"
+        ret_run_module98_v0=''
+        return "${code_808}"
+    fi
+}
+
+# run_module(module_name: Text, module_args: [])
+run_module__98_v1() {
+    local module_name_820="${1}"
+    local module_args_821=("${!2}")
+    import_module__97_v0 "${module_name_820}"
+    __status=$?
+    if [ "${__status}" != 0 ]; then
+        ret_run_module98_v1=''
+        return "${__status}"
+    fi
+    local mod_path_822="${__MOD_DIR_6}""${module_name_820}"
+    log__84_v0 "RUN_MODULE: Executing ${mod_path_822}" 0
+    local __length_41=("${module_args_821[@]}")
+    local argument_count_823="${#__length_41[@]}"
+    log__84_v0 "RUN_MODULE: Forwarding ${argument_count_823} arguments" 2
+    bash -p -- "${mod_path_822}" "${module_args_821[@]}"
+    __status=$?
+    if [ "${__status}" != 0 ]; then
+    code_824="${__status}"
+        error__85_v0 "RUN_MODULE: ${module_name_820} failed (exit ${code_824})"
+        ret_run_module98_v1=''
+        return "${code_824}"
+    fi
+}
+
+# run_step(module_name: Text, module_args: [Text])
+run_step__102_v0() {
+    local module_name_801="${1}"
+    local module_args_802=("${!2}")
+    echo "Running ${module_name_801}. Ctrl+C skips this step; changes already made are not undone."
+    local ccdc_step_interrupted=0 ccdc_saved_int
+      ccdc_saved_int=$(trap -p INT)
+      trap 'ccdc_step_interrupted=1' INT
+    __status=$?
+    if [ "${__status}" != 0 ]; then
+        ret_run_step102_v0=''
+        return "${__status}"
+    fi
+    local result_803=0
+    run_module__98_v0 "${module_name_801}" module_args_802[@]
+    __status=$?
+    if [ "${__status}" != 0 ]; then
+    code_809="${__status}"
+        result_803="${code_809}"
+    fi
+    local interrupted_810=0
+    test "$ccdc_step_interrupted" = 1
+    __status=$?
+    if [ "${__status}" = 0 ]; then
+        interrupted_810=1
+    fi
+    if [ -n "$ccdc_saved_int" ]; then eval "$ccdc_saved_int"; else trap - INT; fi
+    __status=$?
+    if [ "${__status}" != 0 ]; then
+        ret_run_step102_v0=''
+        return "${__status}"
+    fi
+    if [ "$(( interrupted_810 || $(( result_803 == 130 )) ))" != 0 ]; then
+        echo "Skipped ${module_name_801} after Ctrl+C."
+        ret_run_step102_v0=''
+        return 0
+    fi
+    if [ "$(( result_803 != 0 ))" != 0 ]; then
+        trap 'exit 130' INT
+        __status=$?
+        if [ "${__status}" != 0 ]; then
+            ret_run_step102_v0=''
+            return "${__status}"
+        fi
+        fw_yesno__46_v0 "Module failed (exit ${result_803}). Skip and continue? [y/N]" 0
+        __status=$?
+        if [ "${__status}" != 0 ]; then
+            if [ -n "$ccdc_saved_int" ]; then eval "$ccdc_saved_int"; else trap - INT; fi
+            __status=$?
+            if [ "${__status}" != 0 ]; then
+                ret_run_step102_v0=''
+                return "${__status}"
+            fi
+            ret_run_step102_v0=''
+            return "${result_803}"
+        fi
+        local skip_816="${ret_fw_yesno46_v0}"
+        if [ -n "$ccdc_saved_int" ]; then eval "$ccdc_saved_int"; else trap - INT; fi
+        __status=$?
+        if [ "${__status}" != 0 ]; then
+            ret_run_step102_v0=''
+            return "${__status}"
+        fi
+        if [ "$(( ! skip_816 ))" != 0 ]; then
+            ret_run_step102_v0=''
+            return "${result_803}"
+        fi
+        echo "Skipped ${module_name_801} after failure (exit ${result_803})."
+    fi
+}
+
+# run_step(module_name: Text, module_args: [])
+run_step__102_v1() {
+    local module_name_817="${1}"
+    local module_args_818=("${!2}")
+    echo "Running ${module_name_817}. Ctrl+C skips this step; changes already made are not undone."
+    local ccdc_step_interrupted=0 ccdc_saved_int
+      ccdc_saved_int=$(trap -p INT)
+      trap 'ccdc_step_interrupted=1' INT
+    __status=$?
+    if [ "${__status}" != 0 ]; then
+        ret_run_step102_v1=''
+        return "${__status}"
+    fi
+    local result_819=0
+    run_module__98_v1 "${module_name_817}" module_args_818[@]
+    __status=$?
+    if [ "${__status}" != 0 ]; then
+    code_825="${__status}"
+        result_819="${code_825}"
+    fi
+    local interrupted_826=0
+    test "$ccdc_step_interrupted" = 1
+    __status=$?
+    if [ "${__status}" = 0 ]; then
+        interrupted_826=1
+    fi
+    if [ -n "$ccdc_saved_int" ]; then eval "$ccdc_saved_int"; else trap - INT; fi
+    __status=$?
+    if [ "${__status}" != 0 ]; then
+        ret_run_step102_v1=''
+        return "${__status}"
+    fi
+    if [ "$(( interrupted_826 || $(( result_819 == 130 )) ))" != 0 ]; then
+        echo "Skipped ${module_name_817} after Ctrl+C."
+        ret_run_step102_v1=''
+        return 0
+    fi
+    if [ "$(( result_819 != 0 ))" != 0 ]; then
+        trap 'exit 130' INT
+        __status=$?
+        if [ "${__status}" != 0 ]; then
+            ret_run_step102_v1=''
+            return "${__status}"
+        fi
+        fw_yesno__46_v0 "Module failed (exit ${result_819}). Skip and continue? [y/N]" 0
+        __status=$?
+        if [ "${__status}" != 0 ]; then
+            if [ -n "$ccdc_saved_int" ]; then eval "$ccdc_saved_int"; else trap - INT; fi
+            __status=$?
+            if [ "${__status}" != 0 ]; then
+                ret_run_step102_v1=''
+                return "${__status}"
+            fi
+            ret_run_step102_v1=''
+            return "${result_819}"
+        fi
+        local skip_827="${ret_fw_yesno46_v0}"
+        if [ -n "$ccdc_saved_int" ]; then eval "$ccdc_saved_int"; else trap - INT; fi
+        __status=$?
+        if [ "${__status}" != 0 ]; then
+            ret_run_step102_v1=''
+            return "${__status}"
+        fi
+        if [ "$(( ! skip_827 ))" != 0 ]; then
+            ret_run_step102_v1=''
+            return "${result_819}"
+        fi
+        echo "Skipped ${module_name_817} after failure (exit ${result_819})."
+    fi
+}
+
+# splunk_address()
+splunk_address__103_v0() {
+    local ccdc_ip_value='' ccdc_saved_int
+      ccdc_saved_int=$(trap -p INT)
+      ccdc_read_ip() {
+          trap 'if [ -n "$ccdc_saved_int" ]; then eval "$ccdc_saved_int"; else trap - INT; fi; return 130' INT
+          if [ ! -t 0 ]; then printf '%s
+' 'Splunk indexer IPv4 address (Ctrl+C skips Splunk):'; fi
+          IFS= read -r -p 'Splunk indexer IPv4 address (Ctrl+C skips Splunk): ' ccdc_ip_value
+          local ccdc_read_status=$?
+          if [ -n "$ccdc_saved_int" ]; then eval "$ccdc_saved_int"; else trap - INT; fi
+          return "$ccdc_read_status"
+      }
+    __status=$?
+    if [ "${__status}" != 0 ]; then
+        ret_splunk_address103_v0=''
+        return "${__status}"
+    fi
+    while :
+    do
+        local result_1001=0
+        ccdc_read_ip
+        __status=$?
+        if [ "${__status}" != 0 ]; then
+        code_1002="${__status}"
+            result_1001="${code_1002}"
+        fi
+        if [ "$(( result_1001 == 130 ))" != 0 ]; then
+            unset -f ccdc_read_ip
+            __status=$?
+            if [ "${__status}" != 0 ]; then
+                ret_splunk_address103_v0=''
+                return "${__status}"
+            fi
+            echo "Skipped splunk after Ctrl+C."
+            ret_splunk_address103_v0=""
+            return 0
+        fi
+        if [ "$(( result_1001 != 0 ))" != 0 ]; then
+            unset -f ccdc_read_ip
+            __status=$?
+            if [ "${__status}" != 0 ]; then
+                ret_splunk_address103_v0=''
+                return "${__status}"
+            fi
+            echo "Aborted: no Splunk address was provided (EOF)."
+            ret_splunk_address103_v0=''
+            return 1
+        fi
+        local command_42
+        command_42="$(printf '%s' "$ccdc_ip_value")"
+        __status=$?
+        if [ "${__status}" != 0 ]; then
+            ret_splunk_address103_v0=''
+            return "${__status}"
+        fi
+        trim__10_v0 "${command_42}"
+        local address_1003="${ret_trim10_v0}"
+        fw_address__47_v0 "${address_1003}"
+        local ret_fw_address47_v0__63_12="${ret_fw_address47_v0}"
+        text_contains__16_v0 "${address_1003}" "/"
+        local ret_text_contains16_v0__63_40="${ret_text_contains16_v0}"
+        if [ "$(( ret_fw_address47_v0__63_12 && $(( ! ret_text_contains16_v0__63_40 )) ))" != 0 ]; then
+            unset -f ccdc_read_ip
+            __status=$?
+            if [ "${__status}" != 0 ]; then
+                ret_splunk_address103_v0=''
+                return "${__status}"
+            fi
+            ret_splunk_address103_v0="${address_1003}"
+            return 0
+        fi
+        echo "Enter one IPv4 address with decimal octets 0-255, without leading zeros or a subnet prefix."
+    done
+}
+
+command_44="$(id -u)"
+__status=$?
+if [ "${__status}" != 0 ]; then
+    exit "${__status}"
+fi
+uid_11="${command_44}"
+if [ "$([ "_${uid_11}" == "_0" ]; echo $?)" != 0 ]; then
+    echo "Please run with sudo or as root."
+    exit 1
+fi
+array_47=("zulu" "fastfw" "splunk")
+for module_name_12 in "${array_47[@]}"; do
+    import_module__97_v0 "${module_name_12}"
+    __status=$?
+    if [ "${__status}" != 0 ]; then
+        exit "${__status}"
+    fi
+done
+array_48=("-i")
+run_step__102_v0 "zulu" array_48[@]
+__status=$?
+if [ "${__status}" != 0 ]; then
+    exit "${__status}"
+fi
+array_49=()
+run_step__102_v1 "fastfw" array_49[@]
+__status=$?
+if [ "${__status}" != 0 ]; then
+    exit "${__status}"
+fi
+splunk_address__103_v0 
+__status=$?
+if [ "${__status}" != 0 ]; then
+    exit "${__status}"
+fi
+ip_1021="${ret_splunk_address103_v0}"
+if [ "$([ "_${ip_1021}" == "_" ]; echo $?)" != 0 ]; then
+    array_50=("-f" "${ip_1021}")
+    run_step__102_v0 "splunk" array_50[@]
+    __status=$?
+    if [ "${__status}" != 0 ]; then
+        exit "${__status}"
+    fi
+fi
+echo "Initial hardening workflow finished; skipped steps were not completed."
