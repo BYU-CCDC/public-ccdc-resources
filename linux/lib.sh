@@ -155,7 +155,6 @@ function set_ansi {
     local mode=$2
 
     if [ "$NOCOLOR" == true ]; then
-        echo -ne "$text"
         return
     fi
 
