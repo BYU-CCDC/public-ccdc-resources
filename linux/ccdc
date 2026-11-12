@@ -98,7 +98,7 @@ slice__24_v0() {
 }
 
 __VERBOSITY_3=0
-__GITHUB_URL_4="https://raw.githubusercontent.com/BYU-CCDC/linux-hardening-public/refs/heads/main/"
+__GITHUB_URL_4="https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/refs/heads/main/linux/"
 __MOD_DIR_6="/usr/lib/ccdc/modules/"
 # log(message: Text, level: Int)
 log__37_v0() {

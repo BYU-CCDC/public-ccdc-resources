@@ -12,7 +12,7 @@ else
     EXEC_SHELL_VERSION=("${BASH_VERSINFO[0]}" "${BASH_VERSINFO[1]}" "${BASH_VERSINFO[2]}")
 fi
 __VERBOSITY_0=0
-__GITHUB_URL_1="https://raw.githubusercontent.com/BYU-CCDC/linux-hardening-public/refs/heads/main/"
+__GITHUB_URL_1="https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/refs/heads/main/linux/"
 __MOD_DIR_3="/usr/lib/ccdc/modules/"
 __CCDC_SCRIPT_PATH_4="/usr/bin/ccdc"
 # log(message: Text, level: Int)
