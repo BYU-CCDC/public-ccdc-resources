@@ -80,7 +80,7 @@ SNOOPY_SUCCESSFUL=false
 SYSMON_SUCCESSFUL=false
 OSSEC_SUCCESSFUL=false
 SUCCESSFUL_MONITORS=()
-GETOPT_SPEC="hp:P:df:irg:RuSa:Ll:Vv:nD"
+GETOPT_SPEC="hp:P:df:irg:Rua:l:Vv:nD"
 
 # ANSI color codes
 NORMAL=0
@@ -923,12 +923,16 @@ function main {
     echo
 }
 
-# Have to process -g first so that $GITHUB_URL is set before lib.sh is sourced
+# Have to process -g and -l first so that $GITHUB_URL is set before lib.sh is sourced
 while getopts "$GETOPT_SPEC" opt; do
     case "$opt" in
         g)
             # Trim trailing slash if present
             GITHUB_URL="${OPTARG%/}"
+            ;;
+        l)
+            LOCAL=true
+            GITHUB_URL="$(realpath "$OPTARG")"  # Use local path for GITHUB_URL
             ;;
     esac
 done
@@ -1000,10 +1004,6 @@ while getopts "$GETOPT_SPEC" opt; do
             ;;
         R)
             reset_splunk_password
-            ;;
-        l)
-            LOCAL=true
-            GITHUB_URL="$(realpath "$OPTARG")"  # Use local path for GITHUB_URL
             ;;
         a)
             # Pass -i before this argument if on the indexer

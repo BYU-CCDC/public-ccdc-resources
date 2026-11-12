@@ -1,6 +1,7 @@
 #!/bin/bash
 set -o pipefail
 GITHUB_URL="https://raw.githubusercontent.com/BYU-CCDC/public-ccdc-resources/main"
+GETOPT_SPEC="g:l:"
 
 function source_libsh {
     # If run from a cloned GitHub repo, source lib.sh from the repo
@@ -138,6 +139,22 @@ if [ "$EUID" -ne 0 ]; then
     return 1
 fi
 
+# Have to process -g and -l first so that $GITHUB_URL is set before lib.sh is sourced
+while getopts "$GETOPT_SPEC" opt; do
+    case "$opt" in
+        g)
+            # Trim trailing slash if present
+            GITHUB_URL="${OPTARG%/}"
+            ;;
+        l)
+            LOCAL=true
+            GITHUB_URL="$(realpath "$OPTARG")"  # Use local path for GITHUB_URL
+            ;;
+    esac
+done
+OPTIND=1
+
+# Get library functions
 source_libsh
 get_os_info || { log_error "Failed to detect OS information"; exit 1; }
 
