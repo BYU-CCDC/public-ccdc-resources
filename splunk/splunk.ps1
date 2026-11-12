@@ -1,4 +1,4 @@
-# Copyright (C) 2025 deltabluejay
+# Copyright (C) 2026 deltabluejay and BYU CCDC
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -550,6 +550,12 @@ handle_args
 install_splunk
 Write-Host
 
+# TODO:
+# Set default hostname in Splunk configuration?
+# $hostname = [System.Net.Dns]::GetHostByName($env:COMPUTERNAME).HostName
+# $confpath = Join-Path $SPLUNKDIR "etc\system\local\server.conf"
+# Add-Content -Path $confpath -Value "[default]`nhost = $hostname`n" -Encoding ASCII
+
 & "$SPLUNKDIR\bin\splunk.exe" login -auth "${SPLUNK_USERNAME}:${SPLUNK_PASSWORD}"
 
 install_sysmon
@@ -604,6 +610,7 @@ if ($script:WindowsVersion -eq "Windows 7" -or $script:WindowsVersion -eq "Windo
     # Install Splunk Add-ons
     install_app "Splunk Add-on for Microsoft Windows" "Splunk_TA_windows.spl" "$GITHUB_URL/splunk/windows/Splunk_TA_windows.spl"
     install_app "Splunk Add-on for Sysmon" "Splunk_TA_microsoft_sysmon.spl" "$GITHUB_URL/splunk/windows/Splunk_TA_microsoft_sysmon.spl"
+    # TODO: install IIS add-on
 }
 
 enable_auditing
@@ -611,6 +618,14 @@ Write-Host
 
 # Set Splunk service to start automatically
 Set-Service -Name $SPLUNK_SERVICE -StartupType Automatic
+
+# Add splunk.exe to path
+$bin = "$SPLUNKDIR\bin"
+$machinePath = [Environment]::GetEnvironmentVariable("Path", "Machine")
+if (($machinePath -split ';') -notcontains $bin) {
+    [Environment]::SetEnvironmentVariable("Path", "$machinePath;$bin", "Machine")
+}
+$env:Path += ";$bin"   # make it usable in the current session too
 
 info "Restarting Splunk service..."
 Restart-Service $SPLUNK_SERVICE

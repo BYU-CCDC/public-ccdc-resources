@@ -1,0 +1,25 @@
+services:
+  loki:
+    image: grafana/loki:latest
+    container_name: loki
+    restart: unless-stopped
+    command: -config.file=/etc/loki/config.yaml
+    volumes:
+      - ./loki-config.yaml:/etc/loki/config.yaml:ro
+      - /var/lib/loki:/loki
+    ports:
+      - "3100:3100"
+
+  alloy:
+    image: grafana/alloy:latest
+    container_name: alloy
+    restart: unless-stopped
+    command:
+      - run
+      - /etc/alloy/config.alloy
+    volumes:
+      - ./alloy-config.alloy:/etc/alloy/config.alloy:ro
+    ports:
+      - "514:514"
+    depends_on:
+      - loki

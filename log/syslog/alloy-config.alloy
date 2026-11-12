@@ -1,0 +1,40 @@
+loki.relabel "syslog" {
+  forward_to = [loki.write.local.receiver]
+
+  rule {
+    source_labels = ["__syslog_message_hostname"]
+    target_label  = "host"
+  }
+
+  rule {
+    source_labels = ["__syslog_message_facility"]
+    target_label  = "facility"
+  }
+
+  rule {
+    source_labels = ["__syslog_message_severity"]
+    target_label  = "severity"
+  }
+
+  rule {
+    source_labels = ["__syslog_message_app_name"]
+    target_label  = "program"
+  }
+}
+
+loki.source.syslog "syslog" {
+  listener {
+    address  = "0.0.0.0:514"
+    protocol = "tcp"
+  }
+
+  relabel_rules = loki.relabel.syslog.rules
+
+  forward_to = [loki.write.local.receiver]
+}
+
+loki.write "local" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}

@@ -30,8 +30,13 @@ if [[ "$mode" = "backup" ]]; then
     echo "Done. Please copy /opt/splunk.bak/ to a safe location."
 elif [[ "$mode" = "restore" ]]; then
     echo "Restoring Splunk eventdata from /opt/splunk.bak/"
+    echo "Stopping Splunk service..."
     sudo systemctl stop Splunkd
+    echo "Cleaning existing Splunk eventdata..."
     sudo -u splunk /opt/splunk/bin/splunk clean eventdata
+    if [ $? -ne 0 ]; then
+        exit 1
+    fi
 
     for index in "${INDEXES[@]}"; do
         echo "Restoring $index index"
