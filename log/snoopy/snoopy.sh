@@ -136,7 +136,7 @@ function install_snoopy {
 # Execution starts here
 if [ "$EUID" -ne 0 ]; then
     echo "Error: please run this script as root"
-    return 1
+    exit 1
 fi
 
 # Have to process -g and -l first so that $GITHUB_URL is set before lib.sh is sourced
