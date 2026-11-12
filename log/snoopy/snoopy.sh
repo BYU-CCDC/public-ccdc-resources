@@ -173,7 +173,7 @@ if [ $? -ne 0 ]; then
     if [ $? -ne 0 ]; then
         install_snoopy "2.3.2"
         if [ $? -ne 0 ]; then
-            return 1
+            exit 1
         fi
     fi
 fi
