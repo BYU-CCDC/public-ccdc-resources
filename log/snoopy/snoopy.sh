@@ -78,7 +78,12 @@ function install_snoopy {
         return 0
     fi
 
-    download https://github.com/a2o/snoopy/raw/install/install/install-snoopy.sh "install-snoopy.sh"
+    if ! download \
+      "https://github.com/a2o/snoopy/raw/install/install/install-snoopy.sh" \
+      "install-snoopy.sh"; then
+      log_error "Failed to download Snoopy installer"
+      return 1
+    fi
     chmod 755 install-snoopy.sh
 
     # Run install script
@@ -93,7 +98,12 @@ function install_snoopy {
 
     # If it succeeds
     # Download config
-    download $GITHUB_URL/log/snoopy/snoopy.ini "$snoopy_config"
+    if ! download \
+        "$GITHUB_URL/log/snoopy/snoopy.ini" \
+        "$snoopy_config"; then
+        log_error "Failed to download Snoopy configuration"
+        return 1
+    fi
     chown root:root "$snoopy_config"
     chmod 644 "$snoopy_config"
 
